@@ -122,3 +122,35 @@ export function posterizeRGB(rgb: Uint8Array, levels: number): void {
     rgb[i] = Math.round(Math.round(rgb[i] / step) * step);
   }
 }
+
+/**
+ * Boost color saturation before dithering.
+ * Pushes muted/neutral pixels toward more saturated colors so they map
+ * cleanly to a palette entry instead of producing noisy error diffusion.
+ *
+ * @param rgb - RGB pixel data (modified in place)
+ * @param factor - saturation multiplier (e.g. 2.2 = strong boost)
+ */
+export function boostSaturation(rgb: Uint8Array, factor: number): void {
+  for (let i = 0; i < rgb.length; i += 3) {
+    const r = rgb[i], g = rgb[i + 1], b = rgb[i + 2];
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    rgb[i]     = Math.max(0, Math.min(255, Math.round(gray + (r - gray) * factor)));
+    rgb[i + 1] = Math.max(0, Math.min(255, Math.round(gray + (g - gray) * factor)));
+    rgb[i + 2] = Math.max(0, Math.min(255, Math.round(gray + (b - gray) * factor)));
+  }
+}
+
+/**
+ * Boost contrast before dithering.
+ * Pushes light pixels lighter and dark pixels darker, reducing mid-tone
+ * noise after quantization to a small palette.
+ *
+ * @param rgb - RGB pixel data (modified in place)
+ * @param factor - contrast multiplier (e.g. 1.4 = moderate boost)
+ */
+export function boostContrast(rgb: Uint8Array, factor: number): void {
+  for (let i = 0; i < rgb.length; i++) {
+    rgb[i] = Math.max(0, Math.min(255, Math.round(128 + (rgb[i] - 128) * factor)));
+  }
+}

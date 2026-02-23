@@ -65,9 +65,13 @@ function parseRSSItems(xml: string, sourceName: string): RawItem[] {
     const pubDate = decodeEntities(
       (itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1] ?? "").trim()
     );
-    const description = decodeEntities(stripTags(
+    const desc1 = decodeEntities(stripTags(
       (itemXml.match(/<description>([\s\S]*?)<\/description>/i)?.[1] ?? "").trim()
-    )).slice(0, 200);
+    )).slice(0, 300);
+    const desc2 = decodeEntities(stripTags(
+      (itemXml.match(/<content:encoded>([\s\S]*?)<\/content:encoded>/i)?.[1] ?? "").trim()
+    )).slice(0, 300);
+    const description = desc1.length > 50 ? desc1 : (desc2 || desc1);
 
     if (title) {
       items.push({ title, link, pubDate, description, source: sourceName });
@@ -77,22 +81,26 @@ function parseRSSItems(xml: string, sourceName: string): RawItem[] {
   return items;
 }
 
-/** Parse Federal Register API results. */
-function parseFederalRegister(data: any): RawItem[] {
+/** Parse news articles from SteelOrbis latest news HTML page. */
+function parseSteelOrbisItems(html: string): RawItem[] {
   const items: RawItem[] = [];
-  const results = data.results ?? [];
-  for (const r of results) {
-    if (r.title) {
+  const aMatches = html.match(/<a[^>]+href="(\/steel-news\/latest-news\/[^"]+\.htm)"[^>]*>([\s\S]*?)<\/a>/gi) ?? [];
+  for (const match of aMatches) {
+    const href = match.match(/href="([^"]+)"/i)?.[1] ?? "";
+    const date = (match.match(/<div[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "").trim();
+    const titleRaw = stripTags(match.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i)?.[1] ?? "").trim();
+    const title = decodeEntities(titleRaw.replace(/^Free\s+/i, "").trim());
+    if (title && href) {
       items.push({
-        title: r.title,
-        link: r.html_url ?? "",
-        pubDate: r.publication_date ?? "",
-        description: (r.abstract ?? "").slice(0, 200),
-        source: "Federal Register",
+        title,
+        link: `https://www.steelorbis.com${href}`,
+        pubDate: date,
+        description: "",
+        source: "SteelOrbis",
       });
     }
   }
-  return items;
+  return items.slice(0, 6);
 }
 
 /** Simple title similarity check (Jaccard on words). */
@@ -126,27 +134,45 @@ function categorize(title: string, description: string): Headline["category"] {
   return "company";
 }
 
-/** Fetch headlines from RSS + API sources. */
+/** Fetch headlines from RSS + HTML sources. */
 async function fetchRawItems(): Promise<RawItem[]> {
-  const headers = { "User-Agent": "eink-dashboard/3.5 (Cloudflare Worker)" };
+  const headers = { "User-Agent": "eink-dashboard/3.9 (Cloudflare Worker)" };
 
   const fetches = [
-    // Google News RSS for steel/trade/tariff
+    // Steel Industry News Substack — primary source (same newsletter user receives)
     fetchWithTimeout(
-      "https://news.google.com/rss/search?q=steel+tariff+trade+section+232+USA&hl=en-US&gl=US",
+      "https://steelindustrynews.substack.com/feed",
+      { headers },
+    ).then(async r => {
+      if (!r.ok) return [];
+      return parseRSSItems(await r.text(), "Steel Industry News");
+    }).catch(() => [] as RawItem[]),
+
+    // SteelOrbis US latest news — HTML scrape
+    fetchWithTimeout(
+      "https://www.steelorbis.com/steel-news/latest-news/us",
+      { headers },
+    ).then(async r => {
+      if (!r.ok) return [];
+      return parseSteelOrbisItems(await r.text());
+    }).catch(() => [] as RawItem[]),
+
+    // Google News RSS: tariff / trade / import focus
+    fetchWithTimeout(
+      "https://news.google.com/rss/search?q=steel+tariffs+imports+USA+section+232&hl=en-US&gl=US&ceid=US:en",
       { headers },
     ).then(async r => {
       if (!r.ok) return [];
       return parseRSSItems(await r.text(), "Google News");
     }).catch(() => [] as RawItem[]),
 
-    // Federal Register API
+    // Google News RSS: prices / market / companies focus
     fetchWithTimeout(
-      "https://www.federalregister.gov/api/v1/documents.json?conditions[term]=steel+tariff&per_page=5&order=newest",
+      "https://news.google.com/rss/search?q=steel+prices+HRC+scrap+Nucor+%22US+Steel%22+Cleveland-Cliffs&hl=en-US&gl=US&ceid=US:en",
       { headers },
     ).then(async r => {
       if (!r.ok) return [];
-      return parseFederalRegister(await r.json());
+      return parseRSSItems(await r.text(), "Google News");
     }).catch(() => [] as RawItem[]),
   ];
 
@@ -154,7 +180,7 @@ async function fetchRawItems(): Promise<RawItem[]> {
   return results.flat();
 }
 
-/** Use LLM to summarize headlines. Returns headlines with summaries. */
+/** Use LLM to select and summarize the best headlines. Returns up to 4 selected headlines. */
 async function summarizeWithLLM(
   env: Env,
   items: RawItem[]
@@ -168,14 +194,16 @@ async function summarizeWithLLM(
       messages: [
         {
           role: "system",
-          content: `You summarize steel and trade news headlines. For each headline, write a 2-line factual summary. No speculation, no opinions.
+          content: `You are a steel industry news editor for a professional audience. From the headlines provided, select the 4 most significant items. Prioritize: price moves with concrete numbers, tariff and trade policy decisions, import/export data, major company actions. Skip: podcast and video announcements, subscription pitches, generic overviews without new data, duplicate stories.
 
-Reply with ONLY valid JSON array, no markdown fences:
-[{"index":1,"summary":"First line of summary. Second line of summary."},...]`
+For each selected item, write a 1-2 sentence factual summary including any specific numbers or percentages mentioned.
+
+Reply with ONLY a valid JSON array, no markdown fences, using the original 1-based index of each selected item:
+[{"index":1,"summary":"..."},{"index":5,"summary":"..."},...]`
         },
         {
           role: "user",
-          content: `Summarize these headlines:\n\n${headlinesText}`
+          content: `Select 4 and summarize:\n\n${headlinesText}`,
         },
       ],
       max_tokens: 800,
@@ -185,32 +213,35 @@ Reply with ONLY valid JSON array, no markdown fences:
     const raw = response?.response ?? response?.result?.response ?? "";
     const text = typeof raw === "string" ? raw : JSON.stringify(raw);
 
-    // Try to parse JSON array from response
     const match = text.match(/\[[\s\S]*\]/);
     if (match) {
       const summaries: any[] = JSON.parse(match[0]);
-      return items.map((item, i) => {
-        const s = summaries.find((s: any) => s.index === i + 1);
-        return {
-          title: item.title,
-          source: item.source,
-          timestamp: item.pubDate,
-          summary: s?.summary ?? item.description.slice(0, 100),
-          category: categorize(item.title, item.description),
-          link: item.link,
-        };
-      });
+      return summaries
+        .map((s: any) => {
+          const item = items[s.index - 1];
+          if (!item || !s.summary) return null;
+          return {
+            title: item.title,
+            source: item.source,
+            timestamp: item.pubDate,
+            summary: s.summary,
+            category: categorize(item.title, item.description),
+            link: item.link,
+          } as Headline;
+        })
+        .filter((h): h is Headline => h !== null)
+        .slice(0, 4);
     }
   } catch (err) {
     console.error("Headlines LLM error:", err);
   }
 
-  // Fallback: use descriptions as summaries
-  return items.map(item => ({
+  // Fallback: return first 4 items with description as summary
+  return items.slice(0, 4).map(item => ({
     title: item.title,
     source: item.source,
     timestamp: item.pubDate,
-    summary: item.description.slice(0, 100),
+    summary: item.description.slice(0, 120),
     category: categorize(item.title, item.description),
     link: item.link,
   }));
@@ -225,7 +256,7 @@ export async function getHeadlines(
   dateStr: string,
   period: number,
 ): Promise<Headline[]> {
-  const cacheKey = `headlines:v1:${dateStr}:${period}`;
+  const cacheKey = `headlines:v2:${dateStr}:${period}`;
 
   const cached = await env.CACHE.get<CachedValue<Headline[]>>(cacheKey, "json");
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -236,13 +267,13 @@ export async function getHeadlines(
   try {
     const rawItems = await fetchRawItems();
     const unique = deduplicateItems(rawItems);
-    const top5 = unique.slice(0, 5);
+    const top10 = unique.slice(0, 10);
 
-    if (top5.length === 0) {
+    if (top10.length === 0) {
       return cached?.data ?? [];
     }
 
-    const headlines = await summarizeWithLLM(env, top5);
+    const headlines = await summarizeWithLLM(env, top10);
     await env.CACHE.put(cacheKey, JSON.stringify({ data: headlines, timestamp: Date.now() }), { expirationTtl: 604800 });
     return headlines;
   } catch (err) {

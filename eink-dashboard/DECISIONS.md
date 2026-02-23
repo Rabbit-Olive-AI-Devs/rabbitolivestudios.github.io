@@ -819,3 +819,47 @@ Also clamped `.alert-banner` to single line (`white-space: nowrap; overflow: hid
 - No font size or padding changes
 - No changes to alert/rain warning mutual exclusivity logic
 - No visual difference in the no-alert case (flex column matches old block layout)
+
+---
+
+## 29. APOD Dithering: Preprocessing for Photographic Images (2026-02-23)
+
+### Decision: Boost saturation + contrast + posterize before Floyd-Steinberg
+
+**Problem:** NASA APOD photos appeared blurry with heavy dot patterns on the E1002. Floyd-Steinberg error diffusion was designed for the AI-generated color images (which already have "large flat color regions, bold saturated colors, no gradients" from the style prompt). Real photographs have smooth gradients and neutral/muted tones that cause F-S to scatter tiny dots everywhere when mapping to only 6 palette colors.
+
+**Solution:** Apply three preprocessing steps to the decoded RGB data before calling `ditherFloydSteinberg`:
+1. `boostSaturation(rgb, 2.2)` — push muted/neutral pixels toward more saturated colors so they map cleanly to a single palette entry instead of splitting the error across multiple neighbors
+2. `boostContrast(rgb, 1.4)` — push light pixels lighter and dark pixels darker, reducing mid-tone noise
+3. `posterizeRGB(rgb, 4)` — snap to 4 levels per channel (0/85/170/255), eliminating smooth gradients before dithering runs
+
+**Why this works:** The Spectra 6 palette has 6 widely-spaced colors (Black, White, Red, Yellow, Green, Blue). Photographic pixels that fall between two palette entries generate large quantization errors that propagate visibly as dots. Preprocessing collapses the color space so most pixels map decisively to one palette color, leaving minimal error to diffuse.
+
+**Cache key bumped:** `apod-color:v1:` → `apod-color:v2:`
+
+**Note:** These preprocessing steps are intentionally NOT applied to birthday portraits or AI-generated color moments — those images already have the right characteristics for clean F-S dithering.
+
+---
+
+## 30. Headlines: Better Sources + LLM Selection (2026-02-23)
+
+### Decision: 4 sources, LLM selects best 4 from pool of 10
+
+**Problem:** Original headlines used Google News RSS (single query) + Federal Register API. Issues:
+- Federal Register results are dry regulatory documents, not news
+- Single Google News query was narrow and returned repetitive/low-signal articles
+- LLM summarized all 5 items blindly — no filtering of podcasts, promos, or low-quality items
+
+**Sources replaced:**
+- **Removed:** Federal Register API (`federalregister.gov`) — too bureaucratic
+- **Added:** Steel Industry News Substack (`steelindustrynews.substack.com/feed`) — same newsletter the user receives daily; high-quality, industry-specific
+- **Added:** SteelOrbis US latest news (`steelorbis.com/steel-news/latest-news/us`) — HTML scrape; real-time US steel market headlines
+- **Split Google News into 2 queries:** tariff/trade/import focus + prices/market/companies focus
+
+**LLM role changed:** Was "summarize all N items". Now "select the 4 most significant from up to 10, skip podcasts and subscription pitches". The LLM returns only the indices it selected, so low-quality articles are filtered before display.
+
+**Pool size:** 5 → 10 unique items sent to LLM for selection.
+
+**`content:encoded` fallback:** Substack RSS uses thin `<description>` text; full article content is in `<content:encoded>`. Parser now falls back to `content:encoded` when `description` is <50 chars.
+
+**Cache key bumped:** `headlines:v1:` → `headlines:v2:`

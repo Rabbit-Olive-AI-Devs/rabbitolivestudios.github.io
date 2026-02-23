@@ -8,7 +8,7 @@
 import { fetchWithTimeout } from "./fetch-timeout";
 import type { Env, APODData, CachedValue } from "./types";
 import { decodePNG } from "./png-decode";
-import { ditherFloydSteinberg } from "./dither-spectra6";
+import { ditherFloydSteinberg, boostSaturation, boostContrast, posterizeRGB } from "./dither-spectra6";
 import { SPECTRA6_PALETTE } from "./spectra6";
 import { encodePNGIndexed, pngToBase64 } from "./png";
 import { WIDTH, HEIGHT } from "./image";
@@ -69,7 +69,7 @@ export async function getAPODData(env: Env, dateStr: string): Promise<APODData |
  * Returns base64-encoded palette-indexed PNG, or null on failure.
  */
 export async function getAPODColorImage(env: Env, dateStr: string): Promise<string | null> {
-  const cacheKey = `apod-color:v1:${dateStr}`;
+  const cacheKey = `apod-color:v2:${dateStr}`;
 
   const cached = await env.CACHE.get(cacheKey);
   if (cached) {
@@ -101,6 +101,14 @@ export async function getAPODColorImage(env: Env, dateStr: string): Promise<stri
     const decoded = await decodePNG(pngBytes);
 
     if (!decoded.rgb) throw new Error("Expected color image");
+
+    // Preprocess for Spectra 6: boost saturation + contrast + posterize.
+    // NASA photos have gradients and neutral tones that produce heavy dot
+    // patterns after F-S dithering with only 6 colors. These steps push
+    // pixels decisively toward palette colors before error diffusion runs.
+    boostSaturation(decoded.rgb, 2.2);
+    boostContrast(decoded.rgb, 1.4);
+    posterizeRGB(decoded.rgb, 4);
 
     // Dither to Spectra 6 palette (already 800×480 from Images transform)
     const indices = ditherFloydSteinberg(decoded.rgb, WIDTH, HEIGHT, SPECTRA6_PALETTE);
