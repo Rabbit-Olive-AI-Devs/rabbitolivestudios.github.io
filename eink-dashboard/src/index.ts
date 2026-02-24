@@ -210,6 +210,23 @@ function parseSkylineRotateMin(raw: string | null): number {
   return Math.min(n, 1440); // cap at 24h
 }
 
+// --- Skyline debug headers ---
+
+function skylineDebugHeaders(
+  dateStr: string, mode: string, rotateMin: number, bucket: number,
+  city: string, styleKey: string, colorMode: string,
+): Record<string, string> {
+  return {
+    "X-Skyline-Date": dateStr,
+    "X-Skyline-Mode": mode,
+    "X-Skyline-RotateMin": String(rotateMin),
+    "X-Skyline-Bucket": mode === "rotate" ? String(bucket) : "-",
+    "X-Skyline-City": city,
+    "X-Skyline-Style": styleKey,
+    "X-Skyline-ColorMode": colorMode,
+  };
+}
+
 // --- Skyline handlers ---
 
 async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
@@ -219,18 +236,21 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
   const bucket = computeBucket(rotateMin);
   const opts: SkylinePickerOpts = { mode, rotateMin, bucket };
 
+  // Resolve city + style (needed for debug headers even on cache hit)
+  const parts = parseDateParts(dateStr);
+  const city = pickSkylineCity(parts, opts);
+  const style = pickSkylineStyle(parts, opts);
+  const debug = skylineDebugHeaders(dateStr, mode, rotateMin, bucket, city, style.key, style.colorMode);
+
   // mode=random → no cache
   if (mode === "random") {
     try {
-      const parts = parseDateParts(dateStr);
-      const city = pickSkylineCity(parts, opts);
-      const style = pickSkylineStyle(parts, opts);
       const prompt = buildSkylinePrompt(city, style);
       const caption = formatSkylineCaption(city, parts.displayDate);
       console.log(`Skyline random: ${city} | ${style.label} (${style.colorMode})`);
       const result = await generateSkylineImage(env, prompt, caption, style.colorMode);
       return new Response(result.png, {
-        headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" },
+        headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", ...debug },
       });
     } catch (err) {
       console.error("Skyline random error:", err);
@@ -251,15 +271,12 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
     try {
       const binary = Uint8Array.from(atob(cached), (c) => c.charCodeAt(0));
       return new Response(binary, {
-        headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*" },
+        headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*", ...debug },
       });
     } catch { /* cache corrupted, regenerate */ }
   }
 
   try {
-    const parts = parseDateParts(dateStr);
-    const city = pickSkylineCity(parts, opts);
-    const style = pickSkylineStyle(parts, opts);
     const prompt = buildSkylinePrompt(city, style);
     const caption = formatSkylineCaption(city, parts.displayDate);
     console.log(`Skyline ${mode}: ${city} | ${style.label} (${style.colorMode}) | bucket=${bucket}`);
@@ -268,7 +285,7 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
     await env.CACHE.put(cacheKey, result.base64, { expirationTtl: Math.max(ttl, 900) });
 
     return new Response(result.png, {
-      headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*" },
+      headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*", ...debug },
     });
   } catch (err) {
     console.error("Skyline image error:", err);
@@ -281,9 +298,13 @@ function handleSkylinePage(url: URL): Response {
 }
 
 async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
+  const hasExplicitDate = url.searchParams.has("date");
   const dateParam = url.searchParams.get("date") ?? getChicagoDateParts().dateStr;
   const parts = parseDateParts(dateParam);
-  const mode = parseSkylineMode(url.searchParams.get("mode"));
+
+  // Default to daily when date is provided (so different dates show different cities)
+  const modeParam = url.searchParams.get("mode");
+  const mode: SkylineMode = modeParam ? parseSkylineMode(modeParam) : (hasExplicitDate ? "daily" : DEFAULT_MODE);
   const rotateMin = parseSkylineRotateMin(url.searchParams.get("rotateMin"));
   const bucket = computeBucket(rotateMin);
   const opts: SkylinePickerOpts = { mode, rotateMin, bucket };
@@ -300,9 +321,10 @@ async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
   const caption = formatSkylineCaption(city, parts.displayDate);
   console.log(`Skyline test: ${city} | ${style.label} (${colorMode}) | ${parts.dateStr} | mode=${mode}`);
 
+  const debug = skylineDebugHeaders(parts.dateStr, mode, rotateMin, bucket, city, style.key, colorMode);
   const result = await generateSkylineImage(env, prompt, caption, colorMode);
   return new Response(result.png, {
-    headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" },
+    headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", ...debug },
   });
 }
 
