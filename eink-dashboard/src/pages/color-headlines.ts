@@ -70,6 +70,7 @@ function formatTimestamp(ts: string): string {
   if (!ts) return "";
   try {
     const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts.slice(0, 10) || "";
     return d.toLocaleDateString("en-US", {
       month: "short", day: "numeric",
       timeZone: "America/Chicago",
