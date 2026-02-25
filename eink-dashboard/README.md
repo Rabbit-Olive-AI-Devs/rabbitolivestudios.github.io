@@ -4,7 +4,7 @@ A Cloudflare Workers backend for the **reTerminal E1001** (ESP32-S3, 7.5" ePaper
 
 Every day it generates an AI illustration depicting a famous historical event at its most iconic, dramatic moment — the viewer sees the scene, the location, and the date.
 
-Also serves weather data for Naperville, IL, NASA APOD (Astronomy Picture of the Day), steel/trade headlines, and a daily "On This Day" historical fact.
+Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact.
 
 ## The Concept
 
@@ -43,7 +43,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /skyline.png?mode=rotate\|daily\|random&rotateMin=N` | 800x480 skyline PNG (default: rotate every 15 min) | 15 min bucket |
 | `GET /skyline-test?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline HTML (forwards params to .png, requires `TEST_AUTH_KEY`) | none |
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
-| `GET /color/apod` | Redirects to `/skyline` (legacy) | — |
+| `GET /color/apod` | 301 redirect to `/skyline` (legacy compatibility) | — |
 | `GET /health` | Status check | none |
 
 ## Live URL
@@ -305,6 +305,8 @@ KV cache (24h)
 | `env.PHOTOS` | R2 Bucket | Birthday reference photos |
 | `env.TEST_AUTH_KEY` | Secret | Auth key for expensive test endpoints (optional, open in dev) |
 
+> **Note**: The `APOD_API_KEY` secret was removed in v3.10.1. NASA APOD has been replaced by the World Skyline Series. The Cloudflare secret can be deleted: `npx wrangler secret delete APOD_API_KEY`.
+
 ### SenseCraft API-Key Note
 
 `src/device.ts` uses the SenseCraft HMI `API-Key` header for the device data endpoint:
@@ -374,7 +376,6 @@ The display will automatically cycle between pages every 15 minutes. Each page e
 | Stale image in browser | Browser caches for 24h. Hard refresh with Cmd+Shift+R |
 | Weather not updating on device | Check the Interval setting in SenseCraft HMI and that the device is online |
 | Image too large for KV | KV values max 25MB. Current images are ~20-230KB (well within limits) |
-| Error 1102 on `/color/apod` | Worker CPU limit exceeded — usually caused by a very large external image. Since v3.9.1, Cloudflare Images handles resize before JS decode. If it recurs, check `npx wrangler tail` and verify the APOD image URL is reachable. |
 | Hourly cards clipped on weather page | If alert banner is present, hourly cards should shrink to fit. Both pages use flex column layout since 2026-02-19. If still clipped, check for extra padding or new sections pushing content past 480px. |
 | Wrong location weather | Edit `src/weather.ts` — coordinates are hardcoded for Naperville, IL (60540) |
 | No weather alerts showing | NWS alerts only cover active US warnings. Check `api.weather.gov` for your area. Alerts cache for 5 min in KV. |

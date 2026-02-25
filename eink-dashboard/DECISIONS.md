@@ -929,4 +929,4 @@ Also clamped `.alert-banner` to single line (`white-space: nowrap; overflow: hid
 - APOD cron warm (`getAPODData` + `getAPODColorImage`)
 - `APOD_API_KEY` from health-detailed config check
 - APOD entries from health-detailed daily_images
-- Note: `src/apod.ts` and `src/pages/color-apod.ts` files are kept for now (dead code, can be cleaned up later)
+- **v3.10.1 cleanup:** Deleted `src/apod.ts` and `src/pages/color-apod.ts`. Removed `APODData` type and `APOD_API_KEY` from `Env`. Removed APOD_API_KEY comment from `wrangler.toml`. The `/color/apod` → `/skyline` 301 redirect is kept for device compatibility.

@@ -282,7 +282,6 @@ eink-dashboard/
     headlines.ts          — Steel/trade RSS + LLM summarizer
     skyline.ts            — World Skyline Series: city/style selection, prompt building
     skyline-image.ts      — Skyline image generation (SDXL) + BW/color post-processing
-    apod.ts               — NASA APOD fetcher (legacy, unused since v3.10.0)
     spectra6.ts           — Spectra 6 palette constants + CSS variables
     dither-spectra6.ts    — Floyd-Steinberg dithering engine
     png.ts                — Pure JS PNG encoder (8-bit, 1-bit, indexed) + pngToBase64()
@@ -293,7 +292,6 @@ eink-dashboard/
       fact.ts             — /fact HTML wrapper for fact.png
       color-weather.ts    — /color/weather HTML page (E1002 Spectra 6)
       color-moment.ts     — /color/moment + color birthday + test endpoints
-      color-apod.ts       — /color/apod HTML page (legacy, redirects to /skyline)
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-test HTML pages
   photos/                 — Birthday reference photos source

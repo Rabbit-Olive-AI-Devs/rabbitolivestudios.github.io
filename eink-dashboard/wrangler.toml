@@ -22,8 +22,6 @@ binding = "IMAGES"
 binding = "PHOTOS"
 bucket_name = "eink-birthday-photos"
 
-# APOD_API_KEY: store via `wrangler secret put APOD_API_KEY` (never in code)
-
 # Cron schedules:
 #   "5 6 * * *"       — daily image warm at 06:05 UTC (after midnight Chicago in both CST/CDT)
 #   "5 0,6,12,18 * * *" — headlines + weather every 6h
