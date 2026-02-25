@@ -84,10 +84,13 @@ function parseRSSItems(xml: string, sourceName: string): RawItem[] {
 /** Parse news articles from SteelOrbis latest news HTML page. */
 function parseSteelOrbisItems(html: string): RawItem[] {
   const items: RawItem[] = [];
+  const currentYear = new Date().getFullYear();
   const aMatches = html.match(/<a[^>]+href="(\/steel-news\/latest-news\/[^"]+\.htm)"[^>]*>([\s\S]*?)<\/a>/gi) ?? [];
   for (const match of aMatches) {
     const href = match.match(/href="([^"]+)"/i)?.[1] ?? "";
-    const date = (match.match(/<div[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "").trim();
+    const rawDate = (match.match(/<div[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "").trim();
+    // SteelOrbis uses "25 Feb" (no year) — append current year for valid Date parsing
+    const date = rawDate && !rawDate.match(/\d{4}/) ? `${rawDate} ${currentYear}` : rawDate;
     const titleRaw = stripTags(match.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i)?.[1] ?? "").trim();
     const title = decodeEntities(titleRaw.replace(/^Free\s+/i, "").trim());
     if (title && href) {
