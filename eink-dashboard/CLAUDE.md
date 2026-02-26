@@ -93,9 +93,9 @@ This project has independent image pipelines. They share the LLM event selection
 | | Pipeline A (`/fact.png`) | Pipeline B (`/fact1.png`) | Pipeline D (`/color/moment`) | Pipeline E (`/skyline`) |
 |---|---|---|---|---|
 | Model | FLUX.2 klein-9b | SDXL | FLUX.2 (fallback SDXL) | SDXL |
-| Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | 5-style rotation (gouache/oil/graphic/ink/woodblock) | 8-style rotation (5 BW + 3 color) |
+| Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | 5-style rotation (gouache/oil/graphic/ink/woodblock) | 15-style rotation (6 BW + 9 color) |
 | Output | 4-level grayscale | 1-bit (Bayer or threshold) | 6-color Spectra (Floyd-Steinberg) | BW: 4-level gray / Color: Spectra 6 |
-| Cache key | `fact4:v4:YYYY-MM-DD` | `fact1:v7:YYYY-MM-DD` | `color-moment:v2:YYYY-MM-DD:STYLE_ID` | `skyline:v1:YYYY-MM-DD` |
+| Cache key | `fact4:v4:YYYY-MM-DD` | `fact1:v7:YYYY-MM-DD` | `color-moment:v2:YYYY-MM-DD:STYLE_ID` | `skyline:v2:DATE:rN:bBUCKET[:bw]` |
 | Display | E1001 (mono) | E1001 (mono) | E1002 (Spectra 6) | E1002 (Spectra 6) |
 
 ---

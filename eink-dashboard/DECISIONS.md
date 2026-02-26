@@ -885,8 +885,8 @@ Also clamped `.alert-banner` to single line (`white-space: nowrap; overflow: hid
 
 **City list:** 100 curated world cities in a static array.
 
-**Style rotation (18 styles, mixed BW + color):**
-- BW styles (9): woodcut, noir silhouette, pen & ink, pencil sketch, charcoal, linocut, etching, scratchboard, comic ink
+**Style rotation (15 styles, mixed BW + color):**
+- BW styles (6): woodcut, noir silhouette, linocut, comic ink, scratchboard, dark charcoal (pencil/etching/pen_ink removed in v3.11.0 — gray mush on 4-level)
 - Color styles (9): travel poster, WPA poster, minimal flat, art deco, screenprint, ukiyo-e, synthwave, mediterranean
 - BW output: 4-level grayscale PNG (same as Pipeline A)
 - Color output: Spectra 6 indexed PNG via Floyd-Steinberg dithering (same as color moment pipeline)
