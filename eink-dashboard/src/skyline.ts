@@ -200,7 +200,7 @@ export interface SkylineStyle {
 }
 
 export const SKYLINE_STYLES: readonly SkylineStyle[] = [
-  // --- BW styles (9) ---
+  // --- BW styles (6) — bold, high-contrast only (pencil/etching/pen_ink removed: too many mid-tones for 4-level grayscale) ---
   {
     key: "woodcut_hero_bw",
     label: "Woodcut",
@@ -216,27 +216,6 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     colorMode: "bw",
   },
   {
-    key: "pen_ink_bw",
-    label: "Pen & Ink",
-    promptPrefix:
-      "pen and ink illustration, controlled crosshatching, crisp linework, architectural drawing, high contrast black and white, avoid noisy stipple",
-    colorMode: "bw",
-  },
-  {
-    key: "pencil_bw",
-    label: "Pencil Sketch",
-    promptPrefix:
-      "architectural graphite pencil sketch, clean outlines, gentle shading blocks, minimal grain, on white paper",
-    colorMode: "bw",
-  },
-  {
-    key: "charcoal_bw",
-    label: "Charcoal",
-    promptPrefix:
-      "dramatic charcoal drawing, expressive strokes, deep shadows, large tonal masses, textured paper, avoid speckled noise",
-    colorMode: "bw",
-  },
-  {
     key: "linocut_bw",
     label: "Linocut",
     promptPrefix:
@@ -244,10 +223,10 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     colorMode: "bw",
   },
   {
-    key: "etching_bw",
-    label: "Etching",
+    key: "comic_ink_bw",
+    label: "Comic Ink",
     promptPrefix:
-      "fine etching engraving, parallel hatching lines, copper plate style, architectural precision, high contrast black and white",
+      "bold comic book ink illustration, thick outlines, large solid black areas, dynamic composition, high contrast, no halftone dots",
     colorMode: "bw",
   },
   {
@@ -258,10 +237,10 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     colorMode: "bw",
   },
   {
-    key: "comic_ink_bw",
-    label: "Comic Ink",
+    key: "charcoal_bw",
+    label: "Dark Charcoal",
     promptPrefix:
-      "bold comic book ink illustration, thick outlines, large solid black areas, dynamic composition, high contrast, no halftone dots",
+      "bold charcoal drawing, heavy black strokes, stark contrast, large solid dark masses, minimal mid-tones, dramatic shadows, no subtle gradients, no speckled noise",
     colorMode: "bw",
   },
   // --- Color styles (9) ---

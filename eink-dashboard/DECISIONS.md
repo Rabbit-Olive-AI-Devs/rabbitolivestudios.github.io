@@ -970,3 +970,5 @@ Also clamped `.alert-banner` to single line (`white-space: nowrap; overflow: hid
 - Cache key gets `:bw` suffix → fully independent cache namespace
 - `/skyline-bw` is a thin HTML wrapper (like `/fact`) pointing to `/skyline.png?bw=1`
 - Cron warms both BW and mixed skyline buckets independently
+
+**BW style cull (same release):** Reduced BW styles from 9 to 6 for E1001 mono. Removed pencil_bw, etching_bw, pen_ink_bw — too many mid-tones that quantize to gray mush on 4-level grayscale. Reworked charcoal to "Dark Charcoal" with heavier blacks and minimal mid-tones. Kept: woodcut, noir silhouette, linocut, comic ink, scratchboard, dark charcoal.
