@@ -24,11 +24,14 @@ import {
   buildSkylinePrompt,
   formatSkylineCaption,
   findSkylineStyleByKey,
+  findSkylineCity,
+  buildSkylineRefPrompt,
   computeBucket,
   DEFAULT_MODE,
   DEFAULT_ROTATE_MIN,
+  djb2,
 } from "./skyline";
-import type { SkylineColorMode, SkylineMode, SkylinePickerOpts } from "./skyline";
+import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
 const VERSION = "3.11.0";
@@ -214,14 +217,15 @@ function parseSkylineRotateMin(raw: string | null): number {
 
 function skylineDebugHeaders(
   dateStr: string, mode: string, rotateMin: number, bucket: number,
-  city: string, styleKey: string, colorMode: string,
+  city: SkylineCity, styleKey: string, colorMode: string,
 ): Record<string, string> {
   return {
     "X-Skyline-Date": dateStr,
     "X-Skyline-Mode": mode,
     "X-Skyline-RotateMin": String(rotateMin),
     "X-Skyline-Bucket": mode === "rotate" ? String(bucket) : "-",
-    "X-Skyline-City": city,
+    "X-Skyline-City": city.name,
+    "X-Skyline-CityKey": city.key,
     "X-Skyline-Style": styleKey,
     "X-Skyline-ColorMode": colorMode,
   };
@@ -244,15 +248,18 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
   const style = pickSkylineStyle(parts, opts);
   const debug = skylineDebugHeaders(dateStr, mode, rotateMin, bucket, city, style.key, style.colorMode);
 
+  const refPrompt = buildSkylineRefPrompt(city, style);
+  const sdxlPrompt = buildSkylinePrompt(city, style);
+  const caption = formatSkylineCaption(city, parts.displayDate);
+  const photoSeed = djb2(`${dateStr}|photo|${bucket}`);
+
   // mode=random → no cache
   if (mode === "random") {
     try {
-      const prompt = buildSkylinePrompt(city, style);
-      const caption = formatSkylineCaption(city, parts.displayDate);
-      console.log(`Skyline random: ${city} | ${style.label} (${style.colorMode})`);
-      const result = await generateSkylineImage(env, prompt, caption, style.colorMode);
+      console.log(`Skyline random: ${city.name} | ${style.label} (${style.colorMode})`);
+      const result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, style.colorMode, city.key, photoSeed);
       return new Response(result.png, {
-        headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", ...debug },
+        headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", ...debug, "X-Skyline-UsedRef": String(result.usedRef) },
       });
     } catch (err) {
       console.error("Skyline random error:", err);
@@ -263,8 +270,8 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
   // mode=rotate or daily → KV cached
   const bwSuffix = bwOnly ? ":bw" : "";
   const cacheKey = mode === "rotate"
-    ? `skyline:v2:${dateStr}:r${rotateMin}:b${bucket}${bwSuffix}`
-    : `skyline:v2:${dateStr}:daily${bwSuffix}`;
+    ? `skyline:v3:${dateStr}:r${rotateMin}:b${bucket}${bwSuffix}`
+    : `skyline:v3:${dateStr}:daily${bwSuffix}`;
   const ttl = mode === "rotate" ? rotateMin * 60 : 86400;
   const maxAge = mode === "rotate" ? rotateMin * 60 : 86400;
 
@@ -280,15 +287,13 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
   }
 
   try {
-    const prompt = buildSkylinePrompt(city, style);
-    const caption = formatSkylineCaption(city, parts.displayDate);
-    console.log(`Skyline ${mode}: ${city} | ${style.label} (${style.colorMode}) | bucket=${bucket}`);
+    console.log(`Skyline ${mode}: ${city.name} | ${style.label} (${style.colorMode}) | bucket=${bucket}`);
 
-    const result = await generateSkylineImage(env, prompt, caption, style.colorMode);
+    const result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, style.colorMode, city.key, photoSeed);
     await env.CACHE.put(cacheKey, result.base64, { expirationTtl: Math.max(ttl, 900) });
 
     return new Response(result.png, {
-      headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*", ...debug },
+      headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*", ...debug, "X-Skyline-UsedRef": String(result.usedRef) },
     });
   } catch (err) {
     console.error("Skyline image error:", err);
@@ -316,18 +321,22 @@ async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
   const styleOverride = url.searchParams.get("style");
   const colorOverride = url.searchParams.get("color");
 
-  const city = cityOverride ?? pickSkylineCity(parts, opts);
+  const city: SkylineCity = (cityOverride ? findSkylineCity(cityOverride) : null)
+    ?? (cityOverride ? { name: cityOverride, key: cityOverride.toLowerCase().replace(/[^a-z0-9]+/g, "_"), landmarks: "" } : null)
+    ?? pickSkylineCity(parts, opts);
   const style = (styleOverride ? findSkylineStyleByKey(styleOverride) : null) ?? pickSkylineStyle(parts, opts);
   const colorMode: SkylineColorMode = colorOverride === "1" ? "color" : colorOverride === "0" ? "bw" : style.colorMode;
 
-  const prompt = buildSkylinePrompt(city, { ...style, colorMode });
+  const refPrompt = buildSkylineRefPrompt(city, { ...style, colorMode });
+  const sdxlPrompt = buildSkylinePrompt(city, { ...style, colorMode });
   const caption = formatSkylineCaption(city, parts.displayDate);
-  console.log(`Skyline test: ${city} | ${style.label} (${colorMode}) | ${parts.dateStr} | mode=${mode}`);
+  const photoSeed = djb2(`${parts.dateStr}|photo|${bucket}`);
+  console.log(`Skyline test: ${city.name} | ${style.label} (${colorMode}) | ${parts.dateStr} | mode=${mode}`);
 
   const debug = skylineDebugHeaders(parts.dateStr, mode, rotateMin, bucket, city, style.key, colorMode);
-  const result = await generateSkylineImage(env, prompt, caption, colorMode);
+  const result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, colorMode, city.key, photoSeed);
   return new Response(result.png, {
-    headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", ...debug },
+    headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", ...debug, "X-Skyline-UsedRef": String(result.usedRef) },
   });
 }
 
@@ -378,8 +387,8 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
   const fact1Key = `fact1:v7:${dateStr}`;
   const colorMomentKey = birthday ? `color-birthday:v1:${dateStr}` : `color-moment:v2:${dateStr}:${colorStyle.id}`;
   const skylineBucket = computeBucket(DEFAULT_ROTATE_MIN);
-  const skylineKey = `skyline:v2:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}`;
-  const skylineBwKey = `skyline:v2:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}:bw`;
+  const skylineKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}`;
+  const skylineBwKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}:bw`;
   const momentKey = `moment:v1:${dateStr}`;
   const headlinesKey = `headlines:v3:${dateStr}:${period}`;
 
@@ -537,18 +546,20 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     tasks.push((async () => {
       try {
         const skylineBucket = computeBucket(DEFAULT_ROTATE_MIN);
-        const skylineCacheKey = `skyline:v2:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}`;
+        const skylineCacheKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}`;
         const existingSkyline = await env.CACHE.get(skylineCacheKey);
         if (!existingSkyline) {
           const skylineParts = parseDateParts(dateStr);
           const skylineOpts: SkylinePickerOpts = { mode: "rotate", rotateMin: DEFAULT_ROTATE_MIN, bucket: skylineBucket };
           const skylineCity = pickSkylineCity(skylineParts, skylineOpts);
           const skylineStyle = pickSkylineStyle(skylineParts, skylineOpts);
-          const skylinePrompt = buildSkylinePrompt(skylineCity, skylineStyle);
+          const skylineRefPrompt = buildSkylineRefPrompt(skylineCity, skylineStyle);
+          const skylineSdxlPrompt = buildSkylinePrompt(skylineCity, skylineStyle);
           const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate);
-          const skylineResult = await generateSkylineImage(env, skylinePrompt, skylineCaption, skylineStyle.colorMode);
+          const skylinePhotoSeed = djb2(`${dateStr}|photo|${skylineBucket}`);
+          const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineSdxlPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
           await env.CACHE.put(skylineCacheKey, skylineResult.base64, { expirationTtl: Math.max(DEFAULT_ROTATE_MIN * 60, 900) });
-          console.log(`Cron: cached skyline (${skylineCity}, ${skylineStyle.label}) bucket=${skylineBucket}`);
+          console.log(`Cron: cached skyline (${skylineCity.name}, ${skylineStyle.label}, ref=${skylineResult.usedRef}) bucket=${skylineBucket}`);
         } else {
           console.log(`Cron: skyline already cached for bucket=${skylineBucket}`);
         }
@@ -561,18 +572,20 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     tasks.push((async () => {
       try {
         const bwBucket = computeBucket(DEFAULT_ROTATE_MIN);
-        const bwCacheKey = `skyline:v2:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${bwBucket}:bw`;
+        const bwCacheKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${bwBucket}:bw`;
         const existingBw = await env.CACHE.get(bwCacheKey);
         if (!existingBw) {
           const bwParts = parseDateParts(dateStr);
           const bwOpts: SkylinePickerOpts = { mode: "rotate", rotateMin: DEFAULT_ROTATE_MIN, bucket: bwBucket, colorModeFilter: "bw" };
           const bwCity = pickSkylineCity(bwParts, bwOpts);
           const bwStyle = pickSkylineStyle(bwParts, bwOpts);
-          const bwPrompt = buildSkylinePrompt(bwCity, bwStyle);
+          const bwRefPrompt = buildSkylineRefPrompt(bwCity, bwStyle);
+          const bwSdxlPrompt = buildSkylinePrompt(bwCity, bwStyle);
           const bwCaption = formatSkylineCaption(bwCity, bwParts.displayDate);
-          const bwResult = await generateSkylineImage(env, bwPrompt, bwCaption, bwStyle.colorMode);
+          const bwPhotoSeed = djb2(`${dateStr}|photo|${bwBucket}`);
+          const bwResult = await generateSkylineImage(env, bwRefPrompt, bwSdxlPrompt, bwCaption, bwStyle.colorMode, bwCity.key, bwPhotoSeed);
           await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: Math.max(DEFAULT_ROTATE_MIN * 60, 900) });
-          console.log(`Cron: cached skyline BW (${bwCity}, ${bwStyle.label}) bucket=${bwBucket}`);
+          console.log(`Cron: cached skyline BW (${bwCity.name}, ${bwStyle.label}, ref=${bwResult.usedRef}) bucket=${bwBucket}`);
         } else {
           console.log(`Cron: skyline BW already cached for bucket=${bwBucket}`);
         }
