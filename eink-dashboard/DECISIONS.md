@@ -1072,3 +1072,29 @@ Moon icons are algorithmically generated (terminator arc varies continuously), u
 2. **Stale-cache fallback** — when generation fails, scan for any previously cached skyline before returning 503: previous 10 rotation buckets → yesterday's buckets → old v2 keys. Only 503 if no cache exists anywhere.
 
 **Why stale is better than placeholder:** A stale skyline (different city/style) is far more visually appealing than a blank screen on e-ink. The user won't notice it's stale since skylines change every rotation anyway.
+
+---
+
+## 37. Neuron Budget Conservation — Daily Skyline + Sequential Cron (2026-03-22)
+
+### Decision: Switch skyline to daily mode, serialize cron image tasks with early abort
+
+**Problem:** Workers AI free tier (10,000 neurons/day) was exhausted every day, leaving ALL image pipelines broken (not just skyline). Root causes:
+
+1. **Skyline 15-min rotation** — up to 192 on-demand image generations per day (96 color + 96 BW), each attempting FLUX.2 then SDXL fallback = up to 384 AI calls/day.
+2. **Parallel cron execution** — all 5 image pipelines (fact4, fact1, color-moment, skyline, skyline-bw) ran simultaneously. If any failed with budget exhaustion, the others continued wasting neurons on doomed SDXL fallback calls.
+
+**Fix (three parts):**
+
+1. **Skyline daily mode** — `DEFAULT_MODE` changed from `"rotate"` to `"daily"`. One generation per day per variant (color + BW = 2 total) instead of ~192. Cache key: `skyline:v3:YYYY-MM-DD:daily[:bw]`. Rotate mode still accessible via `?mode=rotate` query param.
+
+2. **Sequential cron with 4006 detection** — Image tasks now run in priority order: Pipeline A → Pipeline B → Color Moment → Skyline → Skyline BW. After each task, if the error contains "4006" (neuron budget exhausted), remaining tasks are skipped. This ensures core Moment Before images are generated before skyline.
+
+3. **Stale fallback searches daily keys** — `findStaleSkylineCache` now checks today's and yesterday's daily keys before scanning rotation bucket keys.
+
+**Neuron budget estimate after fix:**
+- Cron: ~3 core images (FLUX.2 + SDXL) + 2 skyline (FLUX.2 + SDXL) = ~5 image gen calls
+- On-demand: 0 (everything cached from cron)
+- Total: well within 10,000 neurons/day
+
+**Future:** Upgrading to Workers Paid ($5/mo) would remove the neuron cap entirely.

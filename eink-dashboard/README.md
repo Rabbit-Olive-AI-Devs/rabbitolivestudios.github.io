@@ -42,7 +42,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store) | none |
 | `GET /skyline-bw` | 800x480 HTML skyline page for E1001 mono (`<img src="/skyline.png?bw=1">`, BW styles only) | none |
-| `GET /skyline.png?mode=rotate\|daily\|random&rotateMin=N&bw=1` | 800x480 skyline PNG (default: rotate every 15 min; `bw=1` restricts to BW styles) | 15 min bucket |
+| `GET /skyline.png?mode=rotate\|daily\|random&rotateMin=N&bw=1` | 800x480 skyline PNG (default: daily; `bw=1` restricts to BW styles; `mode=rotate` for 15-min rotation) | 24 hours |
 | `GET /skyline-test?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline HTML (forwards params to .png, requires `TEST_AUTH_KEY`) | none |
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/apod` | 301 redirect to `/skyline` (legacy compatibility) | — |

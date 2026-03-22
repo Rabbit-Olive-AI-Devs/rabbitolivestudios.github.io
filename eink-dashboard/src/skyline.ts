@@ -13,7 +13,7 @@ export const SKYLINE_SERIES_NAME = "World Skyline Series";
 
 // --- Modes ---
 export type SkylineMode = "rotate" | "daily" | "random";
-export const DEFAULT_MODE: SkylineMode = "rotate";
+export const DEFAULT_MODE: SkylineMode = "daily";
 export const DEFAULT_ROTATE_MIN = 15;
 
 // --- djb2 hash (match existing project hash style) ---

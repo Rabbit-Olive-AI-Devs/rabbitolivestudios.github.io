@@ -240,7 +240,15 @@ function skylineDebugHeaders(
 async function findStaleSkylineCache(
   env: Env, dateStr: string, rotateMin: number, currentBucket: number, bwSuffix: string,
 ): Promise<string | null> {
-  // Try previous buckets (up to 10 back = ~2.5 hours at 15-min rotation)
+  // Try today's daily key first
+  const dailyKey = `skyline:v3:${dateStr}:daily${bwSuffix}`;
+  const dailyVal = await env.CACHE.get(dailyKey);
+  if (dailyVal) {
+    console.log("Skyline stale fallback: found today's daily cache");
+    return dailyVal;
+  }
+
+  // Try previous rotation buckets (up to 10 back = ~2.5 hours at 15-min rotation)
   for (let i = 1; i <= 10; i++) {
     const prevBucket = currentBucket - i;
     if (prevBucket < 0) break;
@@ -252,9 +260,16 @@ async function findStaleSkylineCache(
     }
   }
 
-  // Try yesterday's date with recent buckets
+  // Try yesterday's daily + rotation keys
   const yesterday = new Date(Date.now() - 86400000);
   const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+
+  const yDailyVal = await env.CACHE.get(`skyline:v3:${yStr}:daily${bwSuffix}`);
+  if (yDailyVal) {
+    console.log(`Skyline stale fallback: found yesterday ${yStr} daily cache`);
+    return yDailyVal;
+  }
+
   for (let i = 0; i <= 5; i++) {
     const key = `skyline:v3:${yStr}:r${rotateMin}:b${currentBucket - i}${bwSuffix}`;
     const val = await env.CACHE.get(key);
@@ -456,9 +471,12 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
   const fact4Key = birthday ? `birthday:v1:${dateStr}` : `fact4:v4:${dateStr}`;
   const fact1Key = `fact1:v7:${dateStr}`;
   const colorMomentKey = birthday ? `color-birthday:v1:${dateStr}` : `color-moment:v2:${dateStr}:${colorStyle.id}`;
-  const skylineBucket = computeBucket(DEFAULT_ROTATE_MIN);
-  const skylineKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}`;
-  const skylineBwKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}:bw`;
+  const skylineKey = DEFAULT_MODE === "daily"
+    ? `skyline:v3:${dateStr}:daily`
+    : `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${computeBucket(DEFAULT_ROTATE_MIN)}`;
+  const skylineBwKey = DEFAULT_MODE === "daily"
+    ? `skyline:v3:${dateStr}:daily:bw`
+    : `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${computeBucket(DEFAULT_ROTATE_MIN)}:bw`;
   const momentKey = `moment:v1:${dateStr}`;
   const headlinesKey = `headlines:v3:${dateStr}:${period}`;
 
@@ -558,119 +576,152 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
 
     const birthday = getBirthdayToday(monthNum, dayNum);
 
-    // Launch all independent image tasks in parallel
-    const tasks: Promise<void>[] = [];
+    // fact.json first (no AI cost)
+    try {
+      await getFact(env);
+      console.log(`Cron: cached fact.json for ${dateStr}`);
+    } catch (err) {
+      console.error("Cron: fact.json failed:", err);
+    }
 
-    // Pipeline A or birthday
-    tasks.push((async () => {
-      if (birthday) {
-        try {
+    // --- Sequential image generation with neuron budget awareness ---
+    // Workers AI free tier = 10,000 neurons/day. Running in parallel would
+    // exhaust the budget before any single pipeline finishes its SDXL fallback.
+    // Sequential execution + early abort ensures core images are prioritized.
+    let budgetExhausted = false;
+    function isNeuronError(err: unknown): boolean {
+      const msg = String((err as any)?.message ?? err);
+      return msg.includes("4006") || msg.includes("neurons");
+    }
+
+    // 1. Pipeline A (or birthday) — HIGHEST PRIORITY
+    if (!budgetExhausted) {
+      try {
+        if (birthday) {
           console.log(`Cron: birthday detected — ${birthday.name}`);
           const bdayPng = await generateBirthdayImage(env, birthday, yearNum);
           await env.CACHE.put(`birthday:v1:${dateStr}`, pngToBase64(bdayPng), { expirationTtl: 604800 });
           console.log(`Cron: cached birthday image for ${birthday.name}`);
-        } catch (err) {
-          console.error("Cron: birthday image failed, generating Moment Before instead:", err);
+        } else {
           const png4 = await generateMomentImage(env, sharedMoment, displayDate, dateStr);
           await env.CACHE.put(`fact4:v4:${dateStr}`, pngToBase64(png4), { expirationTtl: 604800 });
-          console.log(`Cron: cached fallback 4-level image for ${dateStr}`);
+          console.log(`Cron: cached 4-level image for ${dateStr}`);
         }
-      } else {
-        const png4 = await generateMomentImage(env, sharedMoment, displayDate, dateStr);
-        await env.CACHE.put(`fact4:v4:${dateStr}`, pngToBase64(png4), { expirationTtl: 604800 });
-        console.log(`Cron: cached 4-level image for ${dateStr}`);
+      } catch (err) {
+        if (isNeuronError(err)) {
+          budgetExhausted = true;
+          console.error("Cron: neuron budget exhausted at Pipeline A");
+        } else {
+          console.error("Cron: Pipeline A failed:", err);
+        }
       }
-    })());
-
-    // Pipeline B (always runs, independent of birthday)
-    tasks.push((async () => {
-      const png1 = await generateMomentImage1Bit(env, sharedMoment, displayDate, dateStr);
-      await env.CACHE.put(`fact1:v7:${dateStr}`, pngToBase64(png1), { expirationTtl: 604800 });
-      console.log(`Cron: cached 1-bit image for ${dateStr}`);
-    })());
-
-    // Color moment (skip on birthday)
-    if (!birthday) {
-      tasks.push((async () => {
-        try {
-          const colorStyle = getColorMomentStyle(dateStr);
-          const colorCacheKey = `color-moment:v2:${dateStr}:${colorStyle.id}`;
-          const existing = await env.CACHE.get(colorCacheKey);
-          if (!existing) {
-            const colorResult = await generateColorMoment(env, sharedMoment, dateStr);
-            const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-            const colorDisplayDate = `${months[monthNum - 1]} ${dayNum}`;
-            const cacheData = JSON.stringify({ imageB64: colorResult.base64, moment: sharedMoment, displayDate: colorDisplayDate });
-            await env.CACHE.put(colorCacheKey, cacheData, { expirationTtl: 604800 });
-            console.log(`Cron: cached color moment (${colorStyle.name}) for ${dateStr}`);
-          } else {
-            console.log(`Cron: color moment already cached for ${dateStr}`);
-          }
-        } catch (err) {
-          console.error("Cron: color moment warm failed:", err);
-        }
-      })());
     }
 
-    // Skyline — warm the current rotation bucket
-    tasks.push((async () => {
+    // 2. Pipeline B
+    if (!budgetExhausted) {
       try {
-        const skylineBucket = computeBucket(DEFAULT_ROTATE_MIN);
-        const skylineCacheKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${skylineBucket}`;
+        const png1 = await generateMomentImage1Bit(env, sharedMoment, displayDate, dateStr);
+        await env.CACHE.put(`fact1:v7:${dateStr}`, pngToBase64(png1), { expirationTtl: 604800 });
+        console.log(`Cron: cached 1-bit image for ${dateStr}`);
+      } catch (err) {
+        if (isNeuronError(err)) {
+          budgetExhausted = true;
+          console.error("Cron: neuron budget exhausted at Pipeline B");
+        } else {
+          console.error("Cron: Pipeline B failed:", err);
+        }
+      }
+    }
+
+    // 3. Color moment
+    if (!budgetExhausted && !birthday) {
+      try {
+        const colorStyle = getColorMomentStyle(dateStr);
+        const colorCacheKey = `color-moment:v2:${dateStr}:${colorStyle.id}`;
+        const existing = await env.CACHE.get(colorCacheKey);
+        if (!existing) {
+          const colorResult = await generateColorMoment(env, sharedMoment, dateStr);
+          const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+          const colorDisplayDate = `${months[monthNum - 1]} ${dayNum}`;
+          const cacheData = JSON.stringify({ imageB64: colorResult.base64, moment: sharedMoment, displayDate: colorDisplayDate });
+          await env.CACHE.put(colorCacheKey, cacheData, { expirationTtl: 604800 });
+          console.log(`Cron: cached color moment (${colorStyle.name}) for ${dateStr}`);
+        } else {
+          console.log(`Cron: color moment already cached for ${dateStr}`);
+        }
+      } catch (err) {
+        if (isNeuronError(err)) {
+          budgetExhausted = true;
+          console.error("Cron: neuron budget exhausted at color moment");
+        } else {
+          console.error("Cron: color moment warm failed:", err);
+        }
+      }
+    }
+
+    // 4. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
+    if (!budgetExhausted) {
+      try {
+        const skylineCacheKey = `skyline:v3:${dateStr}:daily`;
         const existingSkyline = await env.CACHE.get(skylineCacheKey);
         if (!existingSkyline) {
           const skylineParts = parseDateParts(dateStr);
-          const skylineOpts: SkylinePickerOpts = { mode: "rotate", rotateMin: DEFAULT_ROTATE_MIN, bucket: skylineBucket };
+          const skylineOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 };
           const skylineCity = pickSkylineCity(skylineParts, skylineOpts);
           const skylineStyle = pickSkylineStyle(skylineParts, skylineOpts);
           const skylineRefPrompt = buildSkylineRefPrompt(skylineCity, skylineStyle);
           const skylineSdxlPrompt = buildSkylinePrompt(skylineCity, skylineStyle);
           const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate);
-          const skylinePhotoSeed = djb2(`${dateStr}|photo|${skylineBucket}`);
+          const skylinePhotoSeed = djb2(`${dateStr}|photo|daily`);
           const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineSdxlPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
-          await env.CACHE.put(skylineCacheKey, skylineResult.base64, { expirationTtl: Math.max(DEFAULT_ROTATE_MIN * 60, 900) });
-          console.log(`Cron: cached skyline (${skylineCity.name}, ${skylineStyle.label}, ref=${skylineResult.usedRef}) bucket=${skylineBucket}`);
+          await env.CACHE.put(skylineCacheKey, skylineResult.base64, { expirationTtl: 86400 });
+          console.log(`Cron: cached skyline daily (${skylineCity.name}, ${skylineStyle.label}, ref=${skylineResult.usedRef})`);
         } else {
-          console.log(`Cron: skyline already cached for bucket=${skylineBucket}`);
+          console.log(`Cron: skyline already cached for today`);
         }
       } catch (err) {
-        console.error("Cron: skyline warm failed:", err);
+        if (isNeuronError(err)) {
+          budgetExhausted = true;
+          console.error("Cron: neuron budget exhausted at skyline");
+        } else {
+          console.error("Cron: skyline warm failed:", err);
+        }
       }
-    })());
+    }
 
-    // Skyline BW — warm the current rotation bucket (BW styles only)
-    tasks.push((async () => {
+    // 5. Skyline BW — daily mode
+    if (!budgetExhausted) {
       try {
-        const bwBucket = computeBucket(DEFAULT_ROTATE_MIN);
-        const bwCacheKey = `skyline:v3:${dateStr}:r${DEFAULT_ROTATE_MIN}:b${bwBucket}:bw`;
+        const bwCacheKey = `skyline:v3:${dateStr}:daily:bw`;
         const existingBw = await env.CACHE.get(bwCacheKey);
         if (!existingBw) {
           const bwParts = parseDateParts(dateStr);
-          const bwOpts: SkylinePickerOpts = { mode: "rotate", rotateMin: DEFAULT_ROTATE_MIN, bucket: bwBucket, colorModeFilter: "bw" };
+          const bwOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0, colorModeFilter: "bw" };
           const bwCity = pickSkylineCity(bwParts, bwOpts);
           const bwStyle = pickSkylineStyle(bwParts, bwOpts);
           const bwRefPrompt = buildSkylineRefPrompt(bwCity, bwStyle);
           const bwSdxlPrompt = buildSkylinePrompt(bwCity, bwStyle);
           const bwCaption = formatSkylineCaption(bwCity, bwParts.displayDate);
-          const bwPhotoSeed = djb2(`${dateStr}|photo|${bwBucket}`);
+          const bwPhotoSeed = djb2(`${dateStr}|photo|daily-bw`);
           const bwResult = await generateSkylineImage(env, bwRefPrompt, bwSdxlPrompt, bwCaption, bwStyle.colorMode, bwCity.key, bwPhotoSeed);
-          await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: Math.max(DEFAULT_ROTATE_MIN * 60, 900) });
-          console.log(`Cron: cached skyline BW (${bwCity.name}, ${bwStyle.label}, ref=${bwResult.usedRef}) bucket=${bwBucket}`);
+          await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: 86400 });
+          console.log(`Cron: cached skyline BW daily (${bwCity.name}, ${bwStyle.label}, ref=${bwResult.usedRef})`);
         } else {
-          console.log(`Cron: skyline BW already cached for bucket=${bwBucket}`);
+          console.log(`Cron: skyline BW already cached for today`);
         }
       } catch (err) {
-        console.error("Cron: skyline BW warm failed:", err);
+        if (isNeuronError(err)) {
+          budgetExhausted = true;
+          console.error("Cron: neuron budget exhausted at skyline BW");
+        } else {
+          console.error("Cron: skyline BW warm failed:", err);
+        }
       }
-    })());
+    }
 
-    // fact.json (independent)
-    tasks.push((async () => {
-      await getFact(env);
-      console.log(`Cron: cached fact.json for ${dateStr}`);
-    })());
-
-    await Promise.allSettled(tasks);
+    if (budgetExhausted) {
+      console.error("Cron: WARNING — neuron budget exhausted before all images generated. Consider upgrading to Workers Paid plan ($5/mo).");
+    }
     console.log("Cron: daily image warm complete");
   } catch (err) {
     console.error("Cron error:", err);
