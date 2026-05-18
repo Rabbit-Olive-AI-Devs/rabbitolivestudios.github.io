@@ -77,3 +77,16 @@ test("tempColor: blue when cold, black when comfortable, red when hot", () => {
     assert.notEqual(c, "var(--s6-green)");
   }
 });
+
+test("batteryIcon: red at or below 20%, green above, never yellow", () => {
+  const red = "rgb(178,19,24)";
+  const green = "rgb(18,95,32)";
+  const yellow = "rgb(239,222,68)";
+  assert.ok(batteryIcon(10, false, 20).includes(red));
+  assert.ok(batteryIcon(20, false, 20).includes(red)); // <= 20 -> red
+  assert.ok(batteryIcon(21, false, 20).includes(green));
+  assert.ok(batteryIcon(50, false, 20).includes(green)); // was yellow
+  assert.ok(batteryIcon(90, false, 20).includes(green));
+  // a mid-range level no longer renders yellow
+  assert.ok(!batteryIcon(35, false, 20).includes(yellow));
+});

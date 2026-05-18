@@ -108,13 +108,14 @@ const ICONS: Record<string, string> = {
 
 const ic = (key: string, size: number) => sharedIcon(ICONS, key, size);
 
-function batteryIcon(level: number, charging: boolean, size: number): string {
+export function batteryIcon(level: number, charging: boolean, size: number): string {
   const bodyW = 24;
   const bodyH = 12;
   const bodyX = 2;
   const bodyY = 10;
   const fillW = Math.max(0, Math.min(bodyW, Math.round(bodyW * level / 100)));
-  const fillColor = level <= 20 ? "rgb(178,19,24)" : level <= 50 ? "rgb(239,222,68)" : "rgb(18,95,32)";
+  // red when low, green otherwise — no yellow mid-tier (DECISIONS.md #40)
+  const fillColor = level <= 20 ? "rgb(178,19,24)" : "rgb(18,95,32)";
   const bolt = charging
     ? `<polygon points="16,8 12,16 15,16 13,24 20,14 16,14 18,8" fill="#fff"/>`
     : "";
