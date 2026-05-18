@@ -128,15 +128,15 @@ export function batteryIcon(level: number, charging: boolean, size: number): str
 }
 
 /**
- * Temperature text color. Only the extremes get a warning color; the
- * comfortable middle is plain black (the most readable foreground on white).
- * Yellow is never used as foreground — see DECISIONS.md #40.
+ * Temperature text color: a blue → green → red scale. Blue for cold
+ * (< 10°C), green for the comfortable band (10–27°C), red for warm/hot
+ * (> 27°C). All three read clearly on white; yellow is never used as
+ * foreground — see DECISIONS.md #40.
  */
 export function tempColor(tempC: number): string {
-  const f = tempC * 9 / 5 + 32;
-  if (f <= 32) return "var(--s6-blue)"; // cold / freezing
-  if (f <= 86) return "#000";           // comfortable — neutral
-  return "var(--s6-red)";               // hot
+  if (tempC < 10) return "var(--s6-blue)";   // cold
+  if (tempC <= 27) return "var(--s6-green)"; // comfortable
+  return "var(--s6-red)";                    // warm / hot
 }
 
 function renderHTML(w: WeatherResponse, device: DeviceData | null = null, moonOverride?: number): string {

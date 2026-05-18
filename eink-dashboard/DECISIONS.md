@@ -1197,3 +1197,25 @@ npm run dry-run
 **Not changed:** The alert banner (yellow *background*, black text) and the headlines `regulatory` badge (yellow *background*, black text) stay — yellow as a background is fine. The AI image pipelines are unaffected.
 
 **Tests:** `tempColor()` and `batteryIcon()` were exported and given boundary tests in `tests/utils.test.js`.
+
+---
+
+## 41. Temperature Scale: Black Middle → Green Comfort Band (v3.11.4, 2026-05-18)
+
+### Decision: Replace the neutral black mid-tier with a green comfort band
+
+**Context:** #40 shipped a 3-tier `tempColor()` with a *plain black* middle tier (> 0°C up to ≤ 30°C). Black was chosen for maximum contrast. Once v3.11.3 was viewed on the real E1002 panel, the black middle read as flat and uninformative — it covered almost every real temperature, so the page carried no at-a-glance temperature signal.
+
+**Change:** `tempColor()` is now a true **blue → green → red scale**:
+
+| Range | Color | Meaning |
+|---|---|---|
+| `< 10°C` | blue (`--s6-blue`) | cold |
+| `10–27°C` | green (`--s6-green`) | comfortable |
+| `> 27°C` | red (`--s6-red`) | warm / hot |
+
+No black tier remains. Green is a legible foreground on white (#40's rule lists black, red, green, blue as the four legible foreground colors), so this stays within the legibility constraint. The function now compares Celsius directly — the unused intermediate Fahrenheit conversion from #40 was removed.
+
+**Tradeoff accepted:** the boundaries are coarse — 28°C already shows red, 9°C already shows blue. A finer scheme (black "chilly/warm" edge bands) was considered and rejected as over-engineered for a glanceable e-ink dashboard. Three colors, one clear story.
+
+**Not changed:** The #40 rule (yellow is never a foreground color on white) still holds. Battery fill (2-tier red/green) and the white moon are unchanged. The boundary tests in `tests/utils.test.js` were updated to the new ranges.

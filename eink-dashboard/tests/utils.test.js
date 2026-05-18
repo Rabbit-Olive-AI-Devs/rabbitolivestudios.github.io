@@ -59,22 +59,23 @@ test("histogram threshold and cache keys stay stable", () => {
   assert.equal(generationLockKey("fact4:v4:2026-04-27"), "gen-lock:v1:fact4:v4:2026-04-27");
 });
 
-test("tempColor: blue when cold, black when comfortable, red when hot", () => {
-  // <= 32F (<= 0C) -> blue
+test("tempColor: blue below 10C, green 10-27C, red above 27C", () => {
+  // < 10C -> blue (cold)
   assert.equal(tempColor(-10), "var(--s6-blue)");
-  assert.equal(tempColor(0), "var(--s6-blue)"); // 0C == 32F, boundary -> blue
-  // 0C < t <= 30C -> black
-  assert.equal(tempColor(1), "#000");
-  assert.equal(tempColor(20), "#000");
-  assert.equal(tempColor(30), "#000"); // 30C == 86F, boundary -> black
-  // > 30C -> red
-  assert.equal(tempColor(31), "var(--s6-red)");
+  assert.equal(tempColor(0), "var(--s6-blue)");
+  assert.equal(tempColor(9), "var(--s6-blue)");
+  // 10C <= t <= 27C -> green (comfortable)
+  assert.equal(tempColor(10), "var(--s6-green)"); // lower boundary -> green
+  assert.equal(tempColor(20), "var(--s6-green)");
+  assert.equal(tempColor(27), "var(--s6-green)"); // upper boundary -> green
+  // > 27C -> red (warm / hot)
+  assert.equal(tempColor(28), "var(--s6-red)");
   assert.equal(tempColor(40), "var(--s6-red)");
-  // yellow and green are never returned as a temperature color
+  // yellow and black are never returned as a temperature color
   for (let t = -20; t <= 50; t++) {
     const c = tempColor(t);
     assert.notEqual(c, "var(--s6-yellow)");
-    assert.notEqual(c, "var(--s6-green)");
+    assert.notEqual(c, "#000");
   }
 });
 
