@@ -266,6 +266,8 @@ KV cache (24h)
 
 **Spectra 6 palette**: Black (0,0,0), White (255,255,255), Red (178,19,24), Yellow (239,222,68), Green (18,95,32), Blue (33,87,186).
 
+> **Foreground legibility (v3.11.3)**: On a white page background only black, red, green, and blue are legible as foreground (text / thin strokes). Yellow has almost no contrast on white — use it only as a *background* fill or inside dithered images, never as foreground. `/color/weather` therefore uses a 3-tier `tempColor()` (blue ≤ 0°C, black ≤ 30°C, red above), a 2-tier battery fill (red ≤ 20%, green above), and a white moon. See DECISIONS.md #40.
+
 ### Key Technical Details
 
 - **Image models**: FLUX.2 klein-9b (Pipeline A, Skyline with ref photos), SDXL (Pipeline B, Skyline fallback)
