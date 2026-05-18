@@ -1175,3 +1175,25 @@ npm run dry-run
 - Cache key versions for existing image artifacts did not change: output format and visual processing are unchanged. New helper functions centralize the existing key formats.
 - `package.json`, `src/index.ts` `VERSION`, and package lock metadata are bumped to `3.11.2`.
 - `MEMORY.md` references in older docs refer to Claude Code's auto-memory workflow; this checkout may not contain a tracked `MEMORY.md`.
+
+---
+
+## 40. Yellow Is Not a Foreground Color on White (v3.11.3, 2026-05-18)
+
+### Decision: Drop yellow from all foreground uses on /color/weather
+
+**Problem:** On the E1002 Spectra 6 display, `/color/weather` rendered temperature text, the battery fill, and the moon's lit surface in yellow. Against the white page background, yellow has almost no contrast — yellow text and thin yellow strokes are unreadable on the e-ink panel.
+
+**Rule:** Of the Spectra 6 palette (black, white, red, yellow, green, blue), only **black, red, green, and blue** are legible as foreground (text / thin strokes) on a white background. Yellow is usable only as a *background* fill (e.g. the non-severe alert banner, the headlines `regulatory` badge) or inside large dithered image regions — never as foreground on white.
+
+**Changes:**
+
+1. **Temperature colors: 4-tier → 3-tier.** `tempColor()` now returns blue for ≤ 0°C, black (`#000`) for 0–30°C, red for > 30°C. Only the extremes get a warning color; the comfortable middle is plain black (the most readable foreground). The old green and yellow tiers are gone.
+
+2. **Battery fill: 3-tier → 2-tier.** `batteryIcon()` fills red for ≤ 20%, green above. The yellow mid-tier is removed — no Spectra color works as a sensible mid value on white.
+
+3. **Moon lit surface: yellow → white.** The `/color/weather` moon now uses a white lit surface with a black outline and black shadow, matching the mono E1001 treatment. This supersedes the "Color: yellow lit" detail of #34.
+
+**Not changed:** The alert banner (yellow *background*, black text) and the headlines `regulatory` badge (yellow *background*, black text) stay — yellow as a background is fine. The AI image pipelines are unaffected.
+
+**Tests:** `tempColor()` and `batteryIcon()` were exported and given boundary tests in `tests/utils.test.js`.
