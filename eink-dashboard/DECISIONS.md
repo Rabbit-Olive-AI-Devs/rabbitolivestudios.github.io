@@ -1188,7 +1188,7 @@ npm run dry-run
 
 **Changes:**
 
-1. **Temperature colors: 4-tier → 3-tier.** `tempColor()` now returns blue for ≤ 0°C, black (`#000`) for 0–30°C, red for > 30°C. Only the extremes get a warning color; the comfortable middle is plain black (the most readable foreground). The old green and yellow tiers are gone.
+1. **Temperature colors: 4-tier → 3-tier.** `tempColor()` now returns blue for ≤ 0°C, black (`#000`) for > 0°C up to ≤ 30°C, red for > 30°C. Only the extremes get a warning color; the comfortable middle is plain black (the most readable foreground). The old green and yellow tiers are gone.
 
 2. **Battery fill: 3-tier → 2-tier.** `batteryIcon()` fills red for ≤ 20%, green above. The yellow mid-tier is removed — no Spectra color works as a sensible mid value on white.
 
