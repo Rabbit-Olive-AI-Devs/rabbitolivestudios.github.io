@@ -126,13 +126,16 @@ function batteryIcon(level: number, charging: boolean, size: number): string {
   </svg></span>`;
 }
 
-/** Get temperature color class based on Fahrenheit thresholds. */
-function tempColor(tempC: number): string {
+/**
+ * Temperature text color. Only the extremes get a warning color; the
+ * comfortable middle is plain black (the most readable foreground on white).
+ * Yellow is never used as foreground — see DECISIONS.md #40.
+ */
+export function tempColor(tempC: number): string {
   const f = tempC * 9 / 5 + 32;
-  if (f <= 32) return "var(--s6-blue)";
-  if (f <= 77) return "var(--s6-green)";
-  if (f <= 95) return "var(--s6-yellow)";
-  return "var(--s6-red)";
+  if (f <= 32) return "var(--s6-blue)"; // cold / freezing
+  if (f <= 86) return "#000";           // comfortable — neutral
+  return "var(--s6-red)";               // hot
 }
 
 function renderHTML(w: WeatherResponse, device: DeviceData | null = null, moonOverride?: number): string {

@@ -21,6 +21,7 @@ const {
   skylineCacheKey,
   generationLockKey,
 } = fromBuild("src/cache-keys.js");
+const { tempColor, batteryIcon } = fromBuild("src/pages/color-weather.js");
 
 test("query param validators clamp to safe defaults", () => {
   assert.equal(parseMonth("12"), 12);
@@ -56,4 +57,23 @@ test("histogram threshold and cache keys stay stable", () => {
   assert.equal(colorMomentCacheKey("2026-04-27", "gouache"), "color-moment:v2:2026-04-27:gouache");
   assert.equal(skylineCacheKey("2026-04-27", "daily", 15, 0, true), "skyline:v3:2026-04-27:daily:bw");
   assert.equal(generationLockKey("fact4:v4:2026-04-27"), "gen-lock:v1:fact4:v4:2026-04-27");
+});
+
+test("tempColor: blue when cold, black when comfortable, red when hot", () => {
+  // <= 32F (<= 0C) -> blue
+  assert.equal(tempColor(-10), "var(--s6-blue)");
+  assert.equal(tempColor(0), "var(--s6-blue)"); // 0C == 32F, boundary -> blue
+  // 0C < t <= 30C -> black
+  assert.equal(tempColor(1), "#000");
+  assert.equal(tempColor(20), "#000");
+  assert.equal(tempColor(30), "#000"); // 30C == 86F, boundary -> black
+  // > 30C -> red
+  assert.equal(tempColor(31), "var(--s6-red)");
+  assert.equal(tempColor(40), "var(--s6-red)");
+  // yellow and green are never returned as a temperature color
+  for (let t = -20; t <= 50; t++) {
+    const c = tempColor(t);
+    assert.notEqual(c, "var(--s6-yellow)");
+    assert.notEqual(c, "var(--s6-green)");
+  }
 });
