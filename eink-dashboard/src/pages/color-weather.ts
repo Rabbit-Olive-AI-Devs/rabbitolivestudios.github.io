@@ -157,8 +157,8 @@ function renderHTML(w: WeatherResponse, device: DeviceData | null = null, moonOv
   if (cur.wind_gusts_kmh > cur.wind_kmh + 10) windStr += `-${cur.wind_gusts_kmh}`;
   windStr += " km/h";
 
-  // Moon phase — yellow lit surface on color display
-  const moonStr = moonPhaseHTML("rgb(239,222,68)", "#000", 22, now, moonOverride);
+  // Moon phase — white lit surface; yellow is unreadable on white (DECISIONS.md #40)
+  const moonStr = moonPhaseHTML("#fff", "#000", 22, now, moonOverride);
   const sunLine = w.sunrise && w.sunset
     ? `<div class="cur-sun">${ic("sunrise", 28)} ${formatSunTime(w.sunrise)} &nbsp; ${ic("sunset", 28)} ${formatSunTime(w.sunset)} &nbsp; ${moonStr}</div>`
     : "";
