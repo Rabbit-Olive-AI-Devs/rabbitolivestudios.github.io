@@ -133,4 +133,6 @@ export interface Headline {
 export interface CachedValue<T> {
   data: T;
   timestamp: number;
+  /** Which provider produced this weather data (diagnostics; weather only). */
+  source?: "open-meteo" | "nws";
 }
