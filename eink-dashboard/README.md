@@ -34,6 +34,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /weather?test-moon=N` | Override moon phase (0=New, 1=Waxing Crescent, ..., 7=Waning Crescent) | none |
 | **E1002 Color Endpoints** | | |
 | `GET /color/weather` | 800x480 color HTML weather dashboard (Spectra 6 palette accents, moon phase) | 30 min |
+| `GET /color/weather?test-provider=nws\|fail` | Local test: force the NWS fallback (`nws`) or the no-data path (`fail`) | none |
 | `GET /color/moment` | 800x480 color "Moment Before" (Floyd-Steinberg dithered to 6 colors) | 24 hours |
 | `GET /color/headlines` | Steel/trade headlines page for E1002. Uses deterministic RSS/source ranking, no LLM call. | 6 hours |
 | `GET /color/test-moment?m=MM&d=DD&style=ID&key=KEY` | Generate color moment for any date + optional style override (requires `TEST_AUTH_KEY`) | none |
@@ -267,6 +268,8 @@ KV cache (24h)
 **Spectra 6 palette**: Black (0,0,0), White (255,255,255), Red (178,19,24), Yellow (239,222,68), Green (18,95,32), Blue (33,87,186).
 
 > **Foreground legibility (v3.11.3–4)**: On a white page background only black, red, green, and blue are legible as foreground (text / thin strokes). Yellow has almost no contrast on white — use it only as a *background* fill or inside dithered images, never as foreground. `/color/weather` therefore uses a blue → green → red `tempColor()` scale (blue < 10°C, green 10–27°C, red above), a 2-tier battery fill (red ≤ 20%, green above), and a white moon. See DECISIONS.md #40 and #41.
+
+> **Weather resilience + NWS fallback (v3.12.0)**: The weather pages use **stale-while-revalidate** — a cached forecast is served instantly (sub-second) and refreshed in the background via `ctx.waitUntil`, so the page never blocks on a slow/failing upstream (this is what prevents a blank panel when SenseCraft's renderer times out). The refresh tries **Open-Meteo** (primary, 4s timeout) and falls back to **NWS** (`api.weather.gov`, no API key) when Open-Meteo fails. `/health-detailed` reports which provider produced the cached data via a `source` field. While on the NWS fallback there is no 15-min "rain in 30 min" warning or sun/moon line (NWS does not provide that data). See DECISIONS.md #42.
 
 ### Key Technical Details
 

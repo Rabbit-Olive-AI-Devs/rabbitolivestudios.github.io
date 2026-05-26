@@ -50,7 +50,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.11.4";
+const VERSION = "3.12.0";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -572,6 +572,12 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
     return { cached: entry !== null, age_min: age, stale: age !== null ? age > softTtlMin : true };
   }
 
+  // Weather entries also report which provider produced the cached data.
+  function weatherStatus(raw: string | null) {
+    const parsed = parseEphemeral(raw) as ({ timestamp: number; source?: string } | null);
+    return { ...ephemeralStatus(parsed, 15), source: parsed?.source ?? null };
+  }
+
   // Determine daily image keys (birthday-aware)
   const birthday = getBirthdayToday(monthNum, dayNum);
   const colorStyle = getColorMomentStyle(dateStr);
@@ -623,8 +629,8 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         moment_event: { cached: momentRaw !== null,      key: momentKey },
       },
       ephemeral: {
-        weather_home:   ephemeralStatus(parseEphemeral(weatherHomeRaw),   15),
-        weather_office: ephemeralStatus(parseEphemeral(weatherOfficeRaw), 15),
+        weather_home:   weatherStatus(weatherHomeRaw),
+        weather_office: weatherStatus(weatherOfficeRaw),
         alerts_home:    ephemeralStatus(parseEphemeral(alertsHomeRaw),     5),
         alerts_office:  ephemeralStatus(parseEphemeral(alertsOfficeRaw),   5),
         device_home:    ephemeralStatus(parseEphemeral(deviceHomeRaw),     5),

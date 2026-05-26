@@ -1219,3 +1219,42 @@ No black tier remains. Green is a legible foreground on white (#40's rule lists 
 **Tradeoff accepted:** the boundaries are coarse — 28°C already shows red, 9°C already shows blue. A finer scheme (black "chilly/warm" edge bands) was considered and rejected as over-engineered for a glanceable e-ink dashboard. Three colors, one clear story.
 
 **Not changed:** The #40 rule (yellow is never a foreground color on white) still holds. Battery fill (2-tier red/green) and the white moon are unchanged. The boundary tests in `tests/utils.test.js` were updated to the new ranges.
+
+---
+
+## 42. Weather Resilience + NWS Fallback (v3.12.0, 2026-05-26)
+
+### Incident: E1002 `/color/weather` blank ("Failed to load remote image")
+
+The color weather panel went blank-gray with a faint text ghost; SenseCraft HMI reported "Failed to load remote image" and it persisted across forced refreshes, while the other three E1002 pages rendered fine.
+
+### Root cause: a slow upstream made the page block past the renderer's timeout
+
+The page itself was valid (it rendered pixel-perfect in Chromium at 800×480). The problem was **latency**:
+
+- **Open-Meteo was down** — returning 502/504 for *every* query (even `current=temperature_2m`), and taking **8–10 seconds** to fail.
+- `getWeatherForLocation` **awaited** that slow failing fetch (the default 10s `fetchWithTimeout`) before falling back to stale cache, so every `/color/weather` request took ~8–10s. Measured: `/color/headlines` 0.24s, `/skyline` 0.11s, `/color/weather` 8.2–10.1s.
+- SenseCraft's screenshot renderer timed out waiting → "Failed to load remote image" → the device kept its last (blank) frame.
+
+So two faults combined: Open-Meteo's outage (external) **and** our page blocking on it (ours). The second is what turns any provider outage into a blank display.
+
+### Decision: stale-while-revalidate + NWS fallback
+
+**Stale-while-revalidate.** `getWeatherForLocation(env, …, ctx?, opts?)` now:
+- fresh cache (<15min soft TTL) → return it;
+- **stale cache → return it immediately and revalidate in the background via `ctx.waitUntil`** (so the request stays sub-second);
+- cold (no cache) → block on the refresh chain.
+
+`ctx` (`ExecutionContext`) is threaded from the worker `fetch(request, env, ctx)` handler through the page handlers. Cron callers pass no `ctx` (they intentionally await the refresh). Measured after the fix: warm `/color/weather` ≈ 2ms.
+
+**NWS fallback.** `refreshWeather` tries Open-Meteo (timeout shortened **10s → 4s** so the fallback is reached quickly), then falls back to **NWS (`api.weather.gov`, no API key)** — `src/weather-nws.ts`. NWS is a two-step API (`/points/{lat},{lon}` → `forecast` + `forecastHourly`, `units=si`); the points lookup is cached per zip (`nws-points:{zip}`, 7-day TTL). The result is mapped into the existing `WeatherResponse` shape (text `shortForecast` → our icon keys; day/night periods collapsed to daily high/low). NWS provides no 15-min precip or sunrise/sunset, so the "rain in 30 min" warning degrades to the hourly-probability path and the sun/moon line is omitted while on NWS. Cached `CachedValue.source` records which provider produced the data; surfaced in `/health-detailed`.
+
+**Cache key NOT bumped.** The stored shape is unchanged (only an additive optional `source`), so `weather:{zip}:v2` is kept deliberately — the existing ~24h stale cache then serves instantly the moment this deploys, which matters because Open-Meteo was actively down. Bumping would have forced a cold start into a dead Open-Meteo. This is a conscious exception to the "bump on pipeline change" rule.
+
+**`getWeather` dedup.** `getWeather` is now a thin wrapper over `getWeatherForLocation` so both weather pages (E1001 mono + E1002 color) share the resilience + fallback from one implementation. The fragile `zip === "60540"` alerts branch was removed (now always `fetchAlertsForLocation`), which orphaned and removed the old `fetchAlerts`.
+
+**Cron semantic note:** cron calls have no `ctx`, so they `await` the refresh. They also now return early if the cache is <15min fresh — harmless since cron runs every 6h (always past the soft TTL).
+
+**Testing:** `?test-provider=nws|fail` (local) forces the NWS fallback / no-data path. Verified at 800×480: NWS data renders full current/5-day/hourly with correct colors; alert + rain banners render over NWS data; warm cache serves in ~2ms.
+
+**Why not switch providers entirely:** Open-Meteo is excellent and free normally; this was a transient outage. The resilience fix — not the provider — is what prevents a blank display, and it protects against *any* provider's downtime. NWS is the no-key fallback (US-only is fine; both locations are US) consistent with the project's no-key preference (#16).
