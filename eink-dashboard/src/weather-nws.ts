@@ -28,6 +28,8 @@ export function nwsTextToIcon(shortForecast: string, isDaytime: boolean): string
   if (s.includes("drizzle")) return "drizzle";
   if (s.includes("rain") || s.includes("shower")) return "rain";
   if (s.includes("fog") || s.includes("haze") || s.includes("mist") || s.includes("smoke")) return "fog";
+  // "mostly" alone (e.g. "Mostly Cloudy") falls through to cloudy below;
+  // only "mostly sunny"/"mostly clear" count as partly cloudy.
   if (s.includes("partly") || s.includes("mostly sunny") || s.includes("mostly clear")) {
     return isDaytime ? "partly_cloudy" : "partly_cloudy_night";
   }

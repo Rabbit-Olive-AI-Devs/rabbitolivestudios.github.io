@@ -57,4 +57,5 @@ test("collapseNwsDaily handles a leading night period (missing daytime high)", (
   assert.equal(days.length, 1);
   assert.equal(days[0].low_c, 14);
   assert.equal(days[0].high_c, 14);
+  assert.equal(days[0].icon, "clear_night"); // night period sets the icon when no daytime period exists
 });
