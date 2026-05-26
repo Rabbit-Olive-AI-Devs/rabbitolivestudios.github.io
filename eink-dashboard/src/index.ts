@@ -104,9 +104,9 @@ function errorResponse(message: string, status: number): Response {
   return jsonResponse({ error: message }, status, 0);
 }
 
-async function handleWeather(env: Env): Promise<Response> {
+async function handleWeather(env: Env, ctx: ExecutionContext): Promise<Response> {
   try {
-    const weather = await getWeather(env);
+    const weather = await getWeather(env, ctx);
     return jsonResponse(weather, 200, 900); // 15 min
   } catch (err) {
     console.error("Weather error:", err);
@@ -845,7 +845,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
 // --- Main export ---
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -870,7 +870,7 @@ export default {
     // Routing
     switch (path) {
       case "/weather.json":
-        return handleWeather(env);
+        return handleWeather(env, ctx);
       case "/fact.json":
         return handleFact(env);
       case "/fact.png":
@@ -989,11 +989,11 @@ export default {
         }
       }
       case "/weather":
-        return handleWeatherPageV2(env, url);
+        return handleWeatherPageV2(env, url, ctx);
       case "/fact":
         return handleFactPage();
       case "/color/weather":
-        return handleColorWeatherPage(env, url);
+        return handleColorWeatherPage(env, url, ctx);
       case "/color/moment":
         return handleColorMomentPage(env, url);
       case "/color/test-moment": {
