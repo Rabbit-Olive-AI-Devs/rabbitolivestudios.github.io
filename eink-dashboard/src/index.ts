@@ -50,7 +50,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.11.4";
+const VERSION = "3.12.0";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -104,9 +104,9 @@ function errorResponse(message: string, status: number): Response {
   return jsonResponse({ error: message }, status, 0);
 }
 
-async function handleWeather(env: Env): Promise<Response> {
+async function handleWeather(env: Env, ctx: ExecutionContext): Promise<Response> {
   try {
-    const weather = await getWeather(env);
+    const weather = await getWeather(env, ctx);
     return jsonResponse(weather, 200, 900); // 15 min
   } catch (err) {
     console.error("Weather error:", err);
@@ -572,6 +572,12 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
     return { cached: entry !== null, age_min: age, stale: age !== null ? age > softTtlMin : true };
   }
 
+  // Weather entries also report which provider produced the cached data.
+  function weatherStatus(raw: string | null) {
+    const parsed = parseEphemeral(raw) as ({ timestamp: number; source?: string } | null);
+    return { ...ephemeralStatus(parsed, 15), source: parsed?.source ?? null };
+  }
+
   // Determine daily image keys (birthday-aware)
   const birthday = getBirthdayToday(monthNum, dayNum);
   const colorStyle = getColorMomentStyle(dateStr);
@@ -623,8 +629,8 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         moment_event: { cached: momentRaw !== null,      key: momentKey },
       },
       ephemeral: {
-        weather_home:   ephemeralStatus(parseEphemeral(weatherHomeRaw),   15),
-        weather_office: ephemeralStatus(parseEphemeral(weatherOfficeRaw), 15),
+        weather_home:   weatherStatus(weatherHomeRaw),
+        weather_office: weatherStatus(weatherOfficeRaw),
         alerts_home:    ephemeralStatus(parseEphemeral(alertsHomeRaw),     5),
         alerts_office:  ephemeralStatus(parseEphemeral(alertsOfficeRaw),   5),
         device_home:    ephemeralStatus(parseEphemeral(deviceHomeRaw),     5),
@@ -845,7 +851,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
 // --- Main export ---
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -870,7 +876,7 @@ export default {
     // Routing
     switch (path) {
       case "/weather.json":
-        return handleWeather(env);
+        return handleWeather(env, ctx);
       case "/fact.json":
         return handleFact(env);
       case "/fact.png":
@@ -989,11 +995,11 @@ export default {
         }
       }
       case "/weather":
-        return handleWeatherPageV2(env, url);
+        return handleWeatherPageV2(env, url, ctx);
       case "/fact":
         return handleFactPage();
       case "/color/weather":
-        return handleColorWeatherPage(env, url);
+        return handleColorWeatherPage(env, url, ctx);
       case "/color/moment":
         return handleColorMomentPage(env, url);
       case "/color/test-moment": {

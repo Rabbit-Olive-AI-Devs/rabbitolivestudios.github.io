@@ -316,10 +316,10 @@ const TEST_ALERTS: Record<string, import("../types").NWSAlert[]> = {
   ],
 };
 
-export async function handleWeatherPageV2(env: Env, url: URL): Promise<Response> {
+export async function handleWeatherPageV2(env: Env, url: URL, ctx?: ExecutionContext): Promise<Response> {
   try {
     const [weather, device] = await Promise.all([
-      getWeather(env),
+      getWeather(env, ctx),
       fetchDeviceData(env, E1001_DEVICE_ID),
     ]);
 

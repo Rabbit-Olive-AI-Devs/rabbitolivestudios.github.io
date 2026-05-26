@@ -342,10 +342,14 @@ const TEST_ALERTS: Record<string, NWSAlert[]> = {
   ],
 };
 
-export async function handleColorWeatherPage(env: Env, url: URL): Promise<Response> {
+export async function handleColorWeatherPage(env: Env, url: URL, ctx?: ExecutionContext): Promise<Response> {
   try {
+    // Local test only: ?test-provider=nws forces the NWS fallback, =fail forces
+    // a no-data path. Any other value behaves like normal (Open-Meteo -> NWS).
+    const forceProvider = url.searchParams.get("test-provider") as "nws" | "fail" | null;
     const [weather, device] = await Promise.all([
-      getWeatherForLocation(env, OFFICE_LAT, OFFICE_LON, OFFICE_ZIP, OFFICE_NAME),
+      getWeatherForLocation(env, OFFICE_LAT, OFFICE_LON, OFFICE_ZIP, OFFICE_NAME, ctx,
+        forceProvider ? { forceProvider } : undefined),
       fetchDeviceData(env, E1002_DEVICE_ID),
     ]);
 
