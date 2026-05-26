@@ -5,7 +5,7 @@ const test = require("node:test");
 const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
 const fromBuild = (p) => require(path.join(buildDir, p));
 
-const { nwsTextToIcon, parseNwsWind, collapseNwsDaily } = fromBuild("src/weather-nws.js");
+const { nwsTextToIcon, parseNwsWind, collapseNwsDaily, normalizeNws } = fromBuild("src/weather-nws.js");
 
 test("nwsTextToIcon maps NWS shortForecast text to icon keys", () => {
   assert.equal(nwsTextToIcon("Sunny", true), "clear");
@@ -60,8 +60,6 @@ test("collapseNwsDaily handles a leading night period (missing daytime high)", (
   assert.equal(days[0].icon, "clear_night"); // night period sets the icon when no daytime period exists
 });
 
-const { normalizeNws } = fromBuild("src/weather-nws.js");
-
 test("normalizeNws builds a WeatherResponse from forecast + hourly JSON", () => {
   const forecast = { properties: { periods: [
     { startTime: "2026-05-26T06:00:00-05:00", isDaytime: true,  temperature: 24, shortForecast: "Sunny", probabilityOfPrecipitation: { value: 10 } },
@@ -90,4 +88,10 @@ test("normalizeNws builds a WeatherResponse from forecast + hourly JSON", () => 
   assert.equal(w.daily_5d[0].low_c, 14);
   assert.deepEqual(w.precip_next_2h, []);
   assert.equal(w.sunrise, "");
+});
+
+test("normalizeNws throws when there are no hourly periods", () => {
+  const forecast = { properties: { periods: [] } };
+  const hourly = { properties: { periods: [] } };
+  assert.throws(() => normalizeNws(forecast, hourly, [], 41.88, -87.63, "60606", "Chicago, IL"));
 });

@@ -8,7 +8,6 @@
  */
 
 import { fetchWithTimeout } from "./fetch-timeout";
-import { getWeatherInfo } from "./weather-codes";
 import type { Env, WeatherResponse, HourlyEntry, DailyEntry, NWSAlert } from "./types";
 
 interface NwsPeriod {
@@ -110,9 +109,9 @@ export function normalizeNws(
   if (hourlyPeriods.length === 0) throw new Error("NWS hourly has no periods");
 
   const cur = hourlyPeriods[0];
-  const curInfo = getWeatherInfo(0, cur.isDaytime); // code unused; icon/label overridden below
   const curIcon = nwsTextToIcon(cur.shortForecast, cur.isDaytime);
 
+  // Up to 24 hours; the page filters to future hours (matches the Open-Meteo pipeline).
   const hourly_12h: HourlyEntry[] = hourlyPeriods.slice(0, 24).map((h) => ({
     time: h.startTime.slice(0, 16),
     temp_c: Math.round(h.temperature),
@@ -138,7 +137,7 @@ export function normalizeNws(
       wind_gusts_kmh: 0,
       is_day: cur.isDaytime,
       precip_mm_hr: 0,
-      condition: { code: 0, label: cur.shortForecast || curInfo.label, icon: curIcon },
+      condition: { code: 0, label: cur.shortForecast || "", icon: curIcon },
     },
     hourly_12h,
     daily_5d,
@@ -174,6 +173,9 @@ export async function fetchWeatherFromNWS(
       );
       if (!pres.ok) throw new Error(`NWS points ${pres.status}`);
       const pjson: any = await pres.json();
+      if (!pjson?.properties?.forecast || !pjson?.properties?.forecastHourly) {
+        throw new Error("NWS points response missing forecast URLs");
+      }
       urls = { forecast: pjson.properties.forecast, forecastHourly: pjson.properties.forecastHourly };
       await env.CACHE.put(pointsKey, JSON.stringify(urls), { expirationTtl: 604800 });
     }
