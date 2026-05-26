@@ -1,8 +1,8 @@
 import { getWeatherInfo } from "./weather-codes";
-import { fetchAlerts, fetchAlertsForLocation } from "./alerts";
+import { fetchAlertsForLocation } from "./alerts";
 import { fetchWithTimeout } from "./fetch-timeout";
 import { fetchWeatherFromNWS } from "./weather-nws";
-import type { Env, WeatherResponse, HourlyEntry, DailyEntry, CachedValue, NWSAlert } from "./types";
+import type { Env, WeatherResponse, HourlyEntry, DailyEntry, CachedValue } from "./types";
 
 const NAPERVILLE_LAT = 41.7508;
 const NAPERVILLE_LON = -88.1535;
@@ -89,9 +89,7 @@ async function refreshWeather(
   alertsCacheKey: string,
   opts?: { forceProvider?: "nws" | "fail" },
 ): Promise<WeatherResponse | null> {
-  const alerts = zip === "60540"
-    ? await fetchAlerts(env)
-    : await fetchAlertsForLocation(env, lat, lon, alertsCacheKey);
+  const alerts = await fetchAlertsForLocation(env, lat, lon, alertsCacheKey);
 
   if (!opts?.forceProvider) {
     try {
