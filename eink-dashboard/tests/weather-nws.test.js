@@ -59,3 +59,35 @@ test("collapseNwsDaily handles a leading night period (missing daytime high)", (
   assert.equal(days[0].high_c, 14);
   assert.equal(days[0].icon, "clear_night"); // night period sets the icon when no daytime period exists
 });
+
+const { normalizeNws } = fromBuild("src/weather-nws.js");
+
+test("normalizeNws builds a WeatherResponse from forecast + hourly JSON", () => {
+  const forecast = { properties: { periods: [
+    { startTime: "2026-05-26T06:00:00-05:00", isDaytime: true,  temperature: 24, shortForecast: "Sunny", probabilityOfPrecipitation: { value: 10 } },
+    { startTime: "2026-05-26T18:00:00-05:00", isDaytime: false, temperature: 14, shortForecast: "Clear", probabilityOfPrecipitation: { value: 0 } },
+  ] } };
+  const hourly = { properties: { periods: [
+    { startTime: "2026-05-26T09:00:00-05:00", isDaytime: true, temperature: 20, shortForecast: "Sunny",
+      probabilityOfPrecipitation: { value: 5 }, relativeHumidity: { value: 50 }, windSpeed: "13 km/h", windDirection: "SW" },
+    { startTime: "2026-05-26T10:00:00-05:00", isDaytime: true, temperature: 21, shortForecast: "Sunny",
+      probabilityOfPrecipitation: { value: 0 }, relativeHumidity: { value: 48 }, windSpeed: "16 km/h", windDirection: "S" },
+  ] } };
+  const alerts = [];
+  const w = normalizeNws(forecast, hourly, alerts, 41.88, -87.63, "60606", "Chicago, IL");
+
+  assert.equal(w.location.zip, "60606");
+  assert.equal(w.current.temp_c, 20);
+  assert.equal(w.current.humidity_pct, 50);
+  assert.equal(w.current.wind_kmh, 13);
+  assert.equal(w.current.wind_dir_label, "SW");
+  assert.equal(w.current.is_day, true);
+  assert.equal(w.hourly_12h.length, 2);
+  assert.equal(w.hourly_12h[0].time, "2026-05-26T09:00");
+  assert.equal(w.hourly_12h[0].temp_c, 20);
+  assert.equal(w.daily_5d.length, 1);
+  assert.equal(w.daily_5d[0].high_c, 24);
+  assert.equal(w.daily_5d[0].low_c, 14);
+  assert.deepEqual(w.precip_next_2h, []);
+  assert.equal(w.sunrise, "");
+});
