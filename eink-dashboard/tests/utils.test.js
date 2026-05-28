@@ -22,6 +22,7 @@ const {
   generationLockKey,
 } = fromBuild("src/cache-keys.js");
 const { tempColor, batteryIcon } = fromBuild("src/pages/color-weather.js");
+const { withBudget } = fromBuild("src/with-budget.js");
 
 test("query param validators clamp to safe defaults", () => {
   assert.equal(parseMonth("12"), 12);
@@ -77,6 +78,23 @@ test("tempColor: blue below 10C, green 10-27C, red above 27C", () => {
     assert.notEqual(c, "var(--s6-yellow)");
     assert.notEqual(c, "#000");
   }
+});
+
+test("withBudget resolves with value when promise settles inside the budget", async () => {
+  const fast = new Promise((resolve) => setTimeout(() => resolve("ok"), 5));
+  const result = await withBudget(fast, 100);
+  assert.equal(result, "ok");
+});
+
+test("withBudget resolves null when the budget elapses first", async () => {
+  const slow = new Promise((resolve) => setTimeout(() => resolve("ok"), 100));
+  const result = await withBudget(slow, 10);
+  assert.equal(result, null);
+});
+
+test("withBudget rethrows when the promise rejects inside the budget", async () => {
+  const failing = Promise.reject(new Error("boom"));
+  await assert.rejects(() => withBudget(failing, 100), /boom/);
 });
 
 test("batteryIcon: red at or below 20%, green above, never yellow", () => {

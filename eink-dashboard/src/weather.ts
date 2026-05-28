@@ -2,12 +2,18 @@ import { getWeatherInfo } from "./weather-codes";
 import { fetchAlertsForLocation } from "./alerts";
 import { fetchWithTimeout } from "./fetch-timeout";
 import { fetchWeatherFromNWS } from "./weather-nws";
+import { withBudget } from "./with-budget";
 import type { Env, WeatherResponse, HourlyEntry, DailyEntry, CachedValue } from "./types";
 
 const NAPERVILLE_LAT = 41.7508;
 const NAPERVILLE_LON = -88.1535;
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes (soft TTL: when to revalidate)
 const OPEN_METEO_TIMEOUT_MS = 4000;   // short so the NWS fallback is reached quickly
+// Wall-clock budget for the cold-cache refresh on the request path. Must stay
+// well under SenseCraft's renderer timeout (observed ~8-10s in #42) so the page
+// never blocks long enough to produce "Failed to load remote image". Cron runs
+// without a budget — it can afford to wait for the full provider chain.
+const REFRESH_BUDGET_MS = 5000;
 
 const WIND_DIRS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
 
@@ -68,8 +74,22 @@ export async function getWeatherForLocation(
     return cached.data;
   }
 
-  // Cold start (or forced test): must block on the chain.
-  const refreshed = await doRefresh();
+  // Cold start (or forced test): we have no cache to fall back to.
+  // On the request path (ctx present, no forced provider) bound the wait so we
+  // can't block past SenseCraft's renderer timeout. If the budget fires first,
+  // hand the in-flight refresh to ctx.waitUntil so its KV write still completes
+  // and the next request hits a warm cache.
+  const refreshPromise = doRefresh();
+  let refreshed: WeatherResponse | null;
+  if (ctx && !opts?.forceProvider) {
+    refreshed = await withBudget(refreshPromise, REFRESH_BUDGET_MS);
+    if (refreshed === null) {
+      console.warn(`Weather ${zip}: cold-path refresh exceeded ${REFRESH_BUDGET_MS}ms budget`);
+      ctx.waitUntil(refreshPromise.catch(() => {}));
+    }
+  } else {
+    refreshed = await refreshPromise;
+  }
   if (refreshed) return refreshed;
   if (cached) return cached.data;
   throw new Error(`Weather ${zip}: no data from any provider and no cache`);

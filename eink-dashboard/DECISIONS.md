@@ -1258,3 +1258,35 @@ So two faults combined: Open-Meteo's outage (external) **and** our page blocking
 **Testing:** `?test-provider=nws|fail` (local) forces the NWS fallback / no-data path. Verified at 800×480: NWS data renders full current/5-day/hourly with correct colors; alert + rain banners render over NWS data; warm cache serves in ~2ms.
 
 **Why not switch providers entirely:** Open-Meteo is excellent and free normally; this was a transient outage. The resilience fix — not the provider — is what prevents a blank display, and it protects against *any* provider's downtime. NWS is the no-key fallback (US-only is fine; both locations are US) consistent with the project's no-key preference (#16).
+
+---
+
+## 43. Cold-Cache Budget on Weather Request Path (2026-05-28)
+
+### Decision: bound the cold refresh chain at 5s when called from a request
+
+**Context:** Around 2026-05-28 the user observed `/color/weather` blank once on E1002 ("same blank HTML error again") and it self-recovered. Investigation showed v3.12.0 (#42) is correctly wired — warm and stale paths return in ~2ms — but the **cold-cache path** was left unchanged. On a truly cold cache, `getWeatherForLocation` blocks sequentially through Open-Meteo (4s timeout) → NWS `/points` (6s) → NWS forecast + forecastHourly (6s parallel), so worst case is ~10–16s. That exceeds SenseCraft's renderer timeout (~8–10s observed in #42), so any single window where the office weather KV entry is missing (cron failure + 24h TTL expiry, brief KV blip, new namespace) reproduces the "Failed to load remote image" symptom.
+
+We could not pin the May 28 occurrence to cold cache vs. a transient network/colo hiccup — it was a one-off with no persistent logs. The fix is defensive: even without a confirmed root cause, the cold path is a real worst-case latency that should be bounded.
+
+### Implementation
+
+- **New `src/with-budget.ts`** — generic `withBudget<T>(promise, ms): Promise<T | null>`. `Promise.race` against a `setTimeout`, with the timer cleared on settle. The wrapped promise is not cancelled — callers hand it to `ctx.waitUntil` so any pending KV write still completes.
+- **`src/weather.ts` cold-cache branch:** when `ctx && !opts?.forceProvider`, race `doRefresh()` against `REFRESH_BUDGET_MS = 5000`. On budget exceeded, `ctx.waitUntil(refreshPromise.catch(() => {}))` keeps the refresh alive in the background so the next request hits a warm cache. The function falls through to the existing "no refresh + no cache → throw" path, the page handler's existing try/catch returns 503 with `Retry-After: 300`, and SenseCraft retries 15 min later.
+- **No change to fresh, stale, or cron paths.** Cron passes no `ctx` and stays patient — its job is to warm the cache, it can afford the full provider chain.
+- **No cache key bump.** Stored shape is unchanged.
+
+### Why 5 seconds
+
+- Open-Meteo's `fetchWithTimeout` is 4s; 5s gives it its full window plus 1s slack.
+- NWS won't typically complete inside that budget on cold path (~12s by itself), so a cold-cache request during an Open-Meteo outage will 503. That is acceptable — cron is expected to keep cold-cache windows extremely rare, and a fast 503 is strictly better than an 8-16s block that produces the same blank-panel symptom.
+- Well under the 8–10s SenseCraft renderer timeout observed in #42.
+
+### What this does NOT address
+
+- **A persistent provider outage on cold cache will still 503.** A long-term-backup KV key (weekly snapshot, 7-day TTL) would close this gap but adds storage + maintenance complexity. Out of scope.
+- **Persistent observability.** We still have no log of when a cold or budget event fires in production. Option A from the investigation (response headers `X-Weather-Path: warm|stale|cold|fail`, `X-Weather-Source`, plus a small debug KV ring buffer) is worth doing next so the *next* blip is diagnosable from real evidence rather than reasoning.
+
+### Tests
+
+`tests/utils.test.js` covers `withBudget` directly: fast resolve passes through, slow resolve becomes `null`, rejection rethrows.
