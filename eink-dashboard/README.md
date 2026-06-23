@@ -4,7 +4,7 @@ A Cloudflare Workers backend for the **reTerminal E1001** (ESP32-S3, 7.5" ePaper
 
 Every day it generates an AI illustration depicting a famous historical event at its most iconic, dramatic moment — the viewer sees the scene, the location, and the date.
 
-Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact.
+Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, a seasonal FIFA World Cup 2026 dashboard, and a daily "On This Day" historical fact.
 
 ## The Concept
 
@@ -40,6 +40,10 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/test-moment?m=MM&d=DD&style=ID&key=KEY` | Generate color moment for any date + optional style override (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
+| **World Cup 2026** (seasonal) | | |
+| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono (today's matches + results, rotating group standings, knockout bracket) | 12 min |
+| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 (color accents) | 12 min |
+| `GET /worldcup?test-phase=group\|r32\|knockout\|champion` | Preview any phase layout with canned data (also on `/color/worldcup`) | none |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store) | none |
 | `GET /skyline-bw` | 800x480 HTML skyline page for E1001 mono (`<img src="/skyline.png?bw=1">`, BW styles only) | none |
@@ -283,6 +287,19 @@ KV cache (24h)
 
 ---
 
+## World Cup 2026 Dashboard (seasonal)
+
+`/worldcup` (E1001 mono) and `/color/worldcup` (E1002 Spectra 6) are a **single adaptive page per display** that transitions itself by tournament phase:
+
+- **Group stage** — today's matches + latest results on top; a rotating group standings table below (cycles the 12 groups, prefers groups with a match today).
+- **Round of 32** — today/results on top; a Round-of-32 results list below (a 32-team tree isn't legible on 800×480).
+- **Knockouts (R16→Final)** — a converging bracket tree fills the screen; today's ties highlighted, winners bold.
+- **Champion** — winner card after the final.
+
+**Data** comes from football-data.org (primary, free API key) with the static [openfootball/worldcup.json](https://github.com/openfootball/worldcup.json) as a no-key fallback, normalized to a source-agnostic shape and cached as `wc:data:v1`. It reuses the weather stale-while-revalidate + `withBudget` + KV degradation pattern, so the page serves instantly and never blocks the SenseCraft renderer. The favorite team (`FAVORITE_TEAM`, default `BRA`) is highlighted across every view. Preview any phase at 800×480 with `?test-phase=group|r32|knockout|champion`.
+
+> **Setup:** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive). Without it, the page runs on the openfootball fallback. Add the two routes to the device pagelists for the tournament; remove after 2026-07-19. See DECISIONS.md #44.
+
 ## Architecture
 
 ```
@@ -315,6 +332,7 @@ KV cache (24h)
 | `env.CACHE` | KV Namespace | Response caching (24h/6h) |
 | `env.PHOTOS` | R2 Bucket | Birthday portraits (`portraits/`) + skyline reference photos (`skylines/`) |
 | `env.TEST_AUTH_KEY` | Secret | Auth key for expensive test endpoints (optional, open in dev) |
+| `env.FOOTBALL_DATA_KEY` | Secret | football-data.org API key for the World Cup dashboard (optional; falls back to openfootball JSON when absent) |
 
 > **Note**: The `APOD_API_KEY` secret was removed in v3.10.1. NASA APOD has been replaced by the World Skyline Series. The Cloudflare secret can be deleted: `npx wrangler secret delete APOD_API_KEY`.
 

@@ -1290,3 +1290,50 @@ We could not pin the May 28 occurrence to cold cache vs. a transient network/col
 ### Tests
 
 `tests/utils.test.js` covers `withBudget` directly: fast resolve passes through, slow resolve becomes `null`, rejection rethrows.
+
+---
+
+## 44. World Cup 2026 Adaptive Dashboard (v3.13.0, 2026-06-23)
+
+### Decision: one adaptive page per display, phase-driven, with a resilient dual data source
+
+A seasonal FIFA World Cup 2026 view for both displays — `/worldcup` (E1001 mono) and `/color/worldcup` (E1002 Spectra 6) — for the duration of the tournament (group stage now → final 2026-07-19). Rather than three separate pages (today's matches / standings / bracket), it is a **single adaptive page per display** that transitions itself by tournament phase, so a glance always shows the most relevant thing and the SenseCraft pagelist stays short.
+
+### Phase model (derived from data, not the calendar)
+
+`computePhase()` in `src/worldcup-ui.ts` inspects the full match list:
+
+| Phase | Condition | Layout |
+|-------|-----------|--------|
+| **group** | any GROUP match not yet FINISHED | split: today + latest results, rotating group table |
+| **r32** | groups done, furthest active round is R32 | split: today + results, Round-of-32 list |
+| **knockout** | furthest active round ∈ {R16, QF, SF, Final} | converging R16→Final bracket tree |
+| **champion** | FINAL finished | champion card (winner + final score) |
+
+### Bracket legibility (the hard constraint)
+
+A 32-team tree is not legible on 800×480 with the available font. So the **Round of 32 is rendered as a list** during its ~6-day window, and only the **R16→QF→SF→Final** tree (≤8 ties, 7 columns ≈ 114px each) is drawn as a converging bracket. The third-place playoff is a one-line footer. `buildBracket()` deliberately excludes R32 and THIRD from the tree.
+
+### Data source: football-data.org primary + openfootball fallback
+
+Reuses the weather resilience pattern (#42/#43): stale-while-revalidate over KV, `withBudget` cold-path bound (5s), degradation chain. `src/worldcup.ts` tries **football-data.org** (`/competitions/WC/matches` + `/standings`, `X-Auth-Token` secret `FOOTBALL_DATA_KEY`) then falls back to the static **openfootball/worldcup.json** (no key, ~daily updates). Both normalize to a single source-agnostic `WorldCupData`.
+
+- **Why football-data primary:** its `/standings` endpoint computes the group tables server-side. Computing 2026 standings + tiebreakers + the 8-best-third-place ranking ourselves would be the most bug-prone part of the feature.
+- **Why openfootball fallback:** zero-key resilience; it derives simple standings (points/GD) from finished matches when it is the only source available.
+- Cache key `wc:data:v1` (single blob serves both displays — same tournament data). Soft TTL 12 min (drives SWR), KV `expirationTtl` 86400 (≫ soft TTL, per #24). Warmed in the every-6h cron block.
+
+### Third-place qualification ambiguity
+
+2026 advances the 8 best third-placed teams to the Round of 32 — a cross-group, mid-stage-unstable ranking. We therefore mark only the **top 2** of each group as qualifying (`✓`); third place is **never** auto-marked, to avoid implying a wrong outcome.
+
+### Display styling
+
+Same data/layout on both displays via a `WcTheme` object passed to the shared render builders in `worldcup-ui.ts`. Mono = pure black + glyph markers (`▶` favorite, `✓` qualified). Color = Spectra-6 accents: green qualified/champion, red live, blue favorite; **yellow never as foreground** (#40). Favorite team is the `FAVORITE_TEAM` constant (`"BRA"`; `""` disables).
+
+### Testing
+
+`?test-phase=group|r32|knockout|champion` injects canned fixtures (`src/worldcup-testdata.ts`) to preview every layout at 800×480 before the real data reaches that phase. Cheap (no upstream) → no `TEST_AUTH_KEY` required, like `?test-device`. 17 unit tests cover phase detection, team-code/match-cell formatting, group rotation, bracket building, Chicago time conversion, and both normalizers.
+
+### Seasonal / removable
+
+~4-week useful life. Add `/worldcup` + `/color/worldcup` to the device pagelists for the tournament; remove after 2026-07-19 (the champion card is safe to leave up). No cache-key entanglement with other pipelines.
