@@ -244,7 +244,7 @@ function bracketColumn(round: WcBracketRound, theme: WcTheme): string {
     const side = (team: WcMatch["home"], code: string, won: boolean) => {
       const fav = isFav(code) ? `color:${theme.fav};` : "";
       const w = won ? "font-weight:800;" : "";
-      return `<div class="wc-bteam" style="${fav}${w}">${flagImg(theme, code)}${teamLabel(team, 9)}</div>`;
+      return `<div class="wc-bteam" style="${fav}${w}">${flagImg(theme, code)}${teamLabel(team, 12)}</div>`;
     };
     const sc = finished ? `<div class="wc-bscore">${mm.homeScore}-${mm.awayScore}</div>` : "";
     const liveCls = mm.status === "LIVE" ? ` style="border-color:${theme.live}"` : "";
