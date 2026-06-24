@@ -9,6 +9,7 @@ const { worldCupCacheKey } = fromBuild("src/cache-keys.js");
 const {
   computePhase,
   teamCode,
+  teamLabel,
   matchCell,
   STAGE_LABELS,
   pickRotatingGroup,
@@ -18,6 +19,24 @@ const {
 } = fromBuild("src/worldcup-ui.js");
 const { normalizeFootballData, mapStage, mapStatus } = fromBuild("src/worldcup-football-data.js");
 const { normalizeOpenFootball } = fromBuild("src/worldcup-openfootball.js");
+const { FLAGS } = fromBuild("src/worldcup-flags.js");
+
+test("teamLabel returns full name within budget", () => {
+  assert.equal(teamLabel({ name: "Brazil", code: "BRA" }, 14), "Brazil");
+});
+test("teamLabel truncates with ellipsis past budget", () => {
+  assert.equal(teamLabel({ name: "United States", code: "USA" }, 9), "United S…");
+});
+test("teamLabel returns TBD for empty name", () => {
+  assert.equal(teamLabel({ name: "", code: "" }, 14), "TBD");
+});
+test("teamLabel escapes HTML", () => {
+  assert.equal(teamLabel({ name: "A&B", code: "AB" }, 14), "A&amp;B");
+});
+test("FLAGS map covers participants and is well-formed", () => {
+  assert.ok(Object.keys(FLAGS).length >= 40);
+  assert.ok(FLAGS["BRA"] && FLAGS["BRA"].includes("|"));
+});
 
 test("worldCupCacheKey is stable", () => {
   assert.equal(worldCupCacheKey(), "wc:data:v1");

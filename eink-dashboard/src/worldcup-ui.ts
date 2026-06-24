@@ -31,6 +31,14 @@ export function teamCode(team: { name: string; code: string }): string {
   return "TBD";
 }
 
+/** Full team name, escaped, truncated to maxChars with an ellipsis. "TBD" if empty. */
+export function teamLabel(team: { name: string; code: string }, maxChars: number): string {
+  const name = (team.name ?? "").trim();
+  if (!name) return "TBD";
+  const shown = name.length > maxChars ? name.slice(0, Math.max(1, maxChars - 1)) + "…" : name;
+  return escapeHTML(shown);
+}
+
 /** Score ("2-1") when finished/live, else the Chicago kickoff time. */
 export function matchCell(m: { status: WcStatus; homeScore: number | null; awayScore: number | null; timeChicago: string }): string {
   if ((m.status === "FINISHED" || m.status === "LIVE") && m.homeScore !== null && m.awayScore !== null) {
