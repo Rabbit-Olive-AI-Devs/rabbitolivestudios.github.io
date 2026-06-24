@@ -8,10 +8,13 @@
     "dry-run": "wrangler deploy --dry-run",
     "typecheck": "tsc --noEmit",
     "test:utils": "tsc -p tsconfig.test.json --outDir /tmp/eink-dashboard-tests && EINK_TEST_BUILD_DIR=/tmp/eink-dashboard-tests node --test tests/*.test.js",
-    "upload-photos": "bash scripts/upload-photos.sh"
+    "upload-photos": "bash scripts/upload-photos.sh",
+    "flags": "node scripts/generate-flags.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241230.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "flag-icons": "^7.5.0",
     "typescript": "^5.7.0",
     "wrangler": "^4.92.0"
   }
