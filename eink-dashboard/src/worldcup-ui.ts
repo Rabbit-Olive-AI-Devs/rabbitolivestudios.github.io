@@ -286,8 +286,8 @@ function splitLayout(data: WorldCupData, theme: WcTheme): string {
 
   return `${header(data)}
   <div class="wc-split">
-    <div class="wc-col"><div class="wc-panel-label">TODAY</div>${today}</div>
-    <div class="wc-col"><div class="wc-panel-label">LATEST RESULTS</div>${results}</div>
+    <div class="wc-col"><div class="wc-panel-label">TODAY</div><div class="wc-rowlist">${today}</div></div>
+    <div class="wc-col"><div class="wc-panel-label">LATEST RESULTS</div><div class="wc-rowlist">${results}</div></div>
   </div>
   ${bottom}`;
 }
@@ -344,36 +344,38 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 3px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
   .wc-title { font-size: 24px; font-weight: 800; letter-spacing: 1px; }
   .wc-sub { font-size: 17px; font-weight: 600; }
-  .wc-panel-label { font-size: 13px; font-weight: 800; letter-spacing: 1.5px; margin-bottom: 4px; }
-  .wc-split { display: flex; gap: 24px; margin-bottom: 10px; }
-  .wc-col { flex: 1; }
-  .wc-row { font-size: 19px; font-weight: 600; padding: 3px 0; border-bottom: 1px solid #ccc; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; overflow: hidden; }
-  .wc-cell { display: inline-block; min-width: 58px; flex: 0 0 auto; font-weight: 800; }
-  .wc-v { font-size: 14px; font-weight: 500; flex: 0 0 auto; }
+  .wc-panel-label { font-size: 15px; font-weight: 800; letter-spacing: 1.5px; margin-bottom: 4px; }
+  .wc-split { display: flex; gap: 24px; flex: 1; min-height: 0; }
+  .wc-col { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .wc-rowlist { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; min-height: 0; overflow: hidden; }
+  .wc-row { font-size: 21px; font-weight: 600; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; overflow: hidden; }
+  .wc-cell { display: inline-block; min-width: 62px; flex: 0 0 auto; font-weight: 800; }
+  .wc-v { font-size: 15px; font-weight: 500; flex: 0 0 auto; }
   .wc-team { display: inline-flex; align-items: center; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
-  .wc-flag { height: 13px; width: auto; vertical-align: middle; margin-right: 6px; border: 1px solid #000; }
-  .wc-flag-big { height: 110px; width: auto; border: 2px solid #000; image-rendering: pixelated; margin-bottom: 4px; }
-  .wc-bottom { flex: 1; min-height: 0; overflow: hidden; border-top: 3px solid #000; padding-top: 6px; }
-  .wc-group-name { font-size: 15px; font-weight: 800; letter-spacing: 1px; margin-bottom: 2px; }
-  .wc-table { width: 100%; border-collapse: collapse; font-size: 18px; }
-  .wc-table th { font-size: 12px; font-weight: 700; text-align: center; padding: 1px 4px; }
-  .wc-table td { text-align: center; padding: 2px 4px; font-weight: 600; }
+  .wc-flag { height: 15px; width: auto; vertical-align: middle; margin-right: 7px; border: 1px solid #000; }
+  .wc-flag-big { height: 150px; width: auto; border: 2px solid #000; image-rendering: pixelated; margin-bottom: 6px; }
+  .wc-bottom { flex: 1.15; min-height: 0; overflow: hidden; border-top: 3px solid #000; padding-top: 6px; display: flex; flex-direction: column; }
+  .wc-group { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .wc-group-name { font-size: 18px; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; }
+  .wc-table { width: 100%; height: 100%; border-collapse: collapse; font-size: 22px; }
+  .wc-table th { font-size: 14px; font-weight: 700; text-align: center; padding: 1px 6px; }
+  .wc-table td { text-align: center; padding: 2px 6px; font-weight: 600; }
   .wc-table td:nth-child(2) { text-align: left; font-weight: 700; }
-  .wc-pos { color: #555; } .wc-pts { font-weight: 800; }
-  .wc-r32 { columns: 2; font-size: 18px; }
-  .wc-bracket { flex: 1; display: flex; gap: 4px; min-height: 0; overflow: hidden; align-items: stretch; }
+  .wc-pos { color: #000; } .wc-pts { font-weight: 800; }
+  .wc-r32 { columns: 2; font-size: 21px; flex: 1; }
+  .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
-  .wc-bcol-label { font-size: 11px; font-weight: 800; text-align: center; letter-spacing: 1px; margin-bottom: 4px; }
-  .wc-tie { border: 2px solid #000; border-radius: 4px; padding: 2px 4px; margin: 3px 0; text-align: center; }
-  .wc-bteam { font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 3px; }
-  .wc-bteam .wc-flag { height: 11px; margin-right: 0; }
-  .wc-bscore { font-size: 13px; font-weight: 800; }
-  .wc-third { font-size: 15px; font-weight: 700; text-align: center; margin-top: 6px; }
-  .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
-  .wc-champ-label { font-size: 20px; font-weight: 700; letter-spacing: 4px; }
-  .wc-champ-team { font-size: 96px; font-weight: 800; }
-  .wc-champ-final { font-size: 28px; font-weight: 700; }
-  .wc-empty { font-size: 16px; color: #555; padding: 6px 0; }
+  .wc-bcol-label { font-size: 13px; font-weight: 800; text-align: center; letter-spacing: 1px; margin-bottom: 4px; }
+  .wc-tie { border: 2px solid #000; border-radius: 4px; padding: 4px 4px; margin: 4px 0; text-align: center; }
+  .wc-bteam { font-size: 19px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .wc-bteam .wc-flag { height: 13px; margin-right: 0; }
+  .wc-bscore { font-size: 15px; font-weight: 800; }
+  .wc-third { font-size: 17px; font-weight: 700; text-align: center; margin-top: 6px; }
+  .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
+  .wc-champ-team { font-size: 104px; font-weight: 800; line-height: 1; }
+  .wc-champ-final { font-size: 30px; font-weight: 700; }
+  .wc-empty { font-size: 18px; color: #000; padding: 6px 0; }
   ${pageCSS}
 </style>
 </head>
