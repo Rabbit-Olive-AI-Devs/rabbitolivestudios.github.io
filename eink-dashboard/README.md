@@ -298,6 +298,8 @@ KV cache (24h)
 
 **Data** comes from football-data.org (primary, free API key) with the static [openfootball/worldcup.json](https://github.com/openfootball/worldcup.json) as a no-key fallback, normalized to a source-agnostic shape and cached as `wc:data:v1`. It reuses the weather stale-while-revalidate + `withBudget` + KV degradation pattern, so the page serves instantly and never blocks the SenseCraft renderer. The favorite team (`FAVORITE_TEAM`, default `BRA`) is highlighted across every view. Preview any phase at 800×480 with `?test-phase=group|r32|knockout|champion`.
 
+**Team display (v3.14.0)** — teams render as **full country names** (truncated per-layout when they don't fit), never 3-letter codes. The **color display also shows country flags**: small flat-color chips next to each name, plus a large hero flag on the champion card. The mono display is text-only — flags aren't legible in pure black/white. Flags are pre-rendered **offline** (`npm run flags`, `scripts/generate-flags.mjs`): [lipis/flag-icons](https://github.com/lipis/flag-icons) SVG → resvg raster → Floyd–Steinberg dither to the Spectra-6 palette → tiny indexed PNGs committed to `src/worldcup-flags.ts` (~16 KB total, no runtime deps). See DECISIONS.md #45.
+
 > **Setup:** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive). Without it, the page runs on the openfootball fallback. Add the two routes to the device pagelists for the tournament; remove after 2026-07-19. See DECISIONS.md #44.
 
 ## Architecture

@@ -1337,3 +1337,19 @@ Same data/layout on both displays via a `WcTheme` object passed to the shared re
 ### Seasonal / removable
 
 ~4-week useful life. Add `/worldcup` + `/color/worldcup` to the device pagelists for the tournament; remove after 2026-07-19 (the champion card is safe to leave up). No cache-key entanglement with other pipelines.
+
+---
+
+## 45. World Cup Full Team Names + Color-Display Flags (v3.14.0, 2026-06-24)
+
+**Decision:** Replace 3-letter team codes with full country names on both displays, and add country flags on the color display only.
+
+**Names (both displays).** `teamLabel(team, maxChars)` returns the escaped full `team.name`, truncated with `…` past a per-layout budget (rows 14, group table 12, bracket 9, champion 20). The fallback when a name doesn't fit is **truncation, not the 3-letter code** (user preference). `teamCode()` stays, but only for favorite-team matching (`isFav`) and flag lookup — not display.
+
+**Flags: color display only.** Spectra-6 (black/white/red/yellow/green/blue) is essentially "flag colors", so flat flags map onto it cleanly. The mono display gets **no flags** — with pure black only (no grays, DECISIONS #1/#40), red/blue/green fields all collapse to the same indistinguishable shape. Mono is full names alone.
+
+**Why pre-render offline (Option A), not inline SVG.** flag-icons SVGs use each flag's *official* hex colors and fine emblem/text detail — both fight a 6-color, ~17px, device-quantized display. This codebase's rule for HTML pages is *only ever emit exact Spectra-6 colors* (the device quantizes whatever we send; see #40/#41), so arbitrary flag colors would quantize unpredictably. Instead `scripts/generate-flags.mjs` runs **offline** (the Workers runtime can't rasterize SVG): flag-icons 4×3 SVG → `@resvg/resvg-js` raster at 36×27 → the project's existing `ditherFloydSteinberg` + `encodePNGIndexed` (same path as the color image pipelines) → base64 indexed PNG. Output is the committed generated map `src/worldcup-flags.ts` (FIFA TLA → `"WxH|base64"`). ~48 flags ≈ **16 KB** total in the bundle; `flag-icons` + `@resvg/resvg-js` are **devDependencies only** (zero runtime cost). Indexed PNGs (~300 B each) are far smaller and crisper than inlining raw SVG.
+
+**Rendering.** `WcTheme` gains an optional `flag?(code): string` hook — the color page (`COLOR_THEME`) supplies an `<img class="wc-flag">` data-URI from `FLAGS`; mono (`MONO_THEME`) omits it. Keeps `worldcup-ui.ts` display-agnostic, like the existing `fav`/`win`/`live` accents. A hairline black border on `.wc-flag` separates white-dominant flags (Japan) from the white page. Champion card uses a 110px `.wc-flag-big` hero. Missing flag → `""`; empty team → `"TBD"`; the page never breaks on a missing asset.
+
+**No KV cache-key change** — flags are static bundle assets, the `wc:data:v1` blob is untouched. To refresh/extend flags: edit the FIFA→ISO map in `scripts/generate-flags.mjs`, run `npm run flags`, commit the regenerated `src/worldcup-flags.ts`. 5 new unit tests (teamLabel ×4 + FLAGS coverage), 37 total.
