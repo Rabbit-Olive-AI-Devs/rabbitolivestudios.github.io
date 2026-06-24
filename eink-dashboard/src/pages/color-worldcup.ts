@@ -9,12 +9,24 @@ import { getWorldCupData } from "../worldcup";
 import { renderWorldCupHTML, type WcTheme } from "../worldcup-ui";
 import { testWorldCupData } from "../worldcup-testdata";
 import { spectra6CSS } from "../spectra6";
+import { FLAGS } from "../worldcup-flags";
+
+/** FIFA code -> Spectra-6 flag chip; "" when the team has no bundled flag. */
+function flagChip(code: string): string {
+  const v = FLAGS[code];
+  if (!v) return "";
+  const sep = v.indexOf("|");
+  const [w, h] = v.slice(0, sep).split("x");
+  const b64 = v.slice(sep + 1);
+  return `<img class="wc-flag" width="${w}" height="${h}" alt="" src="data:image/png;base64,${b64}">`;
+}
 
 const COLOR_THEME: WcTheme = {
   rootCSS: spectra6CSS(),
   fav: "var(--s6-blue)",
   win: "var(--s6-green)",
   live: "var(--s6-red)",
+  flag: flagChip,
 };
 
 function parseTestPhase(raw: string | null): WcPhase | null {

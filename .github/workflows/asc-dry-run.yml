@@ -1,0 +1,73 @@
+name: ASC Dry Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_identifier:
+        description: "Bundle ID (e.g. com.example.app)"
+        required: true
+        type: string
+      app_store_version:
+        description: "App Store version (e.g. 2.2.1)"
+        required: true
+        type: string
+      build_number:
+        description: "Build number (e.g. 38)"
+        required: true
+        type: string
+
+jobs:
+  dry-run:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure required secrets are present
+        env:
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "${ASC_ISSUER_ID}" || { echo "Missing ASC_ISSUER_ID"; exit 1; }
+          test -n "${ASC_KEY_ID}" || { echo "Missing ASC_KEY_ID"; exit 1; }
+          test -n "${ASC_PRIVATE_KEY_B64}" || { echo "Missing ASC_PRIVATE_KEY_B64"; exit 1; }
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install asc-cli
+        run: npm install -g @appstoreconnect/cli
+
+      - name: Materialize API key (ephemeral)
+        env:
+          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_PRIVATE_KEY_B64" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/asc/AuthKey.p8"
+
+      - name: Authenticate + read-only checks
+        env:
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          set -euo pipefail
+          chmod +x .github/scripts/asc-dry-run.sh
+          .github/scripts/asc-dry-run.sh \
+            "${{ github.event.inputs.app_identifier }}" \
+            "${{ github.event.inputs.app_store_version }}" \
+            "${{ github.event.inputs.build_number }}" \
+            "$ASC_ISSUER_ID" \
+            "$ASC_KEY_ID" \
+            "$RUNNER_TEMP/asc/AuthKey.p8"
+
+      - name: Cleanup key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc/AuthKey.p8"

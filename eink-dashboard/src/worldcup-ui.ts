@@ -145,11 +145,15 @@ export interface WcTheme {
   fav: string;       // favorite-team accent color (CSS color)
   win: string;       // win/qualified accent
   live: string;      // live / today accent
+  flag?: (code: string) => string;  // FIFA code -> <img> flag chip (color page only)
 }
 
 export const FAVORITE_TEAM: string = "BRA"; // 3-letter code; "" disables the highlight
 
 const isFav = (code: string) => FAVORITE_TEAM !== "" && code === FAVORITE_TEAM;
+
+/** Flag chip HTML for a FIFA code, or "" when the theme has no flags (mono). */
+const flagImg = (theme: WcTheme, code: string) => (theme.flag ? theme.flag(code) : "");
 
 /** One match row: "TIME/SCORE  HOME v AWAY", with favorite + live accents. */
 function matchRow(mm: WcMatch, theme: WcTheme): string {
@@ -158,9 +162,11 @@ function matchRow(mm: WcMatch, theme: WcTheme): string {
   const cellColor = mm.status === "LIVE" ? theme.live : "#000";
   const favMark = (c: string) => (isFav(c) ? ` style="color:${theme.fav};font-weight:800"` : "");
   const star = (isFav(h) || isFav(a)) ? ` <span style="color:${theme.fav}">&#9654;</span>` : "";
+  const side = (team: WcMatch["home"], code: string) =>
+    `<span class="wc-team"${favMark(code)}>${flagImg(theme, code)}${teamLabel(team, 14)}</span>`;
   return `<div class="wc-row">
     <span class="wc-cell" style="color:${cellColor}">${escapeHTML(cell)}</span>
-    <span${favMark(h)}>${escapeHTML(h)}</span> <span class="wc-v">v</span> <span${favMark(a)}>${escapeHTML(a)}</span>${star}
+    ${side(mm.home, h)} <span class="wc-v">v</span> ${side(mm.away, a)}${star}
   </div>`;
 }
 
@@ -172,7 +178,7 @@ function groupTable(group: WcGroup, theme: WcTheme): string {
     const nameStyle = fav ? ` style="color:${theme.fav};font-weight:800"` : "";
     return `<tr>
       <td class="wc-pos">${r.position}</td>
-      <td${nameStyle}>${escapeHTML(code)}${mark}</td>
+      <td${nameStyle}>${flagImg(theme, code)}${teamLabel(r.team, 12)}${mark}</td>
       <td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td>
       <td>${r.goalDifference >= 0 ? "+" : ""}${r.goalDifference}</td>
       <td class="wc-pts">${r.points}</td>
@@ -193,14 +199,14 @@ function bracketColumn(round: WcBracketRound, theme: WcTheme): string {
     const finished = mm.status === "FINISHED" && mm.homeScore !== null && mm.awayScore !== null;
     const homeWon = finished && mm.homeScore! > mm.awayScore!;
     const awayWon = finished && mm.awayScore! > mm.homeScore!;
-    const side = (code: string, won: boolean) => {
+    const side = (team: WcMatch["home"], code: string, won: boolean) => {
       const fav = isFav(code) ? `color:${theme.fav};` : "";
       const w = won ? "font-weight:800;" : "";
-      return `<div class="wc-bteam" style="${fav}${w}">${escapeHTML(code)}</div>`;
+      return `<div class="wc-bteam" style="${fav}${w}">${flagImg(theme, code)}${teamLabel(team, 9)}</div>`;
     };
     const sc = finished ? `<div class="wc-bscore">${mm.homeScore}-${mm.awayScore}</div>` : "";
     const liveCls = mm.status === "LIVE" ? ` style="border-color:${theme.live}"` : "";
-    return `<div class="wc-tie"${liveCls}>${side(h, homeWon)}${side(a, awayWon)}${sc}</div>`;
+    return `<div class="wc-tie"${liveCls}>${side(mm.home, h, homeWon)}${side(mm.away, a, awayWon)}${sc}</div>`;
   }).join("");
   return `<div class="wc-bcol"><div class="wc-bcol-label">${escapeHTML(round.label)}</div>${ties}</div>`;
 }
@@ -258,14 +264,19 @@ function bracketLayout(data: WorldCupData, theme: WcTheme): string {
 
 function championLayout(data: WorldCupData, theme: WcTheme): string {
   const final = data.knockout.find((m) => m.stage === "FINAL");
-  const champ = data.champion ? teamCode(data.champion) : "—";
+  const champCode = data.champion ? teamCode(data.champion) : "";
+  const champName = data.champion ? teamLabel(data.champion, 20) : "—";
+  const bigFlag = data.champion && theme.flag
+    ? theme.flag(champCode).replace('class="wc-flag"', 'class="wc-flag-big"')
+    : "";
   const score = final ? `${final.homeScore}-${final.awayScore}` : "";
-  const matchup = final ? `${teamCode(final.home)} ${score} ${teamCode(final.away)}` : "";
+  const matchup = final ? `${teamLabel(final.home, 20)} ${escapeHTML(score)} ${teamLabel(final.away, 20)}` : "";
   return `${header(data)}
   <div class="wc-champion">
     <div class="wc-champ-label">CHAMPIONS</div>
-    <div class="wc-champ-team" style="color:${theme.win}">${escapeHTML(champ)}</div>
-    <div class="wc-champ-final">${escapeHTML(matchup)}</div>
+    ${bigFlag}
+    <div class="wc-champ-team" style="color:${theme.win}">${champName}</div>
+    <div class="wc-champ-final">${matchup}</div>
   </div>`;
 }
 
@@ -297,6 +308,9 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-row { font-size: 19px; font-weight: 600; padding: 3px 0; border-bottom: 1px solid #ccc; display: flex; align-items: center; gap: 8px; }
   .wc-cell { display: inline-block; min-width: 64px; font-weight: 800; }
   .wc-v { font-size: 14px; font-weight: 500; }
+  .wc-team { display: inline-flex; align-items: center; }
+  .wc-flag { height: 13px; width: auto; vertical-align: middle; margin-right: 6px; border: 1px solid #000; }
+  .wc-flag-big { height: 110px; width: auto; border: 2px solid #000; image-rendering: pixelated; margin-bottom: 4px; }
   .wc-bottom { flex: 1; min-height: 0; overflow: hidden; border-top: 3px solid #000; padding-top: 6px; }
   .wc-group-name { font-size: 15px; font-weight: 800; letter-spacing: 1px; margin-bottom: 2px; }
   .wc-table { width: 100%; border-collapse: collapse; font-size: 18px; }
@@ -309,7 +323,8 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
   .wc-bcol-label { font-size: 11px; font-weight: 800; text-align: center; letter-spacing: 1px; margin-bottom: 4px; }
   .wc-tie { border: 2px solid #000; border-radius: 4px; padding: 2px 4px; margin: 3px 0; text-align: center; }
-  .wc-bteam { font-size: 16px; font-weight: 600; }
+  .wc-bteam { font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .wc-bteam .wc-flag { height: 11px; margin-right: 0; }
   .wc-bscore { font-size: 13px; font-weight: 800; }
   .wc-third { font-size: 15px; font-weight: 700; text-align: center; margin-top: 6px; }
   .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
