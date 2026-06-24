@@ -1290,3 +1290,68 @@ We could not pin the May 28 occurrence to cold cache vs. a transient network/col
 ### Tests
 
 `tests/utils.test.js` covers `withBudget` directly: fast resolve passes through, slow resolve becomes `null`, rejection rethrows.
+
+---
+
+## 44. World Cup 2026 Adaptive Dashboard (v3.13.0, 2026-06-23)
+
+### Decision: one adaptive page per display, phase-driven, with a resilient dual data source
+
+A seasonal FIFA World Cup 2026 view for both displays — `/worldcup` (E1001 mono) and `/color/worldcup` (E1002 Spectra 6) — for the duration of the tournament (group stage now → final 2026-07-19). Rather than three separate pages (today's matches / standings / bracket), it is a **single adaptive page per display** that transitions itself by tournament phase, so a glance always shows the most relevant thing and the SenseCraft pagelist stays short.
+
+### Phase model (derived from data, not the calendar)
+
+`computePhase()` in `src/worldcup-ui.ts` inspects the full match list:
+
+| Phase | Condition | Layout |
+|-------|-----------|--------|
+| **group** | any GROUP match not yet FINISHED | split: today + latest results, rotating group table |
+| **r32** | groups done, furthest active round is R32 | split: today + results, Round-of-32 list |
+| **knockout** | furthest active round ∈ {R16, QF, SF, Final} | converging R16→Final bracket tree |
+| **champion** | FINAL finished | champion card (winner + final score) |
+
+### Bracket legibility (the hard constraint)
+
+A 32-team tree is not legible on 800×480 with the available font. So the **Round of 32 is rendered as a list** during its ~6-day window, and only the **R16→QF→SF→Final** tree (≤8 ties, 7 columns ≈ 114px each) is drawn as a converging bracket. The third-place playoff is a one-line footer. `buildBracket()` deliberately excludes R32 and THIRD from the tree.
+
+### Data source: football-data.org primary + openfootball fallback
+
+Reuses the weather resilience pattern (#42/#43): stale-while-revalidate over KV, `withBudget` cold-path bound (5s), degradation chain. `src/worldcup.ts` tries **football-data.org** (`/competitions/WC/matches` + `/standings`, `X-Auth-Token` secret `FOOTBALL_DATA_KEY`) then falls back to the static **openfootball/worldcup.json** (no key, ~daily updates). Both normalize to a single source-agnostic `WorldCupData`.
+
+- **Why football-data primary:** its `/standings` endpoint computes the group tables server-side. Computing 2026 standings + tiebreakers + the 8-best-third-place ranking ourselves would be the most bug-prone part of the feature.
+- **Why openfootball fallback:** zero-key resilience; it derives simple standings (points/GD) from finished matches when it is the only source available.
+- Cache key `wc:data:v1` (single blob serves both displays — same tournament data). Soft TTL 12 min (drives SWR), KV `expirationTtl` 86400 (≫ soft TTL, per #24). Warmed in the every-6h cron block.
+
+### Third-place qualification ambiguity
+
+2026 advances the 8 best third-placed teams to the Round of 32 — a cross-group, mid-stage-unstable ranking. We therefore mark only the **top 2** of each group as qualifying (`✓`); third place is **never** auto-marked, to avoid implying a wrong outcome.
+
+### Display styling
+
+Same data/layout on both displays via a `WcTheme` object passed to the shared render builders in `worldcup-ui.ts`. Mono = pure black + glyph markers (`▶` favorite, `✓` qualified). Color = Spectra-6 accents: green qualified/champion, red live, blue favorite; **yellow never as foreground** (#40). Favorite team is the `FAVORITE_TEAM` constant (`"BRA"`; `""` disables).
+
+### Testing
+
+`?test-phase=group|r32|knockout|champion` injects canned fixtures (`src/worldcup-testdata.ts`) to preview every layout at 800×480 before the real data reaches that phase. Cheap (no upstream) → no `TEST_AUTH_KEY` required, like `?test-device`. 17 unit tests cover phase detection, team-code/match-cell formatting, group rotation, bracket building, Chicago time conversion, and both normalizers.
+
+### Seasonal / removable
+
+~4-week useful life. Add `/worldcup` + `/color/worldcup` to the device pagelists for the tournament; remove after 2026-07-19 (the champion card is safe to leave up). No cache-key entanglement with other pipelines.
+
+---
+
+## 45. World Cup Full Team Names + Color-Display Flags (v3.14.0, 2026-06-24)
+
+**Decision:** Replace 3-letter team codes with full country names on both displays, and add country flags on the color display only.
+
+**Names (both displays).** `teamLabel(team, maxChars)` returns the escaped display name, truncated with `…` past a per-layout budget (rows 14, group table 12, bracket 12, champion 20). The fallback when a name doesn't fit is **truncation, not the 3-letter code** (user preference); truncation is word-aware (trims a trailing space/hyphen so we get `Bosnia…`, not `Bosnia-…`). `displayName()` first applies a curated `NAME_OVERRIDES` map (keyed by FIFA code) for names that overflow the panels: `S. Korea`, `S. Africa`, `Bosnia` (from Bosnia-Herzegovina), `Cape Verde`, `USA`. Match rows are `flex-wrap:nowrap` + `overflow:hidden` so two long names (e.g. South Africa v South Korea) never wrap to a second line and push the standings table. `teamCode()` stays, but only for favorite-team matching (`isFav`) and flag lookup — not display.
+
+**Qualified ✓ means *mathematically* qualified.** `qualifiedFlags(rows)` marks a group-table team with ✓ only when it is **guaranteed** a top-2 finish, not merely currently in the top 2. Conservative worst-case test per team: it gets nothing more from its remaining games while every rival wins all of theirs; ✓ only if at most one rival can still reach-or-exceed its current points. Once the group is complete, ✓ = final position ≤ 2. Never false-positives (a ✓ is real); may under-mark in rare tie/cross-fixture cases, which is the safe side. Third-place best-of qualification is never marked (cross-group / unstable, per #44). Replaces the old `qualifying = position <= 2` flag, which lit up prematurely mid-group.
+
+**Flags: color display only.** Spectra-6 (black/white/red/yellow/green/blue) is essentially "flag colors", so flat flags map onto it cleanly. The mono display gets **no flags** — with pure black only (no grays, DECISIONS #1/#40), red/blue/green fields all collapse to the same indistinguishable shape. Mono is full names alone.
+
+**Why pre-render offline (Option A), not inline SVG.** flag-icons SVGs use each flag's *official* hex colors and fine emblem/text detail — both fight a 6-color, ~17px, device-quantized display. This codebase's rule for HTML pages is *only ever emit exact Spectra-6 colors* (the device quantizes whatever we send; see #40/#41), so arbitrary flag colors would quantize unpredictably. Instead `scripts/generate-flags.mjs` runs **offline** (the Workers runtime can't rasterize SVG): flag-icons 4×3 SVG → `@resvg/resvg-js` raster at 36×27 → the project's existing `ditherFloydSteinberg` + `encodePNGIndexed` (same path as the color image pipelines) → base64 indexed PNG. Output is the committed generated map `src/worldcup-flags.ts` (FIFA TLA → `"WxH|base64"`). ~48 flags ≈ **16 KB** total in the bundle; `flag-icons` + `@resvg/resvg-js` are **devDependencies only** (zero runtime cost). Indexed PNGs (~300 B each) are far smaller and crisper than inlining raw SVG.
+
+**Rendering.** `WcTheme` gains an optional `flag?(code): string` hook — the color page (`COLOR_THEME`) supplies an `<img class="wc-flag">` data-URI from `FLAGS`; mono (`MONO_THEME`) omits it. Keeps `worldcup-ui.ts` display-agnostic, like the existing `fav`/`win`/`live` accents. A hairline black border on `.wc-flag` separates white-dominant flags (Japan) from the white page. Champion card uses a 110px `.wc-flag-big` hero. Missing flag → `""`; empty team → `"TBD"`; the page never breaks on a missing asset.
+
+**No KV cache-key change** — flags are static bundle assets, the `wc:data:v1` blob is untouched. To refresh/extend flags: edit the FIFA→ISO map in `scripts/generate-flags.mjs`, run `npm run flags`, commit the regenerated `src/worldcup-flags.ts`. 5 new unit tests (teamLabel ×4 + FLAGS coverage), 37 total.

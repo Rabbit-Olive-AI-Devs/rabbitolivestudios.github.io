@@ -7,6 +7,7 @@ export const COLOR_MOMENT_CACHE_VERSION = "v2";
 export const COLOR_BIRTHDAY_CACHE_VERSION = "v1";
 export const MOMENT_CACHE_VERSION = "v1";
 export const SKYLINE_CACHE_VERSION = "v3";
+export const WORLDCUP_CACHE_VERSION = "v1";
 
 export function fact4CacheKey(dateStr: string): string {
   return `fact4:${FACT4_CACHE_VERSION}:${dateStr}`;
@@ -48,4 +49,8 @@ export function skylineCacheKey(
 
 export function generationLockKey(cacheKey: string): string {
   return `gen-lock:v1:${cacheKey}`;
+}
+
+export function worldCupCacheKey(): string {
+  return `wc:data:${WORLDCUP_CACHE_VERSION}`;
 }

@@ -4,6 +4,7 @@ export interface Env {
   IMAGES: any;
   PHOTOS: R2Bucket;
   TEST_AUTH_KEY?: string;
+  FOOTBALL_DATA_KEY?: string;
 }
 
 // --- Moment Before types ---
@@ -135,4 +136,57 @@ export interface CachedValue<T> {
   timestamp: number;
   /** Which provider produced this weather data (diagnostics; weather only). */
   source?: "open-meteo" | "nws";
+}
+
+// --- World Cup 2026 types ---
+
+export type WcStage = "GROUP" | "R32" | "R16" | "QF" | "SF" | "THIRD" | "FINAL";
+export type WcStatus = "SCHEDULED" | "LIVE" | "FINISHED";
+export type WcPhase = "group" | "r32" | "knockout" | "champion";
+
+export interface WcTeam {
+  name: string;
+  code: string; // 3-letter (BRA, USA); "TBD" when undecided
+}
+
+export interface WcMatch {
+  id: number;
+  stage: WcStage;
+  group?: string;            // "A".."L" for group stage
+  status: WcStatus;
+  kickoffISO: string;        // UTC ISO from source
+  dateChicago: string;       // YYYY-MM-DD in America/Chicago
+  timeChicago: string;       // "1:00 PM" in America/Chicago
+  home: WcTeam;
+  away: WcTeam;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
+export interface WcStandingRow {
+  position: number;
+  team: WcTeam;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalDifference: number;
+  points: number;
+  qualifying: boolean;       // top 2 only; third place never auto-marked
+}
+
+export interface WcGroup {
+  name: string;              // "A".."L"
+  rows: WcStandingRow[];
+}
+
+export interface WorldCupData {
+  source: "football-data" | "openfootball";
+  phase: WcPhase;
+  todayMatches: WcMatch[];
+  recentResults: WcMatch[];  // most recent finished matchday
+  groups: WcGroup[];         // [] once group stage is over
+  knockout: WcMatch[];       // R32..Final matches
+  champion: WcTeam | null;
+  generatedAt: number;       // epoch ms
 }

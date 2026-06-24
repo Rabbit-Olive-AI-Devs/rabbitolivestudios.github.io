@@ -6,6 +6,9 @@ import { generateMomentBefore, getOrGenerateMoment } from "./moment";
 import { handleWeatherPageV2 } from "./pages/weather2";
 import { handleFactPage } from "./pages/fact";
 import { handleColorWeatherPage } from "./pages/color-weather";
+import { handleWorldCupPage } from "./pages/worldcup";
+import { handleColorWorldCupPage } from "./pages/color-worldcup";
+import { getWorldCupData } from "./worldcup";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
@@ -50,7 +53,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.12.0";
+const VERSION = "3.14.0";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -671,8 +674,9 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       getWeatherForLocation(env, 41.8781, -87.6298, "60606", "Chicago, IL"),
       fetchDeviceData(env, E1001_DEVICE_ID),
       fetchDeviceData(env, E1002_DEVICE_ID),
+      getWorldCupData(env),
     ]);
-    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002"] as const;
+    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002", "worldcup"] as const;
     for (let i = 0; i < sixHourResults.length; i++) {
       if (sixHourResults[i].status === "rejected") {
         console.error(`Cron: ${labels[i]} warm failed:`, (sixHourResults[i] as PromiseRejectedResult).reason);
@@ -1000,6 +1004,10 @@ export default {
         return handleFactPage();
       case "/color/weather":
         return handleColorWeatherPage(env, url, ctx);
+      case "/worldcup":
+        return handleWorldCupPage(env, url, ctx);
+      case "/color/worldcup":
+        return handleColorWorldCupPage(env, url, ctx);
       case "/color/moment":
         return handleColorMomentPage(env, url);
       case "/color/test-moment": {
@@ -1046,6 +1054,7 @@ export default {
             endpoints: [
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
+              "/worldcup", "/color/worldcup",
               "/skyline", "/skyline-bw", "/skyline.png",
               "/test-birthday.png", "/health", "/health-detailed",
             ],
