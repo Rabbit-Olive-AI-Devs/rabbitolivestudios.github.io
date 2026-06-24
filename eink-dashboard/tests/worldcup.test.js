@@ -10,6 +10,8 @@ const {
   computePhase,
   teamCode,
   teamLabel,
+  displayName,
+  qualifiedFlags,
   matchCell,
   STAGE_LABELS,
   pickRotatingGroup,
@@ -25,13 +27,42 @@ test("teamLabel returns full name within budget", () => {
   assert.equal(teamLabel({ name: "Brazil", code: "BRA" }, 14), "Brazil");
 });
 test("teamLabel truncates with ellipsis past budget", () => {
-  assert.equal(teamLabel({ name: "United States", code: "USA" }, 9), "United S…");
+  assert.equal(teamLabel({ name: "Netherlands", code: "NED" }, 9), "Netherla…");
+});
+test("teamLabel word-aware truncation trims a trailing hyphen", () => {
+  // No override for code XXX, so the raw name is truncated; the cut lands on "Bosnia-".
+  assert.equal(teamLabel({ name: "Bosnia-Herzegovina", code: "XXX" }, 8), "Bosnia…");
 });
 test("teamLabel returns TBD for empty name", () => {
   assert.equal(teamLabel({ name: "", code: "" }, 14), "TBD");
 });
 test("teamLabel escapes HTML", () => {
   assert.equal(teamLabel({ name: "A&B", code: "AB" }, 14), "A&amp;B");
+});
+test("displayName applies curated overrides", () => {
+  assert.equal(displayName({ name: "South Korea", code: "KOR" }), "S. Korea");
+  assert.equal(displayName({ name: "South Africa", code: "RSA" }), "S. Africa");
+  assert.equal(displayName({ name: "Bosnia-Herzegovina", code: "BIH" }), "Bosnia");
+  assert.equal(displayName({ name: "Brazil", code: "BRA" }), "Brazil");
+});
+test("qualifiedFlags marks only clinched top-2 mid-group", () => {
+  const rows = [
+    { position: 1, played: 2, points: 6 },
+    { position: 2, played: 2, points: 4 },
+    { position: 3, played: 2, points: 1 },
+    { position: 4, played: 2, points: 0 },
+  ];
+  // Leader clinched; 2nd not safe (a 1-pt team can still reach 4).
+  assert.deepEqual(qualifiedFlags(rows), [true, false, false, false]);
+});
+test("qualifiedFlags marks top 2 once the group is complete", () => {
+  const rows = [
+    { position: 1, played: 3, points: 9 },
+    { position: 2, played: 3, points: 4 },
+    { position: 3, played: 3, points: 4 },
+    { position: 4, played: 3, points: 0 },
+  ];
+  assert.deepEqual(qualifiedFlags(rows), [true, true, false, false]);
 });
 test("FLAGS map covers participants and is well-formed", () => {
   assert.ok(Object.keys(FLAGS).length >= 40);

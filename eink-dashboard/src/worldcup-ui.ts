@@ -31,12 +31,53 @@ export function teamCode(team: { name: string; code: string }): string {
   return "TBD";
 }
 
-/** Full team name, escaped, truncated to maxChars with an ellipsis. "TBD" if empty. */
+/** Curated short names for teams whose full name overflows the panels. Keyed by FIFA code. */
+const NAME_OVERRIDES: Record<string, string> = {
+  RSA: "S. Africa",
+  KOR: "S. Korea",
+  BIH: "Bosnia",
+  CPV: "Cape Verde",
+  USA: "USA",
+};
+
+/** Display name: curated override when present, else the source name. */
+export function displayName(team: { name: string; code: string }): string {
+  const code = (team.code ?? "").trim().toUpperCase();
+  if (NAME_OVERRIDES[code]) return NAME_OVERRIDES[code];
+  return (team.name ?? "").trim();
+}
+
+/** Full team name, escaped, word-aware-truncated to maxChars with an ellipsis. "TBD" if empty. */
 export function teamLabel(team: { name: string; code: string }, maxChars: number): string {
-  const name = (team.name ?? "").trim();
+  const name = displayName(team);
   if (!name) return "TBD";
-  const shown = name.length > maxChars ? name.slice(0, Math.max(1, maxChars - 1)) + "…" : name;
+  let shown = name;
+  if (name.length > maxChars) {
+    // Trim a trailing space/hyphen left by the cut so we don't get "Bosnia-…".
+    shown = name.slice(0, Math.max(1, maxChars - 1)).replace(/[\s\-–]+$/, "") + "…";
+  }
   return escapeHTML(shown);
+}
+
+/**
+ * Per-row "mathematically guaranteed a top-2 group finish" flags. Conservative:
+ * never marks a team that could still be overtaken (so the ✓ means truly qualified,
+ * not just "currently top 2"). Third-place best-of qualification is never marked
+ * (cross-group / unstable — see DECISIONS #44).
+ */
+export function qualifiedFlags(
+  rows: { position: number; played: number; points: number }[],
+): boolean[] {
+  const gamesEach = Math.max(1, rows.length - 1);          // group of 4 -> 3 games each
+  const complete = rows.every((r) => r.played >= gamesEach);
+  return rows.map((r) => {
+    if (complete) return r.position <= 2;                   // positions are final
+    // Worst case for r (gains nothing more); best case for each rival (wins all remaining).
+    const threats = rows.filter(
+      (o) => o !== r && o.points + 3 * (gamesEach - o.played) >= r.points,
+    ).length;
+    return threats <= 1;                                    // at most one team can finish above -> top 2 safe
+  });
 }
 
 /** Score ("2-1") when finished/live, else the Chicago kickoff time. */
@@ -171,10 +212,11 @@ function matchRow(mm: WcMatch, theme: WcTheme): string {
 }
 
 function groupTable(group: WcGroup, theme: WcTheme): string {
-  const rows = group.rows.map((r) => {
+  const qualified = qualifiedFlags(group.rows);
+  const rows = group.rows.map((r, i) => {
     const code = teamCode(r.team);
     const fav = isFav(code);
-    const mark = r.qualifying ? ` <span style="color:${theme.win}">&#10003;</span>` : "";
+    const mark = qualified[i] ? ` <span style="color:${theme.win}">&#10003;</span>` : "";
     const nameStyle = fav ? ` style="color:${theme.fav};font-weight:800"` : "";
     return `<tr>
       <td class="wc-pos">${r.position}</td>
@@ -305,10 +347,10 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-panel-label { font-size: 13px; font-weight: 800; letter-spacing: 1.5px; margin-bottom: 4px; }
   .wc-split { display: flex; gap: 24px; margin-bottom: 10px; }
   .wc-col { flex: 1; }
-  .wc-row { font-size: 19px; font-weight: 600; padding: 3px 0; border-bottom: 1px solid #ccc; display: flex; align-items: center; gap: 8px; }
-  .wc-cell { display: inline-block; min-width: 64px; font-weight: 800; }
-  .wc-v { font-size: 14px; font-weight: 500; }
-  .wc-team { display: inline-flex; align-items: center; }
+  .wc-row { font-size: 19px; font-weight: 600; padding: 3px 0; border-bottom: 1px solid #ccc; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; overflow: hidden; }
+  .wc-cell { display: inline-block; min-width: 58px; flex: 0 0 auto; font-weight: 800; }
+  .wc-v { font-size: 14px; font-weight: 500; flex: 0 0 auto; }
+  .wc-team { display: inline-flex; align-items: center; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
   .wc-flag { height: 13px; width: auto; vertical-align: middle; margin-right: 6px; border: 1px solid #000; }
   .wc-flag-big { height: 110px; width: auto; border: 2px solid #000; image-rendering: pixelated; margin-bottom: 4px; }
   .wc-bottom { flex: 1; min-height: 0; overflow: hidden; border-top: 3px solid #000; padding-top: 6px; }
