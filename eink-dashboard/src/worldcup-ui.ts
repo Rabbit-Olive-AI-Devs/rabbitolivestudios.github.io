@@ -348,7 +348,7 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-split { display: flex; gap: 24px; flex: 1; min-height: 0; }
   .wc-col { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .wc-rowlist { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; min-height: 0; overflow: hidden; }
-  .wc-row { font-size: 21px; font-weight: 600; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; overflow: hidden; }
+  .wc-row { font-size: 21px; font-weight: 700; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; overflow: hidden; }
   .wc-cell { display: inline-block; min-width: 62px; flex: 0 0 auto; font-weight: 800; }
   .wc-v { font-size: 15px; font-weight: 500; flex: 0 0 auto; }
   .wc-team { display: inline-flex; align-items: center; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
@@ -359,7 +359,7 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-group-name { font-size: 18px; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; }
   .wc-table { width: 100%; height: 100%; border-collapse: collapse; font-size: 22px; }
   .wc-table th { font-size: 14px; font-weight: 700; text-align: center; padding: 1px 6px; }
-  .wc-table td { text-align: center; padding: 2px 6px; font-weight: 600; }
+  .wc-table td { text-align: center; padding: 2px 6px; font-weight: 700; }
   .wc-table td:nth-child(2) { text-align: left; font-weight: 700; }
   .wc-pos { color: #000; } .wc-pts { font-weight: 800; }
   .wc-r32 { columns: 2; font-size: 21px; flex: 1; }
@@ -367,7 +367,7 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
   .wc-bcol-label { font-size: 13px; font-weight: 800; text-align: center; letter-spacing: 1px; margin-bottom: 4px; }
   .wc-tie { border: 2px solid #000; border-radius: 4px; padding: 4px 4px; margin: 4px 0; text-align: center; }
-  .wc-bteam { font-size: 19px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .wc-bteam { font-size: 19px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; }
   .wc-bteam .wc-flag { height: 13px; margin-right: 0; }
   .wc-bscore { font-size: 15px; font-weight: 800; }
   .wc-third { font-size: 17px; font-weight: 700; text-align: center; margin-top: 6px; }

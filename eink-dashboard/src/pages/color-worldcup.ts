@@ -21,11 +21,15 @@ function flagChip(code: string): string {
   return `<img class="wc-flag" width="${w}" height="${h}" alt="" src="data:image/png;base64,${b64}">`;
 }
 
+// All text is pure black: colored glyphs anti-alias to in-between colors that the
+// Spectra-6 panel dithers into speckle ("smudge"). Color identity comes from the
+// flags (pre-dithered images), not the type. Accents are conveyed by weight + the
+// ▶/✓ markers, exactly like the mono display.
 const COLOR_THEME: WcTheme = {
   rootCSS: spectra6CSS(),
-  fav: "var(--s6-blue)",
-  win: "var(--s6-green)",
-  live: "var(--s6-red)",
+  fav: "#000",
+  win: "#000",
+  live: "#000",
   flag: flagChip,
 };
 
