@@ -41,8 +41,9 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
 | **World Cup 2026** (seasonal) | | |
-| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono (today's matches + results, rotating group standings, knockout bracket) | 15 min |
-| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 (color accents) | 15 min |
+| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono — served as a **server-pre-dithered 1-bit PNG** (Browser Rendering screenshot of the Inter HTML; DECISIONS #48). SWR-cached + cron-warmed | ~14 min |
+| `GET /worldcup?variant=src` | The Inter-styled HTML screenshot source (also a raw-HTML debug view) | none |
+| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 — live HTML with color flags | 15 min |
 | `GET /worldcup?test-phase=group\|r32\|knockout\|champion` | Preview any phase layout with canned data (also on `/color/worldcup`) | none |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store) | none |
@@ -296,13 +297,18 @@ KV cache (24h)
 - **Knockouts (R16→Final)** — a converging bracket tree fills the screen; today's ties highlighted, winners bold.
 - **Champion** — winner card after the final.
 
-**Data** comes from football-data.org (primary, free API key) with the static [openfootball/worldcup.json](https://github.com/openfootball/worldcup.json) as a no-key fallback, normalized to a source-agnostic shape and cached as `wc:data:v1`. It reuses the weather stale-while-revalidate + `withBudget` + KV degradation pattern, so the page serves instantly and never blocks the SenseCraft renderer. The favorite team (`FAVORITE_TEAM`, default `BRA`) is highlighted across every view. Preview any phase at 800×480 with `?test-phase=group|r32|knockout|champion`.
+**Data** comes from football-data.org (primary, free API key) with the static [openfootball/worldcup.json](https://github.com/openfootball/worldcup.json) as a no-key fallback, normalized to a source-agnostic shape and cached as `wc:data:v2`. It reuses the weather stale-while-revalidate + `withBudget` + KV degradation pattern, so the page serves instantly and never blocks the SenseCraft renderer. The favorite team (`FAVORITE_TEAM`, default `BRA`) is highlighted across every view. Preview any phase at 800×480 with `?test-phase=group|r32|knockout|champion`.
 
-**Team display (v3.14.0)** — teams render as **full country names** (truncated per-layout when they don't fit, with curated abbreviations like `S. Korea`/`Bosnia`), never 3-letter codes. The **color display also shows country flags**: small flat-color chips next to each name, plus a large hero flag on the champion card. The mono display is text-only — flags aren't legible in pure black/white. Flags are pre-rendered **offline** (`npm run flags`, `scripts/generate-flags.mjs`): [lipis/flag-icons](https://github.com/lipis/flag-icons) SVG → resvg raster → Floyd–Steinberg dither to the Spectra-6 palette → tiny indexed PNGs committed to `src/worldcup-flags.ts` (~16 KB total, no runtime deps). The group-table **✓ marks only teams mathematically guaranteed a top-2 finish**, not whoever is momentarily in the top 2.
+**Team display (v3.14.0)** — teams render as **full country names** (truncated per-layout when they don't fit, with curated abbreviations like `S. Korea`/`Bosnia`), never 3-letter codes. The **color display also shows country flags**: small flat-color chips next to each name, plus a large hero flag on the champion card. The mono display is text-only — flags aren't legible in pure black/white. Flags are pre-rendered **offline** (`npm run flags`, `scripts/generate-flags.mjs`): [lipis/flag-icons](https://github.com/lipis/flag-icons) SVG → resvg raster → Floyd–Steinberg dither to the Spectra-6 palette → tiny indexed PNGs committed to `src/worldcup-flags.ts` (~16 KB total, no runtime deps). The group-table **✓ marks only teams mathematically guaranteed a top-2 finish** (DECISIONS.md #47): `qualifiedFlags` brute-forces every win/draw/loss outcome of the group's *remaining* fixtures and marks a team only if it's top-2 in all of them — so it catches cases like "USA is safe because its two chasers play each other," which the old points-only heuristic missed. Best-third qualification is never auto-marked.
 
-**All text is pure black on both displays** — color comes only from the flags. Colored type smudges on the Spectra-6 panel (it dithers non-palette colors into edge speckle), so accents are carried by font weight and the ▶/✓ markers instead. To stay crisp on both the mono and color panels, the WC pages follow the same typographic rules as the weather pages: font weights stay **≤700** (body `500`–`600`, emphasis `700`; `800` blobs at small sizes) and text rows are **content-sized at integer pixel positions** rather than stretched to fill — so content packs from the top with some bottom whitespace, trading full-bleed fill for sharpness. See DECISIONS.md #45 (pure black) and #46 (weights + integer positioning).
+**Rendering differs by display (DECISIONS.md #48):**
 
-> **Setup:** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive). Without it, the page runs on the openfootball fallback. Add the two routes to the device pagelists for the tournament; remove after 2026-07-19. See DECISIONS.md #44.
+- **B&W `/worldcup`** is served as a **server-pre-dithered 1-bit PNG**, not live HTML. SenseCraft renders pages in a cloud headless browser and dithers grayscale text edges into "fog" on the mono panel; to defeat that, the Worker uses **Cloudflare Browser Rendering** (`[browser]` binding + `@cloudflare/puppeteer`, `nodejs_compat`) to screenshot the Inter-styled HTML source (`?variant=src`) at 2×, supersample to 800×480, and threshold to pure black/white itself — so the cloud has no gray to fog and the panel shows crisp proportional type with full names. The image is cached `wc:image:v3` with stale-while-revalidate (14-min soft TTL) + a 6-h cron warm, so the device always gets an instant response despite the ~10 s browser launch; a cold cache falls back to the Inter HTML so the panel never blanks. Inter is inlined as base64 in `src/worldcup-fonts.ts`.
+- **Color `/color/worldcup`** is live HTML with the Spectra-6 palette + flags. All text is pure `#000`; color comes only from the pre-dithered flag images (colored type smudges on Spectra-6), and accents are carried by weight + the ▶/✓ markers.
+
+The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `COLOR_STYLE`, `MONO_STYLE_BASE`), passed via `WcTheme.styleCSS`, so a change to one display's CSS can't affect the other. Structure and logic (`worldcup-ui.ts`) stay shared.
+
+> **Setup:** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive; without it the page runs on the openfootball fallback). The B&W image needs **Cloudflare Browser Rendering** enabled on the account (the `[browser]` binding + `nodejs_compat` are in `wrangler.toml`; `npm i` installs `@cloudflare/puppeteer`). Add the two routes to the device pagelists for the tournament; remove after 2026-07-19. See DECISIONS.md #44/#47/#48.
 
 ## Architecture
 
@@ -335,6 +341,7 @@ KV cache (24h)
 | `env.IMAGES` | Cloudflare Images | Format conversion + center-crop/resize to 800×480 via `.transform()` |
 | `env.CACHE` | KV Namespace | Response caching (24h/6h) |
 | `env.PHOTOS` | R2 Bucket | Birthday portraits (`portraits/`) + skyline reference photos (`skylines/`) |
+| `env.BROWSER` | Browser Rendering | Headless Chromium to screenshot the B&W `/worldcup` HTML → pre-dithered 1-bit image (needs `nodejs_compat`; DECISIONS #48) |
 | `env.TEST_AUTH_KEY` | Secret | Auth key for expensive test endpoints (optional, open in dev) |
 | `env.FOOTBALL_DATA_KEY` | Secret | football-data.org API key for the World Cup dashboard (optional; falls back to openfootball JSON when absent) |
 

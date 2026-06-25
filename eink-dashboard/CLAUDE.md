@@ -290,9 +290,20 @@ eink-dashboard/
     png.ts                — Pure JS PNG encoder (8-bit, 1-bit, indexed) + pngToBase64()
     png-decode.ts         — PNG decoder (RGB, RGBA, Gray, GrayAlpha)
     font.ts               — 8x8 bitmap font (CP437)
+    worldcup.ts           — WC data layer (SWR/withBudget/KV) + finalize (phase, qualifying flags)
+    worldcup-football-data.ts — football-data.org adapter (primary source)
+    worldcup-openfootball.ts  — openfootball/worldcup.json adapter (no-key fallback)
+    worldcup-ui.ts        — WC shared LOGIC (qualifiedFlags fixture-aware, computePhase, pickRotatingGroup) + HTML section builders + renderWorldCupHTML(data, theme)
+    worldcup-styles.ts    — SEPARATE per-display stylesheets: COLOR_STYLE (E1002, pristine) + MONO_STYLE_BASE (E1001 crisp). Never share CSS (DECISIONS #48)
+    worldcup-browser-image.ts — B&W: Browser Rendering screenshot of /worldcup?variant=src → supersample → 1-bit PNG
+    worldcup-fonts.ts     — GENERATED: inlined Inter 500/700 WOFF2 (base64) for the B&W image source
+    worldcup-flags.ts     — GENERATED: Spectra-6 dithered country-flag PNGs (color page only; `npm run flags`)
+    worldcup-testdata.ts  — canned fixtures for ?test-phase previews
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)
       fact.ts             — /fact HTML wrapper for fact.png
+      worldcup.ts         — /worldcup (E1001): default = pre-dithered image (SWR + cron warm), ?variant=src = HTML source
+      color-worldcup.ts   — /color/worldcup (E1002 Spectra 6): live HTML + flags
       color-weather.ts    — /color/weather HTML page (E1002 Spectra 6)
       color-moment.ts     — /color/moment + color birthday + test endpoints
       color-headlines.ts  — /color/headlines HTML page
