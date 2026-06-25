@@ -345,7 +345,7 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-title { font-size: 24px; font-weight: 700; letter-spacing: 1px; }
   .wc-sub { font-size: 17px; font-weight: 500; }
   .wc-panel-label { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 6px; }
-  .wc-split { display: flex; gap: 24px; flex: 1; min-height: 0; }
+  .wc-split { display: flex; gap: 24px; flex: 1; min-height: 0; margin-bottom: 14px; }
   .wc-col { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .wc-rowlist { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 14px; min-height: 0; overflow: hidden; }
   .wc-row { font-size: 21px; font-weight: 700; line-height: 26px; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; overflow: hidden; }
