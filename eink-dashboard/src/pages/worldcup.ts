@@ -74,12 +74,13 @@ export async function handleWorldCupPage(env: Env, url: URL, ctx?: ExecutionCont
     // Nuclear option, done right: screenshot the real Inter HTML via Browser Rendering, then
     // threshold to pure 1-bit ourselves so SenseCraft can't fog it. Cached (browser is expensive).
     if (variant === "image") {
-      const cacheKey = "wc:image:v1";
       const thr = Math.min(255, Math.max(1, parseInt(url.searchParams.get("thr") || "160", 10) || 160));
+      const cacheKey = `wc:image:v2:${thr}`;
       let b64 = url.searchParams.has("fresh") ? null : await env.CACHE.get(cacheKey);
       if (!b64) {
         try {
-          const png = await renderWorldCupBrowserPNG(env, `${url.origin}/worldcup?variant=inter`, thr);
+          // Screenshot the Inter page, but label its corner "image" so it's distinguishable on the panel.
+          const png = await renderWorldCupBrowserPNG(env, `${url.origin}/worldcup?variant=inter&tag=image`, thr);
           b64 = pngToBase64(png);
           await env.CACHE.put(cacheKey, b64, { expirationTtl: 900 });
         } catch (e) {
@@ -96,7 +97,11 @@ export async function handleWorldCupPage(env: Env, url: URL, ctx?: ExecutionCont
       return new Response(imgWrap(pngToBase64(await renderWorldCupImagePNG(data))), { headers: htmlHeaders });
     }
 
-    const html = renderWorldCupHTML(data, MONO_THEME, buildVariantCSS(variant));
+    // Optional ?tag= overrides the corner label (used so the browser-screenshotted page reads "image").
+    let pageCSS = buildVariantCSS(variant);
+    const customTag = (url.searchParams.get("tag") || "").replace(/[^a-z0-9]/gi, "").slice(0, 12);
+    if (customTag) pageCSS += tag(customTag);
+    const html = renderWorldCupHTML(data, MONO_THEME, pageCSS);
     return new Response(html, { headers: htmlHeaders });
   } catch (err) {
     console.error("World Cup page error:", err);
