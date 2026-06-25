@@ -1361,3 +1361,35 @@ Same data/layout on both displays via a `WcTheme` object passed to the shared re
 1. **Smudged text on the color panel → grays.** The WC CSS used `#ccc` row underlines and `#555` rank/empty text. The Spectra-6 panel has no gray, so it *dithers* gray into a black/white speckle — which around glyphs reads as "smudged." The crisp color pages (weather, moment) use **zero** non-`#000`/`#fff`/palette colors. Fix: removed every gray (row borders dropped, `#555`→`#000`). This is just the project's own pure-black e-ink rule (#1/#40), which the v3.13.0 WC code had violated. Also bumped font sizes/weights — thicker strokes quantize more cleanly than thin ones. (The Moment card looks crisp partly because it is a pre-dithered *image* with only a thin white-on-black caption; HTML text on a white field is dithered by the panel itself, so it must stay pure black and reasonably large.)
 2. **Full vertical fill.** The split layout left whitespace below the standings. Now `.wc-split` and `.wc-bottom` are flex children of the 480px body; match rows live in a `.wc-rowlist` with `justify-content: space-evenly` (spreads to fill, adapts to match count), and `.wc-table { height: 100% }` so the 4 standings rows expand to fill the bottom panel. Champion flag 110→150px. Uses the whole display like the Moment cards. No version bump (presentation tuning of v3.14.0).
 3. **All text pure black on the color display, too (smudge round 2).** Removing grays wasn't enough — the *colored* accents still smudged. Colored glyphs (blue favorite name, green ✓/champion, red live) anti-alias to in-between colors the Spectra-6 panel has no anchor for, so it dithers their edges into speckle — and dark blue text on white is the worst offender. Fix: `COLOR_THEME.fav/win/live` all set to `#000`, so the color page renders type exactly like mono. **Color identity now comes only from the flags** (pre-dithered images, crisp by construction), and accents are carried by weight + the ▶/✓ markers. Row/table/bracket weights bumped 600→700. General rule confirmed: on a device-quantized HTML page, *all* text should be `#000` on `#fff`; use color only for solid large fills or pre-dithered images, never small/medium type.
+
+---
+
+## 46. World Cup Text Crispness — Match the Weather Pages (v3.14.1, 2026-06-25)
+
+### Symptom
+
+On-device, WC text was visibly **smudged on BOTH panels** (mono E1001 and color E1002), while the `/weather` pages were crisp on the same devices. (A separate, earlier confusion: the E1001 was briefly pointed at `/color/worldcup` — the color page's flag images + fills render as black mush on the mono panel. Correct routes: E1001 → `/worldcup`, E1002 → `/color/worldcup`. The smudge below is the real, route-correct issue.)
+
+### Root cause (two compounding factors, both measured)
+
+Compared the shared WC stylesheet (`worldcup-ui.ts`, used by both displays) against the proven-crisp weather pages (`weather2.ts` + `color-weather.ts`, which are typographically identical to each other):
+
+1. **Over-bold weights.** Decision #45 bumped WC weights to `700`/`800` on the theory "thicker strokes quantize more cleanly." **Wrong.** At 15–22px, `800` strokes thicken until letter counters (a/e/o holes) and inter-letter gaps fill with anti-alias gray; the panel quantizes that gray to black → letters blob. The weather pages cap at **700** and use **500** for body text — and they're crisp. So heavier ≠ crisper past ~700; it's worse.
+
+2. **Stretch-to-fill → fractional pixel positions.** #45 also added `.wc-table{height:100%}` and `.wc-rowlist{justify-content:space-evenly}` (and `.wc-bcol{space-around}`) to "fill the 480px like the Moment cards." Measured result: table rows at non-integer heights (41.58px) and every text baseline on a *different* sub-pixel phase (tops .66/.23/.81/.39). Sub-pixel baselines force the renderer to anti-alias each glyph *vertically* across two pixel rows → the panel quantizes that to speckle → vertical smudge. The weather pages use fixed-padding cards → integer positions → sharp. (The Moment card is exempt because it's a pre-dithered *image*, not live HTML text.)
+
+Both factors hit mono (1-bit threshold) and color (Floyd-Steinberg dither) alike, because both quantize the same anti-alias gray.
+
+### Fix: adopt the weather pages' typographic discipline (in the shared stylesheet → fixes both displays at once)
+
+- **Weight scale, three tiers, never above 700:** emphasis (titles, labels, scores, points, favorite/winner) `700`; base team/data text `600`; secondary (subtitle, table `th`, position number, "v", third-place) `500`. Favorite/winner emphasis — which on the all-`#000` color page was carried by the `700`↔`800` weight gap — is preserved by the new `600`↔`700` contrast (both crisp). The three inline `font-weight:800` accents in `matchRow`/`groupTable`/`bracketColumn` dropped to `700`.
+- **Kill fractional positioning:** removed `.wc-table{height:100%}` (table is content-sized; rows are integer 38px) and replaced `space-evenly`/`space-around` with `justify-content:flex-start` + fixed `gap` (rowlist 14px, bracket column 12px). Added integer `line-height` to dense rows/cells (`.wc-row` 26px, `td` 26px, `.wc-bteam` 24px).
+- **Specificity note:** `.wc-pts`/`.wc-pos` (0,1,0) lose to `.wc-table td` (0,1,1), so they were silently inert (this is also why #45's `.wc-pts{800}` never actually rendered). Rewrote as `.wc-table td.wc-pts` / `.wc-table td.wc-pos` so the emphasis/secondary weights take effect.
+
+### Tradeoff accepted
+
+Content now packs from the top with fixed spacing instead of stretching to fill all 480px, so there can be modest bottom whitespace. **Crispness over full-bleed fill** — the same tradeoff the weather pages already make. Verified: all phases fit within 800×480; rowlist tops now integer (84/124/164), table row heights integer (38px), zero `800`-weight elements; typecheck + 41 util + 26 WC tests pass.
+
+### Rule (supersedes #45's weight guidance)
+
+On a device-quantized HTML page, keep text `#000` on `#fff` (from #45) **and**: weights `≤700` (body `500–600`, emphasis `700`; `800` smudges at small sizes), and never stretch text containers to a percentage height — size rows to content with fixed spacing so baselines land on integer pixels.

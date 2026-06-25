@@ -41,8 +41,8 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
 | **World Cup 2026** (seasonal) | | |
-| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono (today's matches + results, rotating group standings, knockout bracket) | 12 min |
-| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 (color accents) | 12 min |
+| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono (today's matches + results, rotating group standings, knockout bracket) | 15 min |
+| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 (color accents) | 15 min |
 | `GET /worldcup?test-phase=group\|r32\|knockout\|champion` | Preview any phase layout with canned data (also on `/color/worldcup`) | none |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store) | none |
@@ -300,7 +300,7 @@ KV cache (24h)
 
 **Team display (v3.14.0)** — teams render as **full country names** (truncated per-layout when they don't fit, with curated abbreviations like `S. Korea`/`Bosnia`), never 3-letter codes. The **color display also shows country flags**: small flat-color chips next to each name, plus a large hero flag on the champion card. The mono display is text-only — flags aren't legible in pure black/white. Flags are pre-rendered **offline** (`npm run flags`, `scripts/generate-flags.mjs`): [lipis/flag-icons](https://github.com/lipis/flag-icons) SVG → resvg raster → Floyd–Steinberg dither to the Spectra-6 palette → tiny indexed PNGs committed to `src/worldcup-flags.ts` (~16 KB total, no runtime deps). The group-table **✓ marks only teams mathematically guaranteed a top-2 finish**, not whoever is momentarily in the top 2.
 
-**All text is pure black on both displays** — color comes only from the flags. Colored type smudges on the Spectra-6 panel (it dithers non-palette colors into edge speckle), so accents are carried by font weight and the ▶/✓ markers instead. The layouts fill the full 800×480 (rows spread, the standings table expands). See DECISIONS.md #45.
+**All text is pure black on both displays** — color comes only from the flags. Colored type smudges on the Spectra-6 panel (it dithers non-palette colors into edge speckle), so accents are carried by font weight and the ▶/✓ markers instead. To stay crisp on both the mono and color panels, the WC pages follow the same typographic rules as the weather pages: font weights stay **≤700** (body `500`–`600`, emphasis `700`; `800` blobs at small sizes) and text rows are **content-sized at integer pixel positions** rather than stretched to fill — so content packs from the top with some bottom whitespace, trading full-bleed fill for sharpness. See DECISIONS.md #45 (pure black) and #46 (weights + integer positioning).
 
 > **Setup:** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive). Without it, the page runs on the openfootball fallback. Add the two routes to the device pagelists for the tournament; remove after 2026-07-19. See DECISIONS.md #44.
 
@@ -440,6 +440,8 @@ npm run dry-run
 | No weather alerts showing | NWS alerts only cover active US warnings. Check `api.weather.gov` for your area. Alerts cache for 5 min in KV. |
 | Emoji not showing on display | ESP32-S3 renderer doesn't support emoji. Use inline SVG or text labels. |
 | Faint text on display | All text must be pure black (#000). Grays are invisible on e-ink. |
+| Smudged / blurry HTML text on the panel | Two causes (both bit the WC pages — see DECISIONS.md #46): font weights above 700 blob at small sizes (keep body `500`–`600`, emphasis `700`); and stretch-to-fill layouts (`height:100%`, `justify-content:space-evenly/around`) put text on fractional pixels — size rows to content with fixed `gap`/padding + integer `line-height` so baselines land on whole pixels. |
+| Mono panel shows a black, ghosted mess | The mono E1001 was pointed at a `/color/...` route — color fills + flag images render as black mush in 1-bit. Use the mono route (`/worldcup`, not `/color/worldcup`). |
 
 ---
 
