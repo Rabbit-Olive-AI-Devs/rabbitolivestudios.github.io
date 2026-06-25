@@ -76,7 +76,7 @@ test("FLAGS map covers participants and is well-formed", () => {
 });
 
 test("worldCupCacheKey is stable", () => {
-  assert.equal(worldCupCacheKey(), "wc:data:v1");
+  assert.equal(worldCupCacheKey(), "wc:data:v2");
 });
 
 const gm = (status) => ({ stage: "GROUP", status });
