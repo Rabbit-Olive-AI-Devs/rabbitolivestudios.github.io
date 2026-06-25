@@ -391,19 +391,21 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
   .wc-panel-label { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 6px; }
   .wc-split { display: flex; gap: 24px; flex: 1; min-height: 0; margin-bottom: 14px; }
   .wc-col { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .wc-rowlist { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 14px; min-height: 0; overflow: hidden; }
-  .wc-row { font-size: 21px; font-weight: 700; line-height: 26px; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; overflow: hidden; }
+  .wc-rowlist { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; min-height: 0; overflow: hidden; }
+  /* flex-shrink:0 + overflow:visible: rows keep their full line box so flexbox can't crush
+     6 rows into 14px and clip the text (descenders). See DECISIONS #46. */
+  .wc-row { font-size: 21px; font-weight: 700; line-height: 25px; flex-shrink: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; min-width: 0; overflow: visible; }
   .wc-cell { display: inline-block; min-width: 62px; flex: 0 0 auto; font-weight: 700; }
   .wc-v { font-size: 15px; font-weight: 500; flex: 0 0 auto; }
   .wc-team { display: inline-flex; align-items: center; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
   .wc-flag { height: 15px; width: auto; vertical-align: middle; margin-right: 7px; border: 1px solid #000; }
   .wc-flag-big { height: 150px; width: auto; border: 2px solid #000; image-rendering: pixelated; margin-bottom: 6px; }
-  .wc-bottom { flex: 1.15; min-height: 0; overflow: hidden; border-top: 3px solid #000; padding-top: 6px; display: flex; flex-direction: column; }
+  .wc-bottom { flex: 0 0 auto; min-height: 0; overflow: hidden; border-top: 3px solid #000; padding-top: 6px; display: flex; flex-direction: column; }
   .wc-group { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .wc-group-name { font-size: 18px; font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; }
+  .wc-group-name { font-size: 18px; font-weight: 700; letter-spacing: 1px; margin-bottom: 3px; }
   .wc-table { width: 100%; border-collapse: collapse; font-size: 22px; }
-  .wc-table th { font-size: 14px; font-weight: 500; text-align: center; padding: 2px 6px; }
-  .wc-table td { text-align: center; padding: 6px; font-weight: 700; line-height: 26px; }
+  .wc-table th { font-size: 14px; font-weight: 500; text-align: center; padding: 1px 6px; }
+  .wc-table td { text-align: center; padding: 3px 6px; font-weight: 700; line-height: 24px; }
   .wc-table td:nth-child(2) { text-align: left; font-weight: 700; }
   .wc-table td.wc-pos { font-weight: 500; } .wc-table td.wc-pts { font-weight: 700; }
   .wc-r32 { columns: 2; font-size: 21px; flex: 1; }

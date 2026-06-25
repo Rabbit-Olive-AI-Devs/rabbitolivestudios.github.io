@@ -1398,6 +1398,17 @@ On a device-quantized HTML page, keep text `#000` on `#fff` (from #45) **and**: 
 
 On-device side-by-side (same E1001 panel) showed the smudge gone but the WC body text reading **lighter/softer than the weather page**. Cause: the weather pages set their *primary* data to **700**, but #46 dropped WC body to **600** to give favorite/winner a `600`↔`700` weight contrast. At `600` the strokes lay down less ink, so on e-ink they read grayer/softer than weather's solid `700`. Fix: WC body data (`.wc-row`, `.wc-table td`, team-name cell, `.wc-bteam`) bumped **600 → 700** to match the weather pages exactly. Favorite/winner no longer differ by weight — emphasis rides on the existing ▶ (favorite) and ✓ (qualified) glyphs. Net scheme is now identical to the weather pages: **primary 700 / secondary 500, never 800.** `700` is the proven-crisp weight on this panel (the whole weather page uses it); the smudge was specifically `800`, not `≥700`.
 
+### Follow-up (v3.14.6, 2026-06-25): the real "not crisp" cause was flexbox crushing the rows
+
+After the weight/positioning fixes the user still reported "not crisp" text and **clipped descenders** (the bottoms of g/y/p/ç cut off) in the upper-half match rows. Measuring the live page exposed the actual cause: each `.wc-row` had `line-height: 26px` but a measured **height of only 14px** (`clientHeight 14`, `scrollHeight 20`). With 6 matches today, the six rows didn't fit `.wc-rowlist` (a `flex:1` column), so the default `flex-shrink: 1` **compressed every row to 14px**, and `overflow: hidden` then chopped the text top and bottom. That mangling — not the font weight — is what read as "not crisp." The weather page looks crisp because its rows are in fixed-padding cards that never compress.
+
+Fix (all in the shared `worldcup-ui.ts`):
+- `.wc-row { flex-shrink: 0; overflow: visible; line-height: 25px }` — rows keep their full line box; flexbox can no longer crush or clip them.
+- `.wc-bottom { flex: 0 0 auto }` (was `flex: 1.15`) — the standings panel sizes to its content instead of grabbing a fixed share, so the upper half (`.wc-split { flex: 1 }`) gets all the leftover height it needs for six full-height rows. This also reclaims the wasted whitespace the user spotted under the table.
+- Compacted the table to make the budget close cleanly: `td` padding `6px → 3px 6px` and line-height `26 → 24`, `th` padding `2px → 1px`, `.wc-group-name` margin `6 → 3`, and `.wc-rowlist` gap `14 → 6`.
+
+Verified at 800×480 with the live 6-match day: all six rows full-height (25px, `scrollHeight == clientHeight`, no clipping), every descender intact, the 4-row table fully visible and filling the lower half, total within 480px. **General rule: never let text rows live in a `flex:1`/shrinkable container with `overflow:hidden` — they silently compress and clip. Give text rows `flex-shrink:0` and sized siblings `flex:0 0 auto`.**
+
 ---
 
 ## 47. World Cup Group Qualification ✓ Must Be Fixture-Aware (v3.14.4, 2026-06-25)
