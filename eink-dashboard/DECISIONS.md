@@ -1393,3 +1393,7 @@ Content now packs from the top with fixed spacing instead of stretching to fill 
 ### Rule (supersedes #45's weight guidance)
 
 On a device-quantized HTML page, keep text `#000` on `#fff` (from #45) **and**: weights `≤700` (body `500–600`, emphasis `700`; `800` smudges at small sizes), and never stretch text containers to a percentage height — size rows to content with fixed spacing so baselines land on integer pixels.
+
+### Follow-up (v3.14.2, 2026-06-25): body weight 600 → 700
+
+On-device side-by-side (same E1001 panel) showed the smudge gone but the WC body text reading **lighter/softer than the weather page**. Cause: the weather pages set their *primary* data to **700**, but #46 dropped WC body to **600** to give favorite/winner a `600`↔`700` weight contrast. At `600` the strokes lay down less ink, so on e-ink they read grayer/softer than weather's solid `700`. Fix: WC body data (`.wc-row`, `.wc-table td`, team-name cell, `.wc-bteam`) bumped **600 → 700** to match the weather pages exactly. Favorite/winner no longer differ by weight — emphasis rides on the existing ▶ (favorite) and ✓ (qualified) glyphs. Net scheme is now identical to the weather pages: **primary 700 / secondary 500, never 800.** `700` is the proven-crisp weight on this panel (the whole weather page uses it); the smudge was specifically `800`, not `≥700`.
