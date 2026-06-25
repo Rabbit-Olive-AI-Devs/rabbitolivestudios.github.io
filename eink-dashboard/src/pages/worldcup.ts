@@ -9,7 +9,15 @@ import { renderWorldCupHTML, type WcTheme } from "../worldcup-ui";
 import { testWorldCupData } from "../worldcup-testdata";
 import { FONT_ATKINSON_400, FONT_ATKINSON_700, FONT_INTER_500, FONT_INTER_700 } from "../worldcup-fonts";
 import { renderWorldCupImagePNG } from "../worldcup-image";
+import { renderWorldCupBrowserPNG } from "../worldcup-browser-image";
 import { pngToBase64 } from "../png";
+
+/** Full-bleed wrapper that shows an inline base64 PNG at exactly 800x480 (no scaling). */
+const imgWrap = (b64: string) =>
+  `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=800"><title>World Cup 2026</title>`
+  + `<style>*{margin:0;padding:0}html,body{width:800px;height:480px;overflow:hidden;background:#fff}`
+  + `img{width:800px;height:480px;display:block;image-rendering:pixelated}</style></head>`
+  + `<body><img src="data:image/png;base64,${b64}" width="800" height="480"></body></html>`;
 
 const MONO_THEME: WcTheme = { rootCSS: "", fav: "#000", win: "#000", live: "#000" };
 
@@ -63,14 +71,29 @@ export async function handleWorldCupPage(env: Env, url: URL, ctx?: ExecutionCont
       "Referrer-Policy": "no-referrer",
     };
 
-    // Nuclear option: server-rendered bitmap PNG (no anti-aliasing) shown full-bleed.
+    // Nuclear option, done right: screenshot the real Inter HTML via Browser Rendering, then
+    // threshold to pure 1-bit ourselves so SenseCraft can't fog it. Cached (browser is expensive).
     if (variant === "image") {
-      const b64 = pngToBase64(await renderWorldCupImagePNG(data));
-      const wrap = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=800"><title>World Cup 2026</title>`
-        + `<style>*{margin:0;padding:0}html,body{width:800px;height:480px;overflow:hidden;background:#fff}`
-        + `img{width:800px;height:480px;display:block;image-rendering:pixelated}</style></head>`
-        + `<body><img src="data:image/png;base64,${b64}" width="800" height="480"></body></html>`;
-      return new Response(wrap, { headers: htmlHeaders });
+      const cacheKey = "wc:image:v1";
+      const thr = Math.min(255, Math.max(1, parseInt(url.searchParams.get("thr") || "160", 10) || 160));
+      let b64 = url.searchParams.has("fresh") ? null : await env.CACHE.get(cacheKey);
+      if (!b64) {
+        try {
+          const png = await renderWorldCupBrowserPNG(env, `${url.origin}/worldcup?variant=inter`, thr);
+          b64 = pngToBase64(png);
+          await env.CACHE.put(cacheKey, b64, { expirationTtl: 900 });
+        } catch (e) {
+          return new Response("browser render failed: " + String((e as { message?: string })?.message ?? e), {
+            status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+      }
+      return new Response(imgWrap(b64), { headers: htmlHeaders });
+    }
+
+    // Bitmap fallback (8x8 pixel font, no anti-aliasing) — kept for comparison.
+    if (variant === "bitmap") {
+      return new Response(imgWrap(pngToBase64(await renderWorldCupImagePNG(data))), { headers: htmlHeaders });
     }
 
     const html = renderWorldCupHTML(data, MONO_THEME, buildVariantCSS(variant));

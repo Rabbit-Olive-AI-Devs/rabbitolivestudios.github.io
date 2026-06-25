@@ -1,6 +1,6 @@
 {
   "name": "eink-dashboard",
-  "version": "3.14.9",
+  "version": "3.14.10",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
@@ -17,5 +17,8 @@
     "flag-icons": "^7.5.0",
     "typescript": "^5.7.0",
     "wrangler": "^4.92.0"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^1.1.0"
   }
 }

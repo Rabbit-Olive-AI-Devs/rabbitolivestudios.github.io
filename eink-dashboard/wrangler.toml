@@ -1,6 +1,7 @@
 name = "eink-dashboard"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 
 # KV Namespace — after creating, paste your namespace ID below.
 # Run: npx wrangler kv namespace create CACHE
@@ -16,6 +17,10 @@ binding = "AI"
 # Cloudflare Images (JPEG→PNG conversion for AI output)
 [images]
 binding = "IMAGES"
+
+# Browser Rendering (headless Chromium) for server-side page screenshots
+[browser]
+binding = "BROWSER"
 
 # R2 bucket for birthday reference photos
 [[r2_buckets]]

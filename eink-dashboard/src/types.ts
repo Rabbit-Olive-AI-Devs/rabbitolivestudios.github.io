@@ -3,6 +3,7 @@ export interface Env {
   AI: Ai;
   IMAGES: any;
   PHOTOS: R2Bucket;
+  BROWSER?: Fetcher; // Cloudflare Browser Rendering binding (headless Chromium)
   TEST_AUTH_KEY?: string;
   FOOTBALL_DATA_KEY?: string;
 }
