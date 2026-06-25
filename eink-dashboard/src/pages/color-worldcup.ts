@@ -10,6 +10,7 @@ import { renderWorldCupHTML, type WcTheme } from "../worldcup-ui";
 import { testWorldCupData } from "../worldcup-testdata";
 import { spectra6CSS } from "../spectra6";
 import { FLAGS } from "../worldcup-flags";
+import { COLOR_STYLE } from "../worldcup-styles";
 
 /** FIFA code -> Spectra-6 flag chip; "" when the team has no bundled flag. */
 function flagChip(code: string): string {
@@ -27,6 +28,7 @@ function flagChip(code: string): string {
 // ▶/✓ markers, exactly like the mono display.
 const COLOR_THEME: WcTheme = {
   rootCSS: spectra6CSS(),
+  styleCSS: COLOR_STYLE, // pristine pre-session E1002 stylesheet (own copy; never shares B&W changes)
   fav: "#000",
   win: "#000",
   live: "#000",
@@ -45,7 +47,7 @@ export async function handleColorWorldCupPage(env: Env, url: URL, ctx?: Executio
       : url.searchParams.has("test") ? testWorldCupData("group")
       : await getWorldCupData(env, ctx);
 
-    const html = renderWorldCupHTML(data, COLOR_THEME, "");
+    const html = renderWorldCupHTML(data, COLOR_THEME);
     return new Response(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",

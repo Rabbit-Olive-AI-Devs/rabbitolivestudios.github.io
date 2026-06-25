@@ -227,6 +227,7 @@ export function chicagoTimeOf(iso: string): string {
 
 export interface WcTheme {
   rootCSS: string;   // extra :root vars (spectra6CSS() for color, "" for mono)
+  styleCSS: string;  // the FULL per-display stylesheet (reset + body + .wc-* classes) — separate per display
   fav: string;       // favorite-team accent color (CSS color)
   win: string;       // win/qualified accent
   live: string;      // live / today accent
@@ -245,7 +246,7 @@ function matchRow(mm: WcMatch, theme: WcTheme): string {
   const h = teamCode(mm.home), a = teamCode(mm.away);
   const cell = matchCell(mm);
   const cellColor = mm.status === "LIVE" ? theme.live : "#000";
-  const favMark = (c: string) => (isFav(c) ? ` style="color:${theme.fav};font-weight:700"` : "");
+  const favMark = (c: string) => (isFav(c) ? ` style="color:${theme.fav};font-weight:800"` : "");
   const star = (isFav(h) || isFav(a)) ? ` <span style="color:${theme.fav}">&#9654;</span>` : "";
   const side = (team: WcMatch["home"], code: string) =>
     `<span class="wc-team"${favMark(code)}>${flagImg(theme, code)}${teamLabel(team, 14)}</span>`;
@@ -261,7 +262,7 @@ function groupTable(group: WcGroup, theme: WcTheme): string {
     const fav = isFav(code);
     // r.qualifying is the fixture-aware "guaranteed top-2" flag computed in finalize().
     const mark = r.qualifying ? ` <span style="color:${theme.win}">&#10003;</span>` : "";
-    const nameStyle = fav ? ` style="color:${theme.fav};font-weight:700"` : "";
+    const nameStyle = fav ? ` style="color:${theme.fav};font-weight:800"` : "";
     return `<tr>
       <td class="wc-pos">${r.position}</td>
       <td${nameStyle}>${flagImg(theme, code)}${teamLabel(r.team, 12)}${mark}</td>
@@ -287,7 +288,7 @@ function bracketColumn(round: WcBracketRound, theme: WcTheme): string {
     const awayWon = finished && mm.awayScore! > mm.homeScore!;
     const side = (team: WcMatch["home"], code: string, won: boolean) => {
       const fav = isFav(code) ? `color:${theme.fav};` : "";
-      const w = won ? "font-weight:700;" : "";
+      const w = won ? "font-weight:800;" : "";
       return `<div class="wc-bteam" style="${fav}${w}">${flagImg(theme, code)}${teamLabel(team, 12)}</div>`;
     };
     const sc = finished ? `<div class="wc-bscore">${mm.homeScore}-${mm.awayScore}</div>` : "";
@@ -367,7 +368,12 @@ function championLayout(data: WorldCupData, theme: WcTheme): string {
 }
 
 /** Build the full HTML document for a given theme + page CSS. */
-export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: string): string {
+/**
+ * Build the full HTML document. The stylesheet is supplied entirely by `theme.styleCSS`
+ * (separate per display — see worldcup-styles.ts) so the two displays never share CSS;
+ * only the structure (this function + the section builders) and the logic are shared.
+ */
+export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme): string {
   let body: string;
   switch (data.phase) {
     case "knockout": body = bracketLayout(data, theme); break;
@@ -382,51 +388,7 @@ export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme, pageCSS: 
 <title>World Cup 2026</title>
 <style>
   :root { ${theme.rootCSS} }
-  /* E-ink crispness: disable font anti-aliasing so the mono panel gets pure 1-bit glyph
-     edges instead of grayscale-smoothed ones it would quantize into smudge/serration.
-     See DECISIONS #48 (refs: SumatraPDF#599, MobileRead e-ink font threads). */
-  * { margin: 0; padding: 0; box-sizing: border-box;
-    -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed; }
-  body { width: 800px; height: 480px; overflow: hidden; display: flex; flex-direction: column;
-    background: #fff; color: #000; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; padding: 14px 22px; }
-  .wc-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 3px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
-  .wc-title { font-size: 24px; font-weight: 700; letter-spacing: 1px; }
-  .wc-sub { font-size: 17px; font-weight: 500; }
-  .wc-panel-label { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 6px; }
-  .wc-split { display: flex; gap: 24px; flex: 1; min-height: 0; margin-bottom: 14px; }
-  .wc-col { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .wc-rowlist { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; min-height: 0; overflow: hidden; }
-  /* flex-shrink:0 + overflow:visible: rows keep their full line box so flexbox can't crush
-     6 rows into 14px and clip the text (descenders). See DECISIONS #46. */
-  .wc-row { font-size: 21px; font-weight: 500; line-height: 25px; flex-shrink: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; min-width: 0; overflow: visible; }
-  .wc-cell { display: inline-block; min-width: 62px; flex: 0 0 auto; font-weight: 700; }
-  .wc-v { font-size: 15px; font-weight: 500; flex: 0 0 auto; }
-  .wc-team { display: inline-flex; align-items: center; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
-  .wc-flag { height: 15px; width: auto; vertical-align: middle; margin-right: 7px; border: 1px solid #000; }
-  .wc-flag-big { height: 150px; width: auto; border: 2px solid #000; image-rendering: pixelated; margin-bottom: 6px; }
-  .wc-bottom { flex: 0 0 auto; min-height: 0; overflow: hidden; border-top: 3px solid #000; padding-top: 6px; display: flex; flex-direction: column; }
-  .wc-group { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .wc-group-name { font-size: 18px; font-weight: 700; letter-spacing: 1px; margin-bottom: 3px; }
-  .wc-table { width: 100%; border-collapse: collapse; font-size: 22px; }
-  .wc-table th { font-size: 14px; font-weight: 500; text-align: center; padding: 1px 6px; }
-  .wc-table td { text-align: center; padding: 3px 6px; font-weight: 500; line-height: 24px; }
-  .wc-table td:nth-child(2) { text-align: left; font-weight: 500; }
-  .wc-table td.wc-pos { font-weight: 500; } .wc-table td.wc-pts { font-weight: 700; }
-  .wc-r32 { columns: 2; font-size: 21px; flex: 1; }
-  .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
-  .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; }
-  .wc-bcol-label { font-size: 13px; font-weight: 700; text-align: center; letter-spacing: 1px; margin-bottom: 6px; }
-  .wc-tie { border: 2px solid #000; border-radius: 4px; padding: 5px 4px; text-align: center; }
-  .wc-bteam { font-size: 19px; font-weight: 500; line-height: 24px; display: flex; align-items: center; justify-content: center; gap: 4px; }
-  .wc-bteam .wc-flag { height: 13px; margin-right: 0; }
-  .wc-bscore { font-size: 15px; font-weight: 700; }
-  .wc-third { font-size: 17px; font-weight: 500; text-align: center; margin-top: 6px; }
-  .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
-  .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
-  .wc-champ-team { font-size: 104px; font-weight: 700; line-height: 1; }
-  .wc-champ-final { font-size: 30px; font-weight: 700; }
-  .wc-empty { font-size: 18px; color: #000; padding: 6px 0; }
-  ${pageCSS}
+  ${theme.styleCSS}
 </style>
 </head>
 <body>${body}</body>

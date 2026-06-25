@@ -13,6 +13,7 @@ import { getWorldCupData } from "../worldcup";
 import { renderWorldCupHTML, type WcTheme } from "../worldcup-ui";
 import { testWorldCupData } from "../worldcup-testdata";
 import { FONT_INTER_500, FONT_INTER_700 } from "../worldcup-fonts";
+import { MONO_STYLE_BASE } from "../worldcup-styles";
 import { renderWorldCupBrowserPNG } from "../worldcup-browser-image";
 import { pngToBase64 } from "../png";
 
@@ -21,13 +22,17 @@ const IMG_KEY = "wc:image:v3";
 const IMG_SOFT_TTL_MS = 14 * 60 * 1000; // refresh the rendered image at most ~every 14 min
 const IMG_THRESHOLD = 160;              // gray cutoff for the 1-bit threshold
 
-const MONO_THEME: WcTheme = { rootCSS: "", fav: "#000", win: "#000", live: "#000" };
-
-/** Inlined Inter web font — the proportional typeface used for the screenshot source. */
-const INTER_CSS =
-  `@font-face{font-family:'WCF';font-weight:500;font-display:block;src:url(${FONT_INTER_500}) format('woff2')}`
+/**
+ * B&W stylesheet = its own base (crisp weight-500 / no-clip / content-sized layout) + the inlined
+ * Inter web font, appended last so the font-family wins. Fully separate from the color stylesheet
+ * (worldcup-styles.ts) — changing one never touches the other. (DECISIONS #48)
+ */
+const MONO_STYLE = MONO_STYLE_BASE
+  + `@font-face{font-family:'WCF';font-weight:500;font-display:block;src:url(${FONT_INTER_500}) format('woff2')}`
   + `@font-face{font-family:'WCF';font-weight:700;font-display:block;src:url(${FONT_INTER_700}) format('woff2')}`
-  + `body{font-family:'WCF',sans-serif!important}`;
+  + `body{font-family:'WCF',sans-serif}`;
+
+const MONO_THEME: WcTheme = { rootCSS: "", styleCSS: MONO_STYLE, fav: "#000", win: "#000", live: "#000" };
 
 /** Full-bleed wrapper that shows an inline base64 PNG at exactly 800x480 (no scaling). */
 const imgWrap = (b64: string) =>
@@ -90,18 +95,18 @@ export async function handleWorldCupPage(env: Env, url: URL, ctx?: ExecutionCont
       : url.searchParams.has("test") ? testWorldCupData("group")
       : await getWorldCupData(env, ctx);
 
-    const interHTML = () => new Response(renderWorldCupHTML(data, MONO_THEME, INTER_CSS), { headers: htmlHeaders });
+    const monoHTML = () => new Response(renderWorldCupHTML(data, MONO_THEME), { headers: htmlHeaders });
 
     // Internal screenshot source + raw-HTML debug view (Inter font, no image, no label).
     // Canned-phase/test previews also serve HTML (the cached image is always live data).
     if (variant === "src" || variant === "html" || testPhase || url.searchParams.has("test")) {
-      return interHTML();
+      return monoHTML();
     }
 
     // Default (and ?variant=image): the pre-dithered, crisp 1-bit image. Falls back to the
     // Inter HTML on a cold cache so the panel is never blank while the first render runs.
     const b64 = await getWorldCupImageB64(env, url.origin, ctx);
-    return b64 ? new Response(imgWrap(b64), { headers: htmlHeaders }) : interHTML();
+    return b64 ? new Response(imgWrap(b64), { headers: htmlHeaders }) : monoHTML();
   } catch (err) {
     console.error("World Cup page error:", err);
     return new Response("World Cup data temporarily unavailable", {
