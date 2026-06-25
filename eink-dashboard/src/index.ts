@@ -6,7 +6,7 @@ import { generateMomentBefore, getOrGenerateMoment } from "./moment";
 import { handleWeatherPageV2 } from "./pages/weather2";
 import { handleFactPage } from "./pages/fact";
 import { handleColorWeatherPage } from "./pages/color-weather";
-import { handleWorldCupPage } from "./pages/worldcup";
+import { handleWorldCupPage, warmWorldCupImage } from "./pages/worldcup";
 import { handleColorWorldCupPage } from "./pages/color-worldcup";
 import { getWorldCupData } from "./worldcup";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
@@ -53,7 +53,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.14.11";
+const VERSION = "3.15.0";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -683,6 +683,15 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       }
     }
     console.log("Cron: warmed 6h data (headlines, weather, devices)");
+
+    // Warm the World Cup image (Browser Rendering screenshot → 1-bit) after its data is fresh,
+    // so the device never hits a cold image cache. Failure is non-fatal. (DECISIONS #48)
+    try {
+      await warmWorldCupImage(env);
+      console.log("Cron: warmed WC image");
+    } catch (e) {
+      console.error("Cron: WC image warm failed:", e);
+    }
 
     // --- Daily only: images + skyline ---
     if (!isDaily) return;
