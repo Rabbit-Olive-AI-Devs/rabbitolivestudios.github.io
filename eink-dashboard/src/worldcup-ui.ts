@@ -60,24 +60,55 @@ export function teamLabel(team: { name: string; code: string }, maxChars: number
 }
 
 /**
- * Per-row "mathematically guaranteed a top-2 group finish" flags. Conservative:
- * never marks a team that could still be overtaken (so the ✓ means truly qualified,
- * not just "currently top 2"). Third-place best-of qualification is never marked
- * (cross-group / unstable — see DECISIONS #44).
+ * Per-row "mathematically guaranteed a top-2 group finish" flags. Fixture-aware:
+ * brute-forces every win/draw/loss outcome of the group's remaining matches and marks
+ * a team only if it finishes top-2 in ALL of them. This is the only correct way — the
+ * points-only heuristic counts rivals independently and so misses the common case where
+ * two chasers play EACH OTHER (only one can win), e.g. USA in Group D (DECISIONS #47).
+ *
+ * Conservative on tiebreakers: a team is "safe" only if at most one OTHER team can have
+ * points >= its points in a given scenario (so a points tie never counts as safe, since
+ * GD/head-to-head could rank the tied rival above). Third-place best-of qualification is
+ * never marked (cross-group / unstable — see DECISIONS #44).
+ *
+ * @param rows     standings rows (need team identity + current points + position)
+ * @param remaining non-finished group matches, as { home, away } FIFA codes
  */
 export function qualifiedFlags(
-  rows: { position: number; played: number; points: number }[],
+  rows: { team: { name: string; code: string }; position: number; points: number }[],
+  remaining: { home: string; away: string }[],
 ): boolean[] {
-  const gamesEach = Math.max(1, rows.length - 1);          // group of 4 -> 3 games each
-  const complete = rows.every((r) => r.played >= gamesEach);
-  return rows.map((r) => {
-    if (complete) return r.position <= 2;                   // positions are final
-    // Worst case for r (gains nothing more); best case for each rival (wins all remaining).
-    const threats = rows.filter(
-      (o) => o !== r && o.points + 3 * (gamesEach - o.played) >= r.points,
-    ).length;
-    return threats <= 1;                                    // at most one team can finish above -> top 2 safe
-  });
+  // Group complete: positions are final (tiebreakers already resolved by the source).
+  if (remaining.length === 0) return rows.map((r) => r.position <= 2);
+
+  const codes = rows.map((r) => teamCode(r.team));
+  const idx = new Map(codes.map((c, i) => [c, i] as const));
+  const base = rows.map((r) => r.points);
+  const safe = rows.map(() => true);
+  const total = 3 ** remaining.length;     // group of 4 -> at most 3^6 = 729 scenarios
+
+  for (let scenario = 0; scenario < total; scenario++) {
+    const pts = base.slice();
+    let s = scenario;
+    for (const g of remaining) {
+      const outcome = s % 3;
+      s = (s - outcome) / 3;
+      const h = idx.get(g.home);
+      const a = idx.get(g.away);
+      if (h === undefined || a === undefined) continue;     // match references a team outside this group
+      if (outcome === 0) pts[h] += 3;                       // home win
+      else if (outcome === 1) { pts[h] += 1; pts[a] += 1; } // draw
+      else pts[a] += 3;                                     // away win
+    }
+    for (let i = 0; i < rows.length; i++) {
+      let atOrAbove = 0;
+      for (let j = 0; j < rows.length; j++) {
+        if (j !== i && pts[j] >= pts[i]) atOrAbove++;
+      }
+      if (atOrAbove >= 2) safe[i] = false;                  // could be pushed out of top 2 in this scenario
+    }
+  }
+  return safe;
 }
 
 /** Score ("2-1") when finished/live, else the Chicago kickoff time. */
@@ -212,11 +243,11 @@ function matchRow(mm: WcMatch, theme: WcTheme): string {
 }
 
 function groupTable(group: WcGroup, theme: WcTheme): string {
-  const qualified = qualifiedFlags(group.rows);
-  const rows = group.rows.map((r, i) => {
+  const rows = group.rows.map((r) => {
     const code = teamCode(r.team);
     const fav = isFav(code);
-    const mark = qualified[i] ? ` <span style="color:${theme.win}">&#10003;</span>` : "";
+    // r.qualifying is the fixture-aware "guaranteed top-2" flag computed in finalize().
+    const mark = r.qualifying ? ` <span style="color:${theme.win}">&#10003;</span>` : "";
     const nameStyle = fav ? ` style="color:${theme.fav};font-weight:700"` : "";
     return `<tr>
       <td class="wc-pos">${r.position}</td>

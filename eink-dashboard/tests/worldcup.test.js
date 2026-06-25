@@ -45,24 +45,30 @@ test("displayName applies curated overrides", () => {
   assert.equal(displayName({ name: "Bosnia-Herzegovina", code: "BIH" }), "Bosnia");
   assert.equal(displayName({ name: "Brazil", code: "BRA" }), "Brazil");
 });
-test("qualifiedFlags marks only clinched top-2 mid-group", () => {
-  const rows = [
-    { position: 1, played: 2, points: 6 },
-    { position: 2, played: 2, points: 4 },
-    { position: 3, played: 2, points: 1 },
-    { position: 4, played: 2, points: 0 },
-  ];
-  // Leader clinched; 2nd not safe (a 1-pt team can still reach 4).
-  assert.deepEqual(qualifiedFlags(rows), [true, false, false, false]);
+const R = (code, position, points) => ({ team: { code, name: code }, position, points });
+
+test("qualifiedFlags: leader is guaranteed when its two chasers play each other (real Group D / USA)", () => {
+  // USA 6, AUS 3, PAR 3, TUR 0 after 2 games. Last games: TUR v USA, PAR v AUS.
+  const rows = [R("USA", 1, 6), R("AUS", 2, 3), R("PAR", 3, 3), R("TUR", 4, 0)];
+  const remaining = [{ home: "TUR", away: "USA" }, { home: "PAR", away: "AUS" }];
+  // AUS & PAR can each reach 6, but they play EACH OTHER -> at most one does. USA is safe.
+  assert.deepEqual(qualifiedFlags(rows, remaining), [true, false, false, false]);
 });
-test("qualifiedFlags marks top 2 once the group is complete", () => {
-  const rows = [
-    { position: 1, played: 3, points: 9 },
-    { position: 2, played: 3, points: 4 },
-    { position: 3, played: 3, points: 4 },
-    { position: 4, played: 3, points: 0 },
-  ];
-  assert.deepEqual(qualifiedFlags(rows), [true, true, false, false]);
+test("qualifiedFlags: leader is NOT safe when both chasers play different opponents", () => {
+  // A 6, B 4, C 4, D 0. Last games: A v B, C v D. B and C can BOTH reach 7 -> A can finish 3rd.
+  const rows = [R("A", 1, 6), R("B", 2, 4), R("C", 3, 4), R("D", 4, 0)];
+  const remaining = [{ home: "A", away: "B" }, { home: "C", away: "D" }];
+  assert.deepEqual(qualifiedFlags(rows, remaining), [false, false, false, false]);
+});
+test("qualifiedFlags: a tie on points never marks (conservative on tiebreakers)", () => {
+  // Leader on 7 with one game left can be joined on 7+ by two others -> nobody clinched.
+  const rows = [R("A", 1, 4), R("B", 2, 4), R("C", 3, 4), R("D", 4, 4)];
+  const remaining = [{ home: "A", away: "B" }, { home: "C", away: "D" }];
+  assert.deepEqual(qualifiedFlags(rows, remaining), [false, false, false, false]);
+});
+test("qualifiedFlags: once the group is complete, marks the final top 2 by position", () => {
+  const rows = [R("A", 1, 9), R("B", 2, 4), R("C", 3, 4), R("D", 4, 0)];
+  assert.deepEqual(qualifiedFlags(rows, []), [true, true, false, false]);
 });
 test("FLAGS map covers participants and is well-formed", () => {
   assert.ok(Object.keys(FLAGS).length >= 40);

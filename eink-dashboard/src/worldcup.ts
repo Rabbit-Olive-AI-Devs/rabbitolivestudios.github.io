@@ -14,7 +14,7 @@ import { withBudget } from "./with-budget";
 import { worldCupCacheKey } from "./cache-keys";
 import { fetchFootballData } from "./worldcup-football-data";
 import { fetchOpenFootball } from "./worldcup-openfootball";
-import { computePhase } from "./worldcup-ui";
+import { computePhase, qualifiedFlags, teamCode } from "./worldcup-ui";
 import { getChicagoDateISO } from "./date-utils";
 import type { Env, WorldCupData, WcMatch, CachedValue } from "./types";
 
@@ -30,10 +30,20 @@ function finalize(data: WorldCupData): WorldCupData {
   const todayMatches = all
     .filter((m) => m.dateChicago === today)
     .sort((a, b) => a.kickoffISO.localeCompare(b.kickoffISO));
+  // Recompute each group's "guaranteed top-2" flags fixture-aware (the full match list is
+  // only available here, before _allMatches is stripped). See DECISIONS #47.
+  const groups = data.groups.map((g) => {
+    const remaining = all
+      .filter((m) => m.stage === "GROUP" && m.group === g.name && m.status !== "FINISHED")
+      .map((m) => ({ home: teamCode(m.home), away: teamCode(m.away) }));
+    const flags = qualifiedFlags(g.rows, remaining);
+    return { ...g, rows: g.rows.map((r, i) => ({ ...r, qualifying: flags[i] })) };
+  });
   const out: WorldCupData = {
     ...data,
     phase,
     todayMatches,
+    groups,
     generatedAt: Date.now(),
   };
   delete (out as any)._allMatches;

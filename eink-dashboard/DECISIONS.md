@@ -1397,3 +1397,31 @@ On a device-quantized HTML page, keep text `#000` on `#fff` (from #45) **and**: 
 ### Follow-up (v3.14.2, 2026-06-25): body weight 600 → 700
 
 On-device side-by-side (same E1001 panel) showed the smudge gone but the WC body text reading **lighter/softer than the weather page**. Cause: the weather pages set their *primary* data to **700**, but #46 dropped WC body to **600** to give favorite/winner a `600`↔`700` weight contrast. At `600` the strokes lay down less ink, so on e-ink they read grayer/softer than weather's solid `700`. Fix: WC body data (`.wc-row`, `.wc-table td`, team-name cell, `.wc-bteam`) bumped **600 → 700** to match the weather pages exactly. Favorite/winner no longer differ by weight — emphasis rides on the existing ▶ (favorite) and ✓ (qualified) glyphs. Net scheme is now identical to the weather pages: **primary 700 / secondary 500, never 800.** `700` is the proven-crisp weight on this panel (the whole weather page uses it); the smudge was specifically `800`, not `≥700`.
+
+---
+
+## 47. World Cup Group Qualification ✓ Must Be Fixture-Aware (v3.14.4, 2026-06-25)
+
+### Symptom
+
+On the real Group D table, **USA had no ✓** even though it was already mathematically guaranteed to advance before its last game. Standings (after 2 of 3 games): USA 6, AUS 3, PAR 3, TUR 0; last matchday: **TUR v USA** and **PAR v AUS**.
+
+### Root cause: the qualification check ignored the remaining fixtures
+
+The old `qualifiedFlags(rows)` looked only at points/games-played. For each team it counted how many *other* teams could still reach its points if they **won all their remaining games independently**. For USA that's 2 threats (AUS 3+3=6, PAR 3+3=6) → "not safe" → no ✓.
+
+But AUS and PAR **play each other** on the last day — only one of them can win, so at most one reaches 6. USA is therefore guaranteed at least 2nd. The points-only heuristic can't see this because it never looks at *who plays whom*. (Symmetrically, it was also too generous in other shapes — counting independent threats that can't all happen.)
+
+Separately, the data layer's `WcStandingRow.qualifying` was just naive `position <= 2` ("currently top 2"), which the UI ignored in favor of the heuristic. Neither was correct.
+
+### Fix: brute-force the remaining group matches
+
+`qualifiedFlags(rows, remaining)` now takes the group's non-finished matches (as `{home, away}` FIFA codes) and enumerates **every** win/draw/loss combination (group of 4 → at most 3⁶ = 729 scenarios). A team is marked ✓ only if, in **every** scenario, at most one other team has points `≥` its points (the `≥` keeps it conservative on tiebreakers — a points tie never counts as clinched, since GD/head-to-head could rank the rival above). When the group is complete (`remaining = []`) it trusts the source's final `position <= 2`.
+
+The flags are computed in `finalize()` (the one place the full match list `_allMatches` is still available, before it's stripped) and stored on each `WcStandingRow.qualifying`; the UI now renders the ✓ straight from `row.qualifying` instead of recomputing. Group D now yields **USA ✓, AUS/PAR/TUR ✗** — the correct answer.
+
+### Scope / non-goals
+
+- **Top-2 only.** Best-third qualification (the 8 best 3rd-placed teams advance in the 48-team format) is still **never** auto-marked — it depends on cross-group comparisons that generally aren't decidable until late, and a wrong ✓ is worse than a missing one. A team guaranteed to advance *only* as a best third shows no ✓ by design.
+- Cache key bumped `wc:data:v1 → v2` so the corrected flags recompute immediately on deploy rather than serving the previously-cached naive flags through the SWR window.
+- 4 unit tests in `tests/worldcup.test.js` lock the behavior (the USA "chasers play each other" case, the "chasers play different opponents → leader not safe" case, the all-tied case, and the completed-group case).

@@ -29,7 +29,7 @@ function groupA(): WcGroup {
     name: "A",
     rows: [
       { position: 1, team: BRA, played: 2, won: 2, drawn: 0, lost: 0, goalDifference: 5, points: 6, qualifying: true },
-      { position: 2, team: SUI, played: 2, won: 1, drawn: 1, lost: 0, goalDifference: 2, points: 4, qualifying: true },
+      { position: 2, team: SUI, played: 2, won: 1, drawn: 1, lost: 0, goalDifference: 2, points: 4, qualifying: false },
       { position: 3, team: CMR, played: 2, won: 0, drawn: 1, lost: 1, goalDifference: -2, points: 1, qualifying: false },
       { position: 4, team: SRB, played: 2, won: 0, drawn: 0, lost: 2, goalDifference: -5, points: 0, qualifying: false },
     ],
