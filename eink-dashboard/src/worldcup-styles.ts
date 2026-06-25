@@ -1,13 +1,12 @@
 /**
  * Per-display stylesheets for the World Cup pages — DELIBERATELY SEPARATE so a change to one
  * display never affects the other (DECISIONS #48). Shared structure/logic lives in worldcup-ui.ts;
- * only the CSS diverges. COLOR_STYLE is the pristine pre-session E1002 look (with flags); the B&W
- * page composes MONO_STYLE_BASE with its inlined Inter font in pages/worldcup.ts.
+ * only the CSS diverges. COLOR_STYLE = pristine pre-session E1002 (with flags); the B&W page
+ * composes MONO_STYLE_BASE (crisp 3.15.0 layout) with its inlined Inter font in pages/worldcup.ts.
  */
 
 /** E1002 color page stylesheet (Spectra-6; pristine pre-session). */
-export const COLOR_STYLE = ` }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box; }
   body { width: 800px; height: 480px; overflow: hidden; display: flex; flex-direction: column;
     background: #fff; color: #000; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; padding: 14px 22px; }
   .wc-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 3px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
@@ -44,12 +43,10 @@ export const COLOR_STYLE = ` }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
   .wc-champ-team { font-size: 104px; font-weight: 800; line-height: 1; }
   .wc-champ-final { font-size: 30px; font-weight: 700; }
-  .wc-empty { font-size: 18px; color: #000; padding: 6px 0; }
-  `;
+  .wc-empty { font-size: 18px; color: #000; padding: 6px 0; }`;
 
 /** E1001 B&W page stylesheet base (crispness layout; weight 500, no clip, content-sized). */
-export const MONO_STYLE_BASE = ` }
-  /* E-ink crispness: disable font anti-aliasing so the mono panel gets pure 1-bit glyph
+export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing so the mono panel gets pure 1-bit glyph
      edges instead of grayscale-smoothed ones it would quantize into smudge/serration.
      See DECISIONS #48 (refs: SumatraPDF#599, MobileRead e-ink font threads). */
   * { margin: 0; padding: 0; box-sizing: border-box;
@@ -92,5 +89,4 @@ export const MONO_STYLE_BASE = ` }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
   .wc-champ-team { font-size: 104px; font-weight: 700; line-height: 1; }
   .wc-champ-final { font-size: 30px; font-weight: 700; }
-  .wc-empty { font-size: 18px; color: #000; padding: 6px 0; }
-  `;
+  .wc-empty { font-size: 18px; color: #000; padding: 6px 0; }`;
