@@ -1,6 +1,6 @@
 {
   "name": "eink-dashboard",
-  "version": "3.14.8",
+  "version": "3.14.9",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",

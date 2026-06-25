@@ -8,6 +8,8 @@ import { getWorldCupData } from "../worldcup";
 import { renderWorldCupHTML, type WcTheme } from "../worldcup-ui";
 import { testWorldCupData } from "../worldcup-testdata";
 import { FONT_ATKINSON_400, FONT_ATKINSON_700, FONT_INTER_500, FONT_INTER_700 } from "../worldcup-fonts";
+import { renderWorldCupImagePNG } from "../worldcup-image";
+import { pngToBase64 } from "../png";
 
 const MONO_THEME: WcTheme = { rootCSS: "", fav: "#000", win: "#000", live: "#000" };
 
@@ -48,20 +50,31 @@ function buildVariantCSS(raw: string | null): string {
 export async function handleWorldCupPage(env: Env, url: URL, ctx?: ExecutionContext): Promise<Response> {
   try {
     const testPhase = parseTestPhase(url.searchParams.get("test-phase"));
+    const variant = url.searchParams.get("variant");
     const data = testPhase ? testWorldCupData(testPhase)
       : url.searchParams.has("test") ? testWorldCupData("group")
       : await getWorldCupData(env, ctx);
 
-    const html = renderWorldCupHTML(data, MONO_THEME, buildVariantCSS(url.searchParams.get("variant")));
-    return new Response(html, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "public, max-age=900",
-        "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY",
-        "Referrer-Policy": "no-referrer",
-      },
-    });
+    const htmlHeaders = {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=900",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "no-referrer",
+    };
+
+    // Nuclear option: server-rendered bitmap PNG (no anti-aliasing) shown full-bleed.
+    if (variant === "image") {
+      const b64 = pngToBase64(await renderWorldCupImagePNG(data));
+      const wrap = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=800"><title>World Cup 2026</title>`
+        + `<style>*{margin:0;padding:0}html,body{width:800px;height:480px;overflow:hidden;background:#fff}`
+        + `img{width:800px;height:480px;display:block;image-rendering:pixelated}</style></head>`
+        + `<body><img src="data:image/png;base64,${b64}" width="800" height="480"></body></html>`;
+      return new Response(wrap, { headers: htmlHeaders });
+    }
+
+    const html = renderWorldCupHTML(data, MONO_THEME, buildVariantCSS(variant));
+    return new Response(html, { headers: htmlHeaders });
   } catch (err) {
     console.error("World Cup page error:", err);
     return new Response("World Cup data temporarily unavailable", {
