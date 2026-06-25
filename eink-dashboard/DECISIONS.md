@@ -1425,3 +1425,9 @@ The flags are computed in `finalize()` (the one place the full match list `_allM
 - **Top-2 only.** Best-third qualification (the 8 best 3rd-placed teams advance in the 48-team format) is still **never** auto-marked — it depends on cross-group comparisons that generally aren't decidable until late, and a wrong ✓ is worse than a missing one. A team guaranteed to advance *only* as a best third shows no ✓ by design.
 - Cache key bumped `wc:data:v1 → v2` so the corrected flags recompute immediately on deploy rather than serving the previously-cached naive flags through the SWR window.
 - 4 unit tests in `tests/worldcup.test.js` lock the behavior (the USA "chasers play each other" case, the "chasers play different opponents → leader not safe" case, the all-tied case, and the completed-group case).
+
+### Follow-up (v3.14.5, 2026-06-25): resolve fixtures by NAME, not 3-letter code
+
+The first cut keyed remaining fixtures to standings rows by `teamCode` — and **football-data is internally inconsistent**: Curaçao is `CUW` in the `/standings` feed but `CUR` in the `/matches` feed (same full name "Curaçao"). So the fixture's team didn't resolve, `idx.get()` returned undefined, and that match was **silently skipped** (`continue`) — its points never moved in the simulation, under-counting threats. Real-world fallout: Spain (Group H, 4 pts, 1 game left, chasers on 2/2/1) was wrongly marked ✓ — it is *not* guaranteed, because two chasers can each reach ≥4. (USA/Group D happened to be correct anyway since it's clinched by gap, which masked the bug.)
+
+Fix: `qualifiedFlags` now takes the remaining matches as **team objects** and resolves each to a standings row by **normalized full name first, then code**. Names are stable across both feeds; the code is not. `finalize` passes `m.home`/`m.away` directly. This is the general rule for joining football-data's two feeds: **match on name, treat the 3-letter code as a hint.** A 5th unit test pins the CUR/CUW case.

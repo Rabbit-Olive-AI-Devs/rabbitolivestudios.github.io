@@ -72,17 +72,30 @@ export function teamLabel(team: { name: string; code: string }, maxChars: number
  * never marked (cross-group / unstable — see DECISIONS #44).
  *
  * @param rows     standings rows (need team identity + current points + position)
- * @param remaining non-finished group matches, as { home, away } FIFA codes
+ * @param remaining non-finished group matches, as { home, away } team objects
  */
 export function qualifiedFlags(
   rows: { team: { name: string; code: string }; position: number; points: number }[],
-  remaining: { home: string; away: string }[],
+  remaining: { home: { name: string; code: string }; away: { name: string; code: string } }[],
 ): boolean[] {
   // Group complete: positions are final (tiebreakers already resolved by the source).
   if (remaining.length === 0) return rows.map((r) => r.position <= 2);
 
-  const codes = rows.map((r) => teamCode(r.team));
-  const idx = new Map(codes.map((c, i) => [c, i] as const));
+  // Resolve a match team to its standings row by NAME first, then code. football-data is
+  // internally inconsistent (e.g. Curaçao is CUW in standings but CUR in matches), so keying
+  // on the 3-letter code alone silently drops fixtures; the full name is stable across feeds.
+  const norm = (s: string) => (s ?? "").trim().toLowerCase();
+  const byName = new Map<string, number>();
+  const byCode = new Map<string, number>();
+  rows.forEach((r, i) => {
+    if (r.team.name) byName.set(norm(r.team.name), i);
+    if (r.team.code) byCode.set(norm(r.team.code), i);
+  });
+  const resolve = (t: { name: string; code: string }): number | undefined => {
+    const n = byName.get(norm(t.name));
+    return n !== undefined ? n : byCode.get(norm(t.code));
+  };
+
   const base = rows.map((r) => r.points);
   const safe = rows.map(() => true);
   const total = 3 ** remaining.length;     // group of 4 -> at most 3^6 = 729 scenarios
@@ -93,8 +106,8 @@ export function qualifiedFlags(
     for (const g of remaining) {
       const outcome = s % 3;
       s = (s - outcome) / 3;
-      const h = idx.get(g.home);
-      const a = idx.get(g.away);
+      const h = resolve(g.home);
+      const a = resolve(g.away);
       if (h === undefined || a === undefined) continue;     // match references a team outside this group
       if (outcome === 0) pts[h] += 3;                       // home win
       else if (outcome === 1) { pts[h] += 1; pts[a] += 1; } // draw

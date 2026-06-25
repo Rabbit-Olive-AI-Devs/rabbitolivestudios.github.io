@@ -14,7 +14,7 @@ import { withBudget } from "./with-budget";
 import { worldCupCacheKey } from "./cache-keys";
 import { fetchFootballData } from "./worldcup-football-data";
 import { fetchOpenFootball } from "./worldcup-openfootball";
-import { computePhase, qualifiedFlags, teamCode } from "./worldcup-ui";
+import { computePhase, qualifiedFlags } from "./worldcup-ui";
 import { getChicagoDateISO } from "./date-utils";
 import type { Env, WorldCupData, WcMatch, CachedValue } from "./types";
 
@@ -35,7 +35,7 @@ function finalize(data: WorldCupData): WorldCupData {
   const groups = data.groups.map((g) => {
     const remaining = all
       .filter((m) => m.stage === "GROUP" && m.group === g.name && m.status !== "FINISHED")
-      .map((m) => ({ home: teamCode(m.home), away: teamCode(m.away) }));
+      .map((m) => ({ home: m.home, away: m.away }));
     const flags = qualifiedFlags(g.rows, remaining);
     return { ...g, rows: g.rows.map((r, i) => ({ ...r, qualifying: flags[i] })) };
   });
