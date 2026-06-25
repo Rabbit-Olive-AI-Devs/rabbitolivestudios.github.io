@@ -1442,3 +1442,35 @@ The flags are computed in `finalize()` (the one place the full match list `_allM
 The first cut keyed remaining fixtures to standings rows by `teamCode` — and **football-data is internally inconsistent**: Curaçao is `CUW` in the `/standings` feed but `CUR` in the `/matches` feed (same full name "Curaçao"). So the fixture's team didn't resolve, `idx.get()` returned undefined, and that match was **silently skipped** (`continue`) — its points never moved in the simulation, under-counting threats. Real-world fallout: Spain (Group H, 4 pts, 1 game left, chasers on 2/2/1) was wrongly marked ✓ — it is *not* guaranteed, because two chasers can each reach ≥4. (USA/Group D happened to be correct anyway since it's clinched by gap, which masked the bug.)
 
 Fix: `qualifiedFlags` now takes the remaining matches as **team objects** and resolves each to a standings row by **normalized full name first, then code**. Names are stable across both feeds; the code is not. `finalize` passes `m.home`/`m.away` directly. This is the general rule for joining football-data's two feeds: **match on name, treat the 3-letter code as a hint.** A 5th unit test pins the CUR/CUW case.
+
+---
+
+## 48. E-ink Text Crispness Is Limited by SenseCraft's Cloud Render, Not CSS Tricks (v3.14.7, 2026-06-25)
+
+### Problem
+
+After the layout/clipping fixes (#46), WC text on the E1001 still looked **smudged/serrated** versus the `/weather` page, which is crisp on the **same** device — despite both using the same font stack, pure `#000`/`#fff`, and integer pixel positions. A three-agent research sweep (web + code-diff + device-pipeline) settled it.
+
+### How the pixels actually get to the panel (the key reframing)
+
+**SenseCraft HMI's "Web Function" renders the URL in a headless browser in Seeed's CLOUD**, rasterizes + dithers it to the panel palette server-side, and pushes a finished image to the ESP32 (the device is just a receiver). Confirmed by: device can't reach LAN/HTTP URLs (only public HTTPS), JS executes, full DOM/CSS support, and the panel's 2–3 s refresh is waveform time for a pre-made image. Consequences:
+- **We control only the HTML/CSS** (no browser flags, no deviceScaleFactor, no waveform mode).
+- Every **anti-aliased (grayscale) glyph edge** is the enemy: the cloud quantizes grayscale to the 1-bit mono panel, turning soft edges into serration/smudge.
+
+### What does NOT work (verified, high confidence)
+
+- `-webkit-font-smoothing: none`, `font-smooth: never`, `text-rendering: optimizeSpeed` — **no-ops in Blink/Chromium** (only macOS Safari honors `-webkit-font-smoothing`, and never the `none` value; `text-rendering:optimizeSpeed` only drops kerning/ligatures, it does **not** disable AA; MDN + Chromium bug 40635769). They were added in an earlier cut and **did nothing** — the WC page carried them and was still the *worse*-looking page, which is the proof. Kept temporarily as a no-cost trial; **treat as inert / removable.**
+- `image-rendering` — only affects raster `<img>`/canvas scaling, never font rasterization.
+- Chromium launch flags (`--font-render-hinting`, `--disable-lcd-text`) — launcher-only; a page can't set them and we don't own Seeed's launcher.
+- **Refresh mode** — SenseCraft exposes only an update *interval*, never the waveform mode, and it's not per-page; every push is a full refresh. So it cannot make one page crisp and a sibling smudged. **Ruled out.**
+- **Document downscaling** — both pages lay out at exactly 800×480 with no horizontal overflow (verified `scrollWidth==800`), so no fractional fit-to-width scaling. **Ruled out** as the differentiator here (but it *would* serrate everything if a page exceeded 800×480 — keep pages exactly 800×480).
+
+### Actual cause + fix
+
+The crispness gap is **typographic**: the WC page rendered the **bulk** of its content as **bold `700` at 19–22px**, while the crisp weather page renders most body text as **medium `500` at 14–18px** (reserving `700` for a few small accents and the big isolated numerals). Heavier/larger glyphs expose far more anti-aliased edge area, and the cloud's grayscale→1-bit quantization turns that fringe into the "serrated/smudged" look. (This *reverses* the v3.14.2 call to bump everything to 700 "to match weather" — weather's *body* is 500, not 700.)
+
+Fix (v3.14.7): WC body content (`.wc-row`, `.wc-table td`, team-name cell, `.wc-bteam`) dropped **700 → 500**, matching the weather page's body profile; `700` kept only as accents (titles, panel/group labels, the score/time `.wc-cell`, points, favorite/winner via the existing inline overrides — which now also restores the favorite's weight emphasis over a 500 base). Secondary suspects, to revisit on-device if 500 isn't enough: the standings **CSS `<table>`** and the R32 **`columns:2`** compute content-derived column widths that can land glyphs on sub-pixel x-positions (the weather page is pure flexbox with none of this) — replacing them with fixed flex columns would remove that residual serration. **On-device A/B is mandatory** — none of this is visible in a local browser (the dither only happens in Seeed's cloud render).
+
+### Rule
+
+On a SenseCraft/e-ink HTML page, crispness comes from **medium weight (500) + moderate size + pure `#000`/`#fff` + exact 800×480 + integer positions + flexbox (avoid CSS tables/multicol for text)** — not from font-smoothing CSS (inert) or refresh settings (not ours). When in doubt, mirror the `/weather` page's typography, which is the proven-crisp reference on this exact device.
