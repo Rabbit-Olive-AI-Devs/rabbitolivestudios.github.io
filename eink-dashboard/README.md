@@ -41,8 +41,8 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
 | **World Cup 2026** (seasonal) | | |
-| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono (today's matches + results, rotating group standings, knockout bracket) | 12 min |
-| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 (color accents) | 12 min |
+| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono (today's matches + results, rotating group standings, knockout bracket) | 15 min |
+| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 (color accents) | 15 min |
 | `GET /worldcup?test-phase=group\|r32\|knockout\|champion` | Preview any phase layout with canned data (also on `/color/worldcup`) | none |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store) | none |

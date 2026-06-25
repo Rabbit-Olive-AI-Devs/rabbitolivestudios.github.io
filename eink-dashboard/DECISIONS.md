@@ -1364,7 +1364,7 @@ Same data/layout on both displays via a `WcTheme` object passed to the shared re
 
 ---
 
-## 46. World Cup Text Crispness — Match the Weather Pages (post-v3.14.0, 2026-06-25)
+## 46. World Cup Text Crispness — Match the Weather Pages (v3.14.1, 2026-06-25)
 
 ### Symptom
 
