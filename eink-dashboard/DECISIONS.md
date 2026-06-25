@@ -1474,3 +1474,9 @@ Fix (v3.14.7): WC body content (`.wc-row`, `.wc-table td`, team-name cell, `.wc-
 ### Rule
 
 On a SenseCraft/e-ink HTML page, crispness comes from **medium weight (500) + moderate size + pure `#000`/`#fff` + exact 800×480 + integer positions + flexbox (avoid CSS tables/multicol for text)** — not from font-smoothing CSS (inert) or refresh settings (not ours). When in doubt, mirror the `/weather` page's typography, which is the proven-crisp reference on this exact device.
+
+### Follow-up (v3.14.8): local 1-bit simulation + on-device A/B variants
+
+A faithful local simulation (Playwright render of each page → downsample to 800×480 → 1-bit threshold + 4-level Floyd–Steinberg via the project's own `decodePNG`/`encodePNGGray8`) showed **both** `/weather` and `/worldcup` render **crisp** — identical quality. So the fog is **not** in the page's CSS/text logic; it's introduced downstream in Seeed's cloud renderer (most likely a poorly-hinted *fallback* font at our larger sizes, since neither page names a font that exists on the cloud's Linux Chromium) or the physical panel — neither reproducible locally.
+
+To settle it on the real device without N deploys, `/worldcup?variant=` switches typography in one build (corner label shows which): `atkinson` (inline Atkinson Hyperlegible 400/700 WOFF2 — legibility/e-ink font), `inter` (inline Inter 500/700 — neutral, well-hinted), `small` (weather-sized 14–17px, no embed), default = current. Fonts are base64 data-URIs in `src/worldcup-fonts.ts` so the cloud renderer cannot fall back. Option 4 (server-render the page to a pre-dithered PNG, bypassing the cloud renderer — guaranteed crisp but a full rewrite) is held in reserve. Pick the winner on-device, then make it the default and drop the rest.
