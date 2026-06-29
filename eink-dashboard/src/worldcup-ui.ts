@@ -429,9 +429,13 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
     : finished ? "Full time"
     : compact ? shortChicagoDate(mm.dateChicago)
     : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
+  // In compact (inner) boxes, only render a side once it's decided — so a single advanced
+  // team shows as one prominent centered flag/code rather than a blank second line.
+  const homeLine = (!compact || teamKnown(mm.home)) ? line(mm.home, h, homeWon, mm.homeScore) : "";
+  const awayLine = (!compact || teamKnown(mm.away)) ? line(mm.away, a, awayWon, mm.awayScore) : "";
   return `<div class="${cls}${live ? " wc-klive" : ""}">
-    ${line(mm.home, h, homeWon, mm.homeScore)}
-    ${line(mm.away, a, awayWon, mm.awayScore)}
+    ${homeLine}
+    ${awayLine}
     <div class="wc-kwhen">${escapeHTML(when)}</div>
   </div>`;
 }

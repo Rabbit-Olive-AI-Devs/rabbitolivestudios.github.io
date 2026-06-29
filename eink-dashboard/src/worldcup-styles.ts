@@ -44,9 +44,13 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-kscore { font-weight: 800; flex: 0 0 auto; padding-left: 4px; }
   .wc-kwhen { font-size: 9px; font-weight: 600; line-height: 11px; white-space: nowrap; overflow: hidden; opacity: 0.85; }
   .wc-ktie .wc-flag { height: 11px; width: auto; border: 1px solid #000; margin: 0; flex: 0 0 auto; }
-  .wc-kempty { flex: 0 0 auto; min-height: 44px; align-items: center; justify-content: center; }
+  .wc-kempty { flex: 0 0 auto; min-height: 46px; align-items: center; justify-content: center; }
   .wc-ktbd { font-size: 11px; font-weight: 700; }
-  .wc-kfinal { min-height: 50px; }
+  /* Inner rounds (everything but the wide R32 columns): roomy boxes with a big, centered flag
+     so an advancing team reads clearly on the color panel. */
+  .wc-kcol:not(.wc-kr32) .wc-ktie, .wc-kfinal { min-height: 58px; }
+  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; line-height: 26px; }
+  .wc-kcol:not(.wc-kr32) .wc-flag, .wc-kfinal .wc-flag { height: 24px; }
   .wc-klive { border-width: 2.5px; }
   .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }

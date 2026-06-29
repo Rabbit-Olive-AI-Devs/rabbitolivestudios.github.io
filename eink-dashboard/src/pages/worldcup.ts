@@ -18,7 +18,7 @@ import { renderWorldCupBrowserPNG } from "../worldcup-browser-image";
 import { pngToBase64 } from "../png";
 
 const WC_ORIGIN = "https://eink-dashboard.thiago-oliveira77.workers.dev";
-const IMG_KEY = "wc:image:v8"; // v8: bracket advances winners + compact inner codes/flags (DECISIONS #49); v7: data-driven; v6: bracket; v4: phase fix
+const IMG_KEY = "wc:image:v9"; // v9: bigger advancing flag on color (DECISIONS #49); v8: advances winners; v7: data-driven; v6: bracket
 const IMG_SOFT_TTL_MS = 14 * 60 * 1000; // refresh the rendered image at most ~every 14 min
 const IMG_THRESHOLD = 160;              // gray cutoff for the 1-bit threshold
 
