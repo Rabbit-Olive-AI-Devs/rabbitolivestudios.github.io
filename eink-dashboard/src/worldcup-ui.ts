@@ -136,8 +136,14 @@ export function matchCell(m: { status: WcStatus; homeScore: number | null; awayS
  * Derive the tournament phase from the full match list.
  * - champion: the FINAL is finished
  * - group: any GROUP match is not yet FINISHED
- * - else knockout sub-phase by the latest round with any match:
- *   r32 if the furthest active round is R32, otherwise knockout (R16+).
+ * - else knockout sub-phase by the CURRENT active round (earliest knockout round with
+ *   an unfinished match): r32 if R32 is still active, otherwise knockout (R16+).
+ *
+ * The source publishes all 104 fixtures up front, so R16/QF/SF/FINAL exist as scheduled
+ * TBD placeholders from the start. "A later round exists" therefore does NOT mean it is
+ * active — keying on the furthest *existing* round wrongly jumps straight to the (all-TBD)
+ * R16 bracket the moment the group stage ends. Use the earliest round that still has an
+ * unfinished (SCHEDULED/LIVE) match: that is the round actually being played.
  */
 export function computePhase(matches: { stage: WcStage; status: WcStatus }[]): WcPhase {
   if (matches.some((m) => m.stage === "FINAL" && m.status === "FINISHED")) return "champion";
@@ -146,14 +152,18 @@ export function computePhase(matches: { stage: WcStage; status: WcStatus }[]): W
   const groupUnfinished = groupMatches.some((m) => m.status !== "FINISHED");
   if (groupMatches.length === 0 || groupUnfinished) return "group";
 
-  // Group stage complete → find the furthest knockout round that has any match.
-  let furthest = -1;
-  for (const m of matches) {
-    const idx = KO_ORDER.indexOf(m.stage);
-    if (idx > furthest) furthest = idx;
+  // Group stage complete → current round = earliest knockout round with an unfinished match.
+  let current = -1;
+  for (let i = 0; i < KO_ORDER.length; i++) {
+    if (matches.some((m) => m.stage === KO_ORDER[i] && m.status !== "FINISHED")) {
+      current = i;
+      break;
+    }
   }
-  // furthest === 0 means only R32 exists so far.
-  return furthest <= 0 ? "r32" : "knockout";
+  // No unfinished knockout match left (FINAL-finished already returned champion above) or no
+  // knockout fixtures yet → fall back to the R32 split layout, which degrades gracefully.
+  if (current < 0) return "r32";
+  return current === 0 ? "r32" : "knockout";
 }
 
 /**

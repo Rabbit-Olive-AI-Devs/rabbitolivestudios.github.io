@@ -18,7 +18,7 @@ import { renderWorldCupBrowserPNG } from "../worldcup-browser-image";
 import { pngToBase64 } from "../png";
 
 const WC_ORIGIN = "https://eink-dashboard.thiago-oliveira77.workers.dev";
-const IMG_KEY = "wc:image:v3";
+const IMG_KEY = "wc:image:v4"; // v4: invalidate stale knockout-bracket renders after the phase fix (DECISIONS #49)
 const IMG_SOFT_TTL_MS = 14 * 60 * 1000; // refresh the rendered image at most ~every 14 min
 const IMG_THRESHOLD = 160;              // gray cutoff for the 1-bit threshold
 

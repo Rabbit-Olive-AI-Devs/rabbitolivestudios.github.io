@@ -93,7 +93,7 @@ test("FLAGS map covers participants and is well-formed", () => {
 });
 
 test("worldCupCacheKey is stable", () => {
-  assert.equal(worldCupCacheKey(), "wc:data:v2");
+  assert.equal(worldCupCacheKey(), "wc:data:v3");
 });
 
 const gm = (status) => ({ stage: "GROUP", status });
@@ -110,6 +110,26 @@ test("computePhase: r32 when groups done and latest active round is R32", () => 
 
 test("computePhase: knockout from R16 onward", () => {
   const matches = [gm("FINISHED"), km("R32", "FINISHED"), km("R16", "SCHEDULED")];
+  assert.equal(computePhase(matches), "knockout");
+});
+
+test("computePhase: r32 even when later-round fixtures exist as scheduled placeholders", () => {
+  // football-data publishes all 104 matches; R16/QF/SF/FINAL exist as TBD placeholders
+  // from the start. Once the group stage ends, R32 is the active round, so the phase must
+  // be r32 (the split layout) — NOT knockout, which would render an all-TBD R16 bracket.
+  const matches = [
+    gm("FINISHED"),
+    km("R32", "SCHEDULED"), km("R16", "SCHEDULED"), km("QF", "SCHEDULED"),
+    km("SF", "SCHEDULED"), km("FINAL", "SCHEDULED"),
+  ];
+  assert.equal(computePhase(matches), "r32");
+});
+
+test("computePhase: knockout once R32 is all finished and R16 is the active round", () => {
+  const matches = [
+    gm("FINISHED"),
+    km("R32", "FINISHED"), km("R16", "SCHEDULED"), km("QF", "SCHEDULED"), km("FINAL", "SCHEDULED"),
+  ];
   assert.equal(computePhase(matches), "knockout");
 });
 
