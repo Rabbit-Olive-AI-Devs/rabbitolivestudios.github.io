@@ -66,22 +66,22 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
   if (phase === "r32") {
     // Full 16-match Round of 32 (one finished, the rest scheduled across the round).
     const knockout = [
-      m(73, "R32", "FINISHED", "—", RSA, CAN, 0, 1),
-      m(76, "R32", "SCHEDULED", "12:00 PM", BRA, JPN, null, null),
-      m(74, "R32", "SCHEDULED", "3:30 PM", GER, PAR, null, null),
-      m(75, "R32", "SCHEDULED", "8:00 PM", NED, MAR, null, null),
-      m(77, "R32", "SCHEDULED", "4:00 PM", FRA, SWE, null, null),
-      m(78, "R32", "SCHEDULED", "12:00 PM", CIV, NOR, null, null),
-      m(79, "R32", "SCHEDULED", "8:00 PM", MEX, ECU, null, null),
-      m(80, "R32", "SCHEDULED", "11:00 AM", ENG, COD, null, null),
-      m(81, "R32", "SCHEDULED", "7:00 PM", USA, BIH, null, null),
-      m(82, "R32", "SCHEDULED", "3:00 PM", BEL, SEN, null, null),
-      m(83, "R32", "SCHEDULED", "6:00 PM", POR, CRO, null, null),
-      m(84, "R32", "SCHEDULED", "2:00 PM", ESP, AUT, null, null),
-      m(85, "R32", "SCHEDULED", "10:00 PM", SUI, ALG, null, null),
-      m(86, "R32", "SCHEDULED", "5:00 PM", ARG, CPV, null, null),
-      m(87, "R32", "SCHEDULED", "8:30 PM", COL, GHA, null, null),
-      m(88, "R32", "SCHEDULED", "1:00 PM", SRB, CMR, null, null),
+      m(73, "R32", "FINISHED", "—", RSA, CAN, 0, 1, undefined, "2026-06-28"),
+      m(74, "R32", "SCHEDULED", "12:00 PM", BRA, JPN, null, null, undefined, "2026-06-29"),
+      m(75, "R32", "SCHEDULED", "3:30 PM", GER, PAR, null, null, undefined, "2026-06-29"),
+      m(76, "R32", "SCHEDULED", "8:00 PM", NED, MAR, null, null, undefined, "2026-06-29"),
+      m(77, "R32", "SCHEDULED", "12:00 PM", CIV, NOR, null, null, undefined, "2026-06-30"),
+      m(78, "R32", "SCHEDULED", "4:00 PM", FRA, SWE, null, null, undefined, "2026-06-30"),
+      m(79, "R32", "SCHEDULED", "8:00 PM", MEX, ECU, null, null, undefined, "2026-06-30"),
+      m(80, "R32", "SCHEDULED", "11:00 AM", ENG, COD, null, null, undefined, "2026-07-01"),
+      m(81, "R32", "SCHEDULED", "3:00 PM", BEL, SEN, null, null, undefined, "2026-07-01"),
+      m(82, "R32", "SCHEDULED", "7:00 PM", USA, BIH, null, null, undefined, "2026-07-01"),
+      m(83, "R32", "SCHEDULED", "2:00 PM", POR, CRO, null, null, undefined, "2026-07-02"),
+      m(84, "R32", "SCHEDULED", "6:00 PM", ESP, AUT, null, null, undefined, "2026-07-02"),
+      m(85, "R32", "SCHEDULED", "10:00 PM", SUI, ALG, null, null, undefined, "2026-07-02"),
+      m(86, "R32", "SCHEDULED", "1:00 PM", ARG, CPV, null, null, undefined, "2026-07-03"),
+      m(87, "R32", "SCHEDULED", "5:00 PM", COL, GHA, null, null, undefined, "2026-07-03"),
+      m(88, "R32", "SCHEDULED", "8:30 PM", SRB, CMR, null, null, undefined, "2026-07-03"),
     ];
     return { ...base, knockout, phase };
   }

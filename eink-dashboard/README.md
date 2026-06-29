@@ -293,7 +293,7 @@ KV cache (24h)
 `/worldcup` (E1001 mono) and `/color/worldcup` (E1002 Spectra 6) are a **single adaptive page per display** that transitions itself by tournament phase:
 
 - **Group stage** — today's matches + latest results on top; a rotating group standings table below (cycles the 12 groups, prefers groups with a match today).
-- **Round of 32** — the full 16-match round as a 2-column grid filling the screen (scores for played ties, kickoff times for upcoming, ▶ on the favorite); a 32-team bracket tree isn't legible on 800×480.
+- **Round of 32** — the full 16-tie knockout bracket: 8 ties down each edge converging through empty R16/QF/SF slots to a center Final box. Each tie shows both teams (flags on color, names-only on mono — flags aren't legible in pure B/W), a score for played ties (winner bold), and a date·time line for upcoming ones. Header shows the round's date span + "times CT".
 - **Knockouts (R16→Final)** — a converging bracket tree fills the screen; today's ties highlighted, winners bold.
 - **Champion** — winner card after the final.
 

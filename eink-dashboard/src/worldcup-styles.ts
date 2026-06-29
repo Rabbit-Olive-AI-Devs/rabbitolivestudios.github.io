@@ -30,10 +30,23 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-table td { text-align: center; padding: 2px 6px; font-weight: 700; }
   .wc-table td:nth-child(2) { text-align: left; font-weight: 700; }
   .wc-pos { color: #000; } .wc-pts { font-weight: 800; }
-  .wc-r32full { flex: 1; min-height: 0; columns: 2; column-gap: 30px; overflow: hidden; }
-  .wc-r32full .wc-row { font-size: 19px; break-inside: avoid; margin-bottom: 11px; }
-  .wc-r32full .wc-cell { min-width: 54px; }
-  .wc-r32full .wc-flag { height: 14px; margin-right: 6px; }
+  /* Round-of-32 knockout bracket (color: with flags) */
+  .wc-kbracket { flex: 1; min-height: 0; display: flex; gap: 3px; align-items: stretch; overflow: hidden; }
+  .wc-kside { flex: 1; display: flex; gap: 3px; min-width: 0; }
+  .wc-kcol { display: flex; flex-direction: column; justify-content: space-around; min-width: 0; }
+  .wc-kr32 { flex: 0 0 196px; }
+  .wc-kside .wc-kcol:not(.wc-kr32) { flex: 1; }
+  .wc-kcenter { flex: 0 0 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+  .wc-kcenter-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+  .wc-ktie { border: 1.5px solid #000; border-radius: 4px; padding: 2px 6px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+  .wc-kteam { font-size: 15px; font-weight: 600; line-height: 18px; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+  .wc-kname { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .wc-kscore { font-weight: 800; flex: 0 0 auto; padding-left: 4px; }
+  .wc-kwhen { font-size: 10px; font-weight: 600; line-height: 13px; white-space: nowrap; overflow: hidden; }
+  .wc-ktie .wc-flag { height: 12px; width: auto; border: 1px solid #000; margin: 0; flex: 0 0 auto; }
+  .wc-kempty { flex: 0 0 auto; min-height: 30px; }
+  .wc-kfinal { min-height: 42px; }
+  .wc-klive { border-width: 2.5px; }
   .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
   .wc-bcol-label { font-size: 13px; font-weight: 800; text-align: center; letter-spacing: 1px; margin-bottom: 4px; }
@@ -79,9 +92,21 @@ export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing
   .wc-table td { text-align: center; padding: 3px 6px; font-weight: 500; line-height: 24px; }
   .wc-table td:nth-child(2) { text-align: left; font-weight: 500; }
   .wc-table td.wc-pos { font-weight: 500; } .wc-table td.wc-pts { font-weight: 700; }
-  .wc-r32full { flex: 1; min-height: 0; columns: 2; column-gap: 30px; overflow: hidden; }
-  .wc-r32full .wc-row { font-size: 20px; line-height: 24px; break-inside: avoid; margin-bottom: 12px; }
-  .wc-r32full .wc-cell { min-width: 56px; }
+  /* Round-of-32 knockout bracket (mono: names only, no flags) */
+  .wc-kbracket { flex: 1; min-height: 0; display: flex; gap: 3px; align-items: stretch; overflow: hidden; }
+  .wc-kside { flex: 1; display: flex; gap: 3px; min-width: 0; }
+  .wc-kcol { display: flex; flex-direction: column; justify-content: space-around; min-width: 0; }
+  .wc-kr32 { flex: 0 0 188px; }
+  .wc-kside .wc-kcol:not(.wc-kr32) { flex: 1; }
+  .wc-kcenter { flex: 0 0 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+  .wc-kcenter-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+  .wc-ktie { border: 1.5px solid #000; border-radius: 4px; padding: 2px 7px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+  .wc-kteam { font-size: 16px; font-weight: 600; line-height: 19px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; }
+  .wc-kname { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .wc-kscore { font-weight: 800; flex: 0 0 auto; padding-left: 4px; }
+  .wc-kwhen { font-size: 11px; font-weight: 600; line-height: 13px; white-space: nowrap; overflow: hidden; }
+  .wc-kempty { flex: 0 0 auto; min-height: 30px; }
+  .wc-kfinal { min-height: 42px; }
   .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; }
   .wc-bcol-label { font-size: 13px; font-weight: 700; text-align: center; letter-spacing: 1px; margin-bottom: 6px; }

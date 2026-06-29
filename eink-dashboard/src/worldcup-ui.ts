@@ -308,16 +308,25 @@ function bracketColumn(round: WcBracketRound, theme: WcTheme): string {
   return `<div class="wc-bcol"><div class="wc-bcol-label">${escapeHTML(round.label)}</div>${ties}</div>`;
 }
 
-function header(data: WorldCupData): string {
+function header(data: WorldCupData, subtitleOverride?: string): string {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Chicago" });
   const phaseLabel = data.phase === "group" ? "Group Stage"
     : data.phase === "r32" ? "Round of 32"
     : data.phase === "champion" ? "Champions" : "Knockouts";
+  const sub = subtitleOverride ?? `${dateStr} · ${phaseLabel}`;
   return `<div class="wc-header">
     <div class="wc-title">FIFA WORLD CUP 2026</div>
-    <div class="wc-sub">${escapeHTML(dateStr)} &middot; ${escapeHTML(phaseLabel)}</div>
+    <div class="wc-sub">${escapeHTML(sub)}</div>
   </div>`;
+}
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "2026-06-29" -> "Jun 29" (the date is already Chicago-local). */
+function shortChicagoDate(dateChicago: string): string {
+  const [, m, d] = dateChicago.split("-").map((n) => parseInt(n, 10));
+  if (!m || !d) return "";
+  return `${SHORT_MONTHS[m - 1]} ${d}`;
 }
 
 /** Group-stage layout: today + results on top, a rotating group table below. */
@@ -341,23 +350,100 @@ function splitLayout(data: WorldCupData, theme: WcTheme): string {
   ${bottom}`;
 }
 
+/** One filled Round-of-32 tie box: two full-width team lines + a compact score/date·time line. */
+function r32TieBox(mm: WcMatch, theme: WcTheme): string {
+  const h = teamCode(mm.home), a = teamCode(mm.away);
+  const finished = mm.status === "FINISHED" && mm.homeScore !== null && mm.awayScore !== null;
+  const live = mm.status === "LIVE";
+  const homeWon = finished && mm.homeScore! > mm.awayScore!;
+  const awayWon = finished && mm.awayScore! > mm.homeScore!;
+  // Per-team trailing score on finished ties; winner bolded.
+  const line = (team: WcMatch["home"], code: string, won: boolean, score: number | null) => {
+    const fav = isFav(code) ? `color:${theme.fav};` : "";
+    const w = won ? "font-weight:800;" : "";
+    const sc = finished ? `<span class="wc-kscore">${score}</span>` : "";
+    return `<div class="wc-kteam" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${teamLabel(team, 13)}</span>${sc}</div>`;
+  };
+  const when = live
+    ? "LIVE"
+    : finished
+      ? "Full time"
+      : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
+  return `<div class="wc-ktie${live ? " wc-klive" : ""}">
+    ${line(mm.home, h, homeWon, mm.homeScore)}
+    ${line(mm.away, a, awayWon, mm.awayScore)}
+    <div class="wc-kwhen">${escapeHTML(when)}</div>
+  </div>`;
+}
+
+/** A placeholder box for a future-round tie whose teams aren't decided yet. */
+function emptyTieBox(): string {
+  return `<div class="wc-ktie wc-kempty"></div>`;
+}
+
+function emptyCol(n: number, extraClass = ""): string {
+  const boxes = Array.from({ length: n }, () => emptyTieBox()).join("");
+  return `<div class="wc-kcol ${extraClass}">${boxes}</div>`;
+}
+
 /**
- * Round-of-32 layout: the full 16-match round as a 2-column grid filling the screen.
- * A today/results split would be redundant here (this list already carries scores for
- * played ties, kickoff times for upcoming ones, and the ▶ on the favorite) and would not
- * fit alongside 16 rows. Sorted by kickoff so finished/today ties lead.
+ * Round-of-32 layout: the full knockout bracket frame. The 16 R32 ties sit on the two
+ * outer edges (8 left, 8 right) and the empty R16→Final slots converge toward a center
+ * Final box, mirroring the classic tournament bracket. Filled ties show both teams (flags
+ * on the color theme), the favorite accent, and a score (finished) or date·time line.
+ * Future rounds are drawn empty until the source seeds their teams.
+ *
+ * Ties are split by match id (the source numbers them in bracket order); a side with fewer
+ * than 8 ties just renders fewer boxes (the bracket still reads correctly).
  */
 function r32Layout(data: WorldCupData, theme: WcTheme): string {
-  const matches = data.knockout
+  const r32 = data.knockout
     .filter((m) => m.stage === "R32")
     .slice()
-    .sort((a, b) => a.kickoffISO.localeCompare(b.kickoffISO));
-  const rows = matches.length > 0
-    ? matches.map((mm) => matchRow(mm, theme)).join("")
-    : `<div class="wc-empty">Round of 32 fixtures not available yet</div>`;
-  return `${header(data)}
-  <div class="wc-panel-label">ROUND OF 32</div>
-  <div class="wc-r32full">${rows}</div>`;
+    .sort((a, b) => a.id - b.id);
+
+  if (r32.length === 0) {
+    return `${header(data, "Round of 32")}
+    <div class="wc-empty">Round of 32 fixtures not available yet</div>`;
+  }
+
+  const dates = r32.map((m) => m.dateChicago).filter(Boolean).sort();
+  const range = dates.length > 0 && dates[0] !== dates[dates.length - 1]
+    ? `${shortChicagoDate(dates[0])} – ${shortChicagoDate(dates[dates.length - 1])}`
+    : dates.length > 0 ? shortChicagoDate(dates[0]) : "";
+  const subtitle = `Round of 32${range ? ` · ${range}` : ""} · times CT`;
+
+  const half = Math.ceil(r32.length / 2);
+  const left = r32.slice(0, half);
+  const right = r32.slice(half);
+  const r32Col = (ties: WcMatch[]) =>
+    `<div class="wc-kcol wc-kr32">${ties.map((mm) => r32TieBox(mm, theme)).join("")}</div>`;
+  // Inner empty slots per side, scaled to that side's tie count (8 ties -> 4/2/1).
+  const inner = (n: number) => {
+    const r16 = Math.ceil(n / 2), qf = Math.ceil(r16 / 2), sf = Math.ceil(qf / 2);
+    return { r16, qf, sf };
+  };
+  const l = inner(left.length), r = inner(right.length);
+
+  return `${header(data, subtitle)}
+  <div class="wc-kbracket">
+    <div class="wc-kside">
+      ${r32Col(left)}
+      ${emptyCol(l.r16)}
+      ${emptyCol(l.qf)}
+      ${emptyCol(l.sf)}
+    </div>
+    <div class="wc-kcenter">
+      <div class="wc-kcenter-label">FINAL</div>
+      <div class="wc-ktie wc-kempty wc-kfinal"></div>
+    </div>
+    <div class="wc-kside wc-kside-right">
+      ${emptyCol(r.sf)}
+      ${emptyCol(r.qf)}
+      ${emptyCol(r.r16)}
+      ${r32Col(right)}
+    </div>
+  </div>`;
 }
 
 /** Bracket layout (R16 → Final). */
