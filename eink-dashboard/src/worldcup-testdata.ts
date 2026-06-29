@@ -83,7 +83,19 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
       m(87, "R32", "SCHEDULED", "5:00 PM", COL, GHA, null, null, undefined, "2026-07-03"),
       m(88, "R32", "SCHEDULED", "8:30 PM", SRB, CMR, null, null, undefined, "2026-07-03"),
     ];
-    return { ...base, knockout, phase };
+    // Future rounds exist with empty teams + dates (as the source provides them) so the
+    // bracket renders the full frame and fills in as winners advance.
+    const TBD = T("", "");
+    const future: WcMatch[] = [
+      ...[89, 90, 91, 92].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-04")),
+      ...[93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
+      ...[97, 98].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-09")),
+      ...[99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-11")),
+      m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
+      m(102, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-15"),
+      m(104, "FINAL", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-19"),
+    ];
+    return { ...base, knockout: [...knockout, ...future], phase };
   }
 
   if (phase === "knockout") {
