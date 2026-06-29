@@ -34,7 +34,7 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-kbracket { flex: 1; min-height: 0; display: flex; gap: 3px; align-items: stretch; overflow: hidden; }
   .wc-kside { flex: 1; display: flex; gap: 3px; min-width: 0; }
   .wc-kcol { display: flex; flex-direction: column; justify-content: space-around; min-width: 0; }
-  .wc-kr32 { flex: 0 0 196px; }
+  .wc-kr32 { flex: 0 0 158px; }
   .wc-kside .wc-kcol:not(.wc-kr32) { flex: 1; }
   .wc-kcenter { flex: 0 0 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
   .wc-kcenter-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
@@ -52,14 +52,6 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; line-height: 26px; }
   .wc-kcol:not(.wc-kr32) .wc-flag, .wc-kfinal .wc-flag { height: 24px; }
   .wc-klive { border-width: 2.5px; }
-  .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
-  .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
-  .wc-bcol-label { font-size: 13px; font-weight: 800; text-align: center; letter-spacing: 1px; margin-bottom: 4px; }
-  .wc-tie { border: 2px solid #000; border-radius: 4px; padding: 4px 4px; margin: 4px 0; text-align: center; }
-  .wc-bteam { font-size: 19px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; }
-  .wc-bteam .wc-flag { height: 13px; margin-right: 0; }
-  .wc-bscore { font-size: 15px; font-weight: 800; }
-  .wc-third { font-size: 17px; font-weight: 700; text-align: center; margin-top: 6px; }
   .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
   .wc-champ-team { font-size: 104px; font-weight: 800; line-height: 1; }
@@ -101,7 +93,7 @@ export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing
   .wc-kbracket { flex: 1; min-height: 0; display: flex; gap: 3px; align-items: stretch; overflow: hidden; }
   .wc-kside { flex: 1; display: flex; gap: 3px; min-width: 0; }
   .wc-kcol { display: flex; flex-direction: column; justify-content: space-around; min-width: 0; }
-  .wc-kr32 { flex: 0 0 188px; }
+  .wc-kr32 { flex: 0 0 152px; }
   .wc-kside .wc-kcol:not(.wc-kr32) { flex: 1; }
   .wc-kcenter { flex: 0 0 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
   .wc-kcenter-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; }
@@ -112,15 +104,9 @@ export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing
   .wc-kwhen { font-size: 10px; font-weight: 600; line-height: 12px; white-space: nowrap; overflow: hidden; }
   .wc-kempty { flex: 0 0 auto; min-height: 44px; align-items: center; justify-content: center; }
   .wc-ktbd { font-size: 12px; font-weight: 700; }
-  .wc-kfinal { min-height: 50px; }
-  .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
-  .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; }
-  .wc-bcol-label { font-size: 13px; font-weight: 700; text-align: center; letter-spacing: 1px; margin-bottom: 6px; }
-  .wc-tie { border: 2px solid #000; border-radius: 4px; padding: 5px 4px; text-align: center; }
-  .wc-bteam { font-size: 19px; font-weight: 500; line-height: 24px; display: flex; align-items: center; justify-content: center; gap: 4px; }
-  .wc-bteam .wc-flag { height: 13px; margin-right: 0; }
-  .wc-bscore { font-size: 15px; font-weight: 700; }
-  .wc-third { font-size: 17px; font-weight: 500; text-align: center; margin-top: 6px; }
+  /* Inner rounds: roomy boxes; bigger centered 3-letter codes since R32 is narrower now. */
+  .wc-kcol:not(.wc-kr32) .wc-ktie, .wc-kfinal { min-height: 52px; }
+  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; }
   .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
   .wc-champ-team { font-size: 104px; font-weight: 700; line-height: 1; }

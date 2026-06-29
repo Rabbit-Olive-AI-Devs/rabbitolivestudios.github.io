@@ -67,9 +67,9 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
     // Full 16-match Round of 32 (one finished, the rest scheduled across the round).
     const knockout = [
       m(73, "R32", "FINISHED", "—", RSA, CAN, 0, 1, undefined, "2026-06-28"),
-      m(74, "R32", "SCHEDULED", "12:00 PM", BRA, JPN, null, null, undefined, "2026-06-29"),
-      m(75, "R32", "SCHEDULED", "3:30 PM", GER, PAR, null, null, undefined, "2026-06-29"),
-      m(76, "R32", "SCHEDULED", "8:00 PM", NED, MAR, null, null, undefined, "2026-06-29"),
+      m(74, "R32", "FINISHED", "—", BRA, JPN, 2, 0, undefined, "2026-06-29"),
+      m(75, "R32", "FINISHED", "—", GER, PAR, 2, 1, undefined, "2026-06-29"),
+      m(76, "R32", "FINISHED", "—", NED, MAR, 1, 0, undefined, "2026-06-29"),
       m(77, "R32", "SCHEDULED", "12:00 PM", CIV, NOR, null, null, undefined, "2026-06-30"),
       m(78, "R32", "SCHEDULED", "4:00 PM", FRA, SWE, null, null, undefined, "2026-06-30"),
       m(79, "R32", "SCHEDULED", "8:00 PM", MEX, ECU, null, null, undefined, "2026-06-30"),
@@ -99,12 +99,34 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
   }
 
   if (phase === "knockout") {
-    const r16 = [
-      m(40, "R16", "FINISHED", "—", BRA, SUI, 2, 0), m(41, "R16", "FINISHED", "—", ARG, NED, 1, 0),
-      m(42, "R16", "SCHEDULED", "1:00 PM", ENG, FRA, null, null), m(43, "R16", "SCHEDULED", "4:00 PM", ESP, POR, null, null),
+    // Full knockout bracket: all 16 R32 finished, R16 underway (one played), QF+ pending.
+    // The bracket computes R16/QF teams from the R32 winners (advanceRound), so this exercises
+    // the 2-team inner boxes (both flags/codes) and winner propagation into the QF.
+    const TBD = T("", "");
+    const W = (id: number, h: WcTeam, a: WcTeam, hs: number, as: number, date: string) =>
+      m(id, "R32", "FINISHED", "—", h, a, hs, as, undefined, date);
+    const r32 = [
+      W(73, RSA, CAN, 0, 1, "2026-06-28"), W(74, BRA, JPN, 2, 0, "2026-06-29"),
+      W(75, GER, PAR, 2, 1, "2026-06-29"), W(76, NED, MAR, 1, 0, "2026-06-29"),
+      W(77, CIV, NOR, 2, 0, "2026-06-30"), W(78, FRA, SWE, 3, 1, "2026-06-30"),
+      W(79, MEX, ECU, 1, 0, "2026-06-30"), W(80, ENG, COD, 2, 0, "2026-07-01"),
+      W(81, BEL, SEN, 1, 0, "2026-07-01"), W(82, USA, BIH, 2, 1, "2026-07-01"),
+      W(83, POR, CRO, 1, 0, "2026-07-02"), W(84, ESP, AUT, 3, 0, "2026-07-02"),
+      W(85, SUI, ALG, 2, 1, "2026-07-02"), W(86, ARG, CPV, 4, 0, "2026-07-03"),
+      W(87, COL, GHA, 1, 0, "2026-07-03"), W(88, SRB, CMR, 2, 0, "2026-07-03"),
     ];
-    const qf = [m(50, "QF", "SCHEDULED", "—", BRA, ARG, null, null)];
-    return { ...base, knockout: [...r16, ...qf], todayMatches: [r16[2], r16[3]], phase };
+    const r16 = [
+      m(89, "R16", "FINISHED", "—", CAN, BRA, 0, 2, undefined, "2026-07-04"), // slot 0 played: Brazil through
+      ...[90, 91, 92].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-04")),
+      ...[93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
+    ];
+    const rest = [
+      ...[97, 98, 99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-10")),
+      m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
+      m(102, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-15"),
+      m(104, "FINAL", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-19"),
+    ];
+    return { ...base, knockout: [...r32, ...r16, ...rest], phase };
   }
 
   // champion

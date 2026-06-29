@@ -192,31 +192,6 @@ export function pickRotatingGroup(
   return candidates[idx];
 }
 
-export interface WcBracketRound {
-  stage: WcStage;
-  label: string;
-  matches: WcMatch[];
-}
-export interface WcBracket {
-  rounds: WcBracketRound[];   // R16 -> QF -> SF -> FINAL (only those present)
-  third: WcMatch | null;      // third-place playoff, shown as a footer
-}
-
-const TREE_ORDER: WcStage[] = ["R16", "QF", "SF", "FINAL"];
-
-/** Group knockout matches into the legible R16→Final tree; R32 + third excluded from the tree. */
-export function buildBracket(knockout: WcMatch[]): WcBracket {
-  const rounds: WcBracketRound[] = [];
-  for (const stage of TREE_ORDER) {
-    const matches = knockout.filter((m) => m.stage === stage);
-    if (matches.length > 0) {
-      rounds.push({ stage, label: STAGE_LABELS[stage], matches });
-    }
-  }
-  const third = knockout.find((m) => m.stage === "THIRD") ?? null;
-  return { rounds, third };
-}
-
 /** YYYY-MM-DD for a UTC ISO timestamp, in America/Chicago. */
 export function chicagoDateOf(iso: string): string {
   const fmt = new Intl.DateTimeFormat("en-CA", {
@@ -288,24 +263,6 @@ function groupTable(group: WcGroup, theme: WcTheme): string {
       <tbody>${rows}</tbody>
     </table>
   </div>`;
-}
-
-function bracketColumn(round: WcBracketRound, theme: WcTheme): string {
-  const ties = round.matches.map((mm) => {
-    const h = teamCode(mm.home), a = teamCode(mm.away);
-    const finished = mm.status === "FINISHED" && mm.homeScore !== null && mm.awayScore !== null;
-    const homeWon = finished && mm.homeScore! > mm.awayScore!;
-    const awayWon = finished && mm.awayScore! > mm.homeScore!;
-    const side = (team: WcMatch["home"], code: string, won: boolean) => {
-      const fav = isFav(code) ? `color:${theme.fav};` : "";
-      const w = won ? "font-weight:800;" : "";
-      return `<div class="wc-bteam" style="${fav}${w}">${flagImg(theme, code)}${teamLabel(team, 12)}</div>`;
-    };
-    const sc = finished ? `<div class="wc-bscore">${mm.homeScore}-${mm.awayScore}</div>` : "";
-    const liveCls = mm.status === "LIVE" ? ` style="border-color:${theme.live}"` : "";
-    return `<div class="wc-tie"${liveCls}>${side(mm.home, h, homeWon)}${side(mm.away, a, awayWon)}${sc}</div>`;
-  }).join("");
-  return `<div class="wc-bcol"><div class="wc-bcol-label">${escapeHTML(round.label)}</div>${ties}</div>`;
 }
 
 function header(data: WorldCupData, subtitleOverride?: string): string {
@@ -422,11 +379,13 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
   const line = (team: WcMatch["home"], code: string, won: boolean, score: number | null) => {
     const fav = isFav(code) ? `color:${theme.fav};` : "";
     const w = won ? "font-weight:700;" : "";
-    const sc = finished ? `<span class="wc-kscore">${score}</span>` : "";
+    // Per-team inline score only on the wide R32 boxes; compact boxes put the score on the
+    // when-line instead (a code + inline score overflows the narrow inner boxes → truncation).
+    const sc = finished && !compact ? `<span class="wc-kscore">${score}</span>` : "";
     return `<div class="wc-kteam" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${label(team, code)}</span>${sc}</div>`;
   };
   const when = live ? "LIVE"
-    : finished ? "Full time"
+    : finished ? (compact ? `${mm.homeScore}-${mm.awayScore}` : "Full time")
     : compact ? shortChicagoDate(mm.dateChicago)
     : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
   // In compact (inner) boxes, only render a side once it's decided — so a single advanced
@@ -440,21 +399,32 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
   </div>`;
 }
 
+/** Date span ("Jun 28 – Jul 3") of a set of matches, in Chicago time. */
+function dateRange(matches: WcMatch[]): string {
+  const dates = matches.map((m) => m.dateChicago).filter(Boolean).sort();
+  if (dates.length === 0) return "";
+  return dates[0] === dates[dates.length - 1]
+    ? shortChicagoDate(dates[0])
+    : `${shortChicagoDate(dates[0])} – ${shortChicagoDate(dates[dates.length - 1])}`;
+}
+
 /**
- * Round-of-32 layout: the full knockout bracket, data-driven and self-advancing. The 16 R32
- * ties sit on the two outer edges; the R16→SF columns converge toward a center Final box. Each
- * round past R32 is computed from the previous round's winners (`advanceRound`) so a team that
- * has won its tie (e.g. Canada) immediately appears in its next-round box, even though the
- * source leaves those matches' teams empty until later. Inner rounds use compact 3-letter codes
- * (+ flags on color) since their boxes are narrow; R32 uses full names. Bracket order = match id.
+ * The full knockout bracket, data-driven and self-advancing — used for the whole knockout
+ * phase (R32 → Final), not just R32. The 16 R32 ties sit on the two outer edges; the R16→SF
+ * columns converge toward a center Final box. Each round past R32 is computed from the previous
+ * round's winners (`advanceRound`) so a team that has won (e.g. Canada) immediately appears in
+ * its next-round box, even though the source leaves those matches' teams empty until later; once
+ * a later round is actually played, its real source teams + scores take over. Inner rounds use
+ * compact codes (mono) / flags (color) since their boxes are narrow; R32 uses full names. The
+ * header names the current round (earliest unfinished) + that round's date span. Order = match id.
  */
-function r32Layout(data: WorldCupData, theme: WcTheme): string {
+function knockoutBracket(data: WorldCupData, theme: WcTheme): string {
   const stage = (s: WcStage) => data.knockout.filter((m) => m.stage === s).slice().sort((a, b) => a.id - b.id);
   const r32 = stage("R32");
 
   if (r32.length === 0) {
-    return `${header(data, "Round of 32")}
-    <div class="wc-empty">Round of 32 fixtures not available yet</div>`;
+    return `${header(data, "Knockouts")}
+    <div class="wc-empty">Knockout bracket not available yet</div>`;
   }
 
   const r16 = advanceRound(r32, stage("R16"));
@@ -462,11 +432,15 @@ function r32Layout(data: WorldCupData, theme: WcTheme): string {
   const sf = advanceRound(qf, stage("SF"));
   const final = advanceRound(sf, stage("FINAL"))[0];
 
-  const dates = r32.map((m) => m.dateChicago).filter(Boolean).sort();
-  const range = dates.length > 0 && dates[0] !== dates[dates.length - 1]
-    ? `${shortChicagoDate(dates[0])} – ${shortChicagoDate(dates[dates.length - 1])}`
-    : dates.length > 0 ? shortChicagoDate(dates[0]) : "";
-  const subtitle = `Round of 32${range ? ` · ${range}` : ""} · times CT`;
+  // Subtitle: the current round (earliest with an unfinished match) + that round's dates.
+  const rounds: { stage: WcStage; matches: WcMatch[] }[] = [
+    { stage: "R32", matches: r32 }, { stage: "R16", matches: r16 },
+    { stage: "QF", matches: qf }, { stage: "SF", matches: sf },
+    { stage: "FINAL", matches: final ? [final] : [] },
+  ];
+  const current = rounds.find((r) => r.matches.some((m) => m.status !== "FINISHED")) ?? rounds[rounds.length - 1];
+  const range = dateRange(current.matches.filter((m) => m.status !== "FINISHED").length ? current.matches : r32);
+  const subtitle = `${STAGE_LABELS[current.stage]}${range ? ` · ${range}` : ""} · times CT`;
 
   const lh = <T,>(arr: T[]): T[] => arr.slice(0, Math.ceil(arr.length / 2));
   const rh = <T,>(arr: T[]): T[] => arr.slice(Math.ceil(arr.length / 2));
@@ -492,18 +466,6 @@ function r32Layout(data: WorldCupData, theme: WcTheme): string {
       ${col(rh(r32), "wc-kr32")}
     </div>
   </div>`;
-}
-
-/** Bracket layout (R16 → Final). */
-function bracketLayout(data: WorldCupData, theme: WcTheme): string {
-  const b = buildBracket(data.knockout);
-  const cols = b.rounds.map((r) => bracketColumn(r, theme)).join("");
-  const third = b.third
-    ? `<div class="wc-third">3rd place: ${escapeHTML(teamCode(b.third.home))} ${b.third.status === "FINISHED" ? `${b.third.homeScore}-${b.third.awayScore}` : "v"} ${escapeHTML(teamCode(b.third.away))}</div>`
-    : "";
-  return `${header(data)}
-  <div class="wc-bracket">${cols || `<div class="wc-empty">Bracket not available yet</div>`}</div>
-  ${third}`;
 }
 
 function championLayout(data: WorldCupData, theme: WcTheme): string {
@@ -533,8 +495,8 @@ function championLayout(data: WorldCupData, theme: WcTheme): string {
 export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme): string {
   let body: string;
   switch (data.phase) {
-    case "r32": body = r32Layout(data, theme); break;
-    case "knockout": body = bracketLayout(data, theme); break;
+    case "r32":
+    case "knockout": body = knockoutBracket(data, theme); break; // one full bracket for the whole KO phase
     case "champion": body = championLayout(data, theme); break;
     default: body = splitLayout(data, theme); break; // group
   }

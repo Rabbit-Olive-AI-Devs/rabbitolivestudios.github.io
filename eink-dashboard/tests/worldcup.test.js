@@ -15,7 +15,6 @@ const {
   matchCell,
   STAGE_LABELS,
   pickRotatingGroup,
-  buildBracket,
   chicagoDateOf,
   chicagoTimeOf,
   winnerTeam,
@@ -214,31 +213,6 @@ test("pickRotatingGroup returns null for empty groups", () => {
   assert.equal(pickRotatingGroup([], [], "BRA", 0), null);
 });
 
-const ko = (stage, h, a, hs = null, as = null, status = "SCHEDULED") => ({
-  stage, status, home: { name: h, code: h }, away: { name: a, code: a },
-  homeScore: hs, awayScore: as,
-});
-
-test("buildBracket groups knockout matches into ordered rounds", () => {
-  const matches = [
-    ko("R16", "BRA", "SUI", 2, 0, "FINISHED"),
-    ko("R16", "ARG", "NED"),
-    ko("QF", "BRA", "ARG"),
-    ko("FINAL", "BRA", "ENG"),
-    ko("SF", "BRA", "FRA"),
-  ];
-  const b = buildBracket(matches);
-  assert.deepEqual(b.rounds.map((r) => r.stage), ["R16", "QF", "SF", "FINAL"]);
-  assert.equal(b.rounds[0].matches.length, 2);
-  assert.equal(b.rounds[3].stage, "FINAL");
-});
-
-test("buildBracket excludes R32 and THIRD from the tree", () => {
-  const matches = [ko("R32", "BRA", "SUI"), ko("THIRD", "X", "Y"), ko("R16", "BRA", "ARG")];
-  const b = buildBracket(matches);
-  assert.deepEqual(b.rounds.map((r) => r.stage), ["R16"]);
-  assert.equal(b.third && b.third.stage, "THIRD");
-});
 
 test("chicagoDateOf/chicagoTimeOf convert UTC to Chicago", () => {
   // 2026-06-23T18:00Z is 1:00 PM CDT (UTC-5)
