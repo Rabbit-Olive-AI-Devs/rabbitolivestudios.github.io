@@ -30,7 +30,10 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-table td { text-align: center; padding: 2px 6px; font-weight: 700; }
   .wc-table td:nth-child(2) { text-align: left; font-weight: 700; }
   .wc-pos { color: #000; } .wc-pts { font-weight: 800; }
-  .wc-r32 { columns: 2; font-size: 21px; flex: 1; }
+  .wc-r32full { flex: 1; min-height: 0; columns: 2; column-gap: 30px; overflow: hidden; }
+  .wc-r32full .wc-row { font-size: 19px; break-inside: avoid; margin-bottom: 11px; }
+  .wc-r32full .wc-cell { min-width: 54px; }
+  .wc-r32full .wc-flag { height: 14px; margin-right: 6px; }
   .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
   .wc-bcol-label { font-size: 13px; font-weight: 800; text-align: center; letter-spacing: 1px; margin-bottom: 4px; }
@@ -76,7 +79,9 @@ export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing
   .wc-table td { text-align: center; padding: 3px 6px; font-weight: 500; line-height: 24px; }
   .wc-table td:nth-child(2) { text-align: left; font-weight: 500; }
   .wc-table td.wc-pos { font-weight: 500; } .wc-table td.wc-pts { font-weight: 700; }
-  .wc-r32 { columns: 2; font-size: 21px; flex: 1; }
+  .wc-r32full { flex: 1; min-height: 0; columns: 2; column-gap: 30px; overflow: hidden; }
+  .wc-r32full .wc-row { font-size: 20px; line-height: 24px; break-inside: avoid; margin-bottom: 12px; }
+  .wc-r32full .wc-cell { min-width: 56px; }
   .wc-bracket { flex: 1; display: flex; gap: 5px; min-height: 0; overflow: hidden; align-items: stretch; }
   .wc-bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; }
   .wc-bcol-label { font-size: 13px; font-weight: 700; text-align: center; letter-spacing: 1px; margin-bottom: 6px; }

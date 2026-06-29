@@ -23,6 +23,12 @@ function m(
 const BRA = T("Brazil", "BRA"), SRB = T("Serbia", "SRB"), SUI = T("Switzerland", "SUI"), CMR = T("Cameroon", "CMR");
 const ARG = T("Argentina", "ARG"), NED = T("Netherlands", "NED"), ENG = T("England", "ENG"), FRA = T("France", "FRA");
 const ESP = T("Spain", "ESP"), POR = T("Portugal", "POR"), GER = T("Germany", "GER"), USA = T("USA", "USA");
+// Additional teams for the 16-match Round-of-32 fixture (mirrors the real 2026 bracket).
+const RSA = T("South Africa", "RSA"), CAN = T("Canada", "CAN"), PAR = T("Paraguay", "PAR"), MAR = T("Morocco", "MAR");
+const JPN = T("Japan", "JPN"), SWE = T("Sweden", "SWE"), CIV = T("Ivory Coast", "CIV"), NOR = T("Norway", "NOR");
+const MEX = T("Mexico", "MEX"), ECU = T("Ecuador", "ECU"), COD = T("Congo DR", "COD"), BIH = T("Bosnia-Herzegovina", "BIH");
+const BEL = T("Belgium", "BEL"), SEN = T("Senegal", "SEN"), CRO = T("Croatia", "CRO"), AUT = T("Austria", "AUT");
+const ALG = T("Algeria", "ALG"), CPV = T("Cape Verde", "CPV"), COL = T("Colombia", "COL"), GHA = T("Ghana", "GHA");
 
 function groupA(): WcGroup {
   return {
@@ -43,7 +49,7 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
     generatedAt: Date.now(),
   };
 
-  if (phase === "group" || phase === "r32") {
+  if (phase === "group") {
     const today = [
       m(13, "GROUP", "SCHEDULED", "1:00 PM", USA, SRB, null, null, "C"),
       m(16, "GROUP", "SCHEDULED", "4:00 PM", ARG, NED, null, null, "B"),
@@ -54,10 +60,30 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
       m(21, "GROUP", "FINISHED", "—", FRA, POR, 0, 0, "E", "2026-06-22"),
       m(22, "GROUP", "FINISHED", "—", ENG, USA, 3, 0, "C", "2026-06-22"),
     ];
-    const knockout = phase === "r32"
-      ? [m(30, "R32", "FINISHED", "—", BRA, ESP, 2, 1), m(31, "R32", "SCHEDULED", "3:00 PM", ARG, POR, null, null)]
-      : [];
-    return { ...base, todayMatches: today, recentResults: results, groups: phase === "r32" ? [] : [groupA()], knockout, phase };
+    return { ...base, todayMatches: today, recentResults: results, groups: [groupA()], knockout: [], phase };
+  }
+
+  if (phase === "r32") {
+    // Full 16-match Round of 32 (one finished, the rest scheduled across the round).
+    const knockout = [
+      m(73, "R32", "FINISHED", "—", RSA, CAN, 0, 1),
+      m(76, "R32", "SCHEDULED", "12:00 PM", BRA, JPN, null, null),
+      m(74, "R32", "SCHEDULED", "3:30 PM", GER, PAR, null, null),
+      m(75, "R32", "SCHEDULED", "8:00 PM", NED, MAR, null, null),
+      m(77, "R32", "SCHEDULED", "4:00 PM", FRA, SWE, null, null),
+      m(78, "R32", "SCHEDULED", "12:00 PM", CIV, NOR, null, null),
+      m(79, "R32", "SCHEDULED", "8:00 PM", MEX, ECU, null, null),
+      m(80, "R32", "SCHEDULED", "11:00 AM", ENG, COD, null, null),
+      m(81, "R32", "SCHEDULED", "7:00 PM", USA, BIH, null, null),
+      m(82, "R32", "SCHEDULED", "3:00 PM", BEL, SEN, null, null),
+      m(83, "R32", "SCHEDULED", "6:00 PM", POR, CRO, null, null),
+      m(84, "R32", "SCHEDULED", "2:00 PM", ESP, AUT, null, null),
+      m(85, "R32", "SCHEDULED", "10:00 PM", SUI, ALG, null, null),
+      m(86, "R32", "SCHEDULED", "5:00 PM", ARG, CPV, null, null),
+      m(87, "R32", "SCHEDULED", "8:30 PM", COL, GHA, null, null),
+      m(88, "R32", "SCHEDULED", "1:00 PM", SRB, CMR, null, null),
+    ];
+    return { ...base, knockout, phase };
   }
 
   if (phase === "knockout") {

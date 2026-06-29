@@ -293,7 +293,7 @@ KV cache (24h)
 `/worldcup` (E1001 mono) and `/color/worldcup` (E1002 Spectra 6) are a **single adaptive page per display** that transitions itself by tournament phase:
 
 - **Group stage** — today's matches + latest results on top; a rotating group standings table below (cycles the 12 groups, prefers groups with a match today).
-- **Round of 32** — today/results on top; a Round-of-32 results list below (a 32-team tree isn't legible on 800×480).
+- **Round of 32** — the full 16-match round as a 2-column grid filling the screen (scores for played ties, kickoff times for upcoming, ▶ on the favorite); a 32-team bracket tree isn't legible on 800×480.
 - **Knockouts (R16→Final)** — a converging bracket tree fills the screen; today's ties highlighted, winners bold.
 - **Champion** — winner card after the final.
 
@@ -305,7 +305,7 @@ The page advances through phases by the **current round being played**, not by w
 
 **Rendering differs by display (DECISIONS.md #48):**
 
-- **B&W `/worldcup`** is served as a **server-pre-dithered 1-bit PNG**, not live HTML. SenseCraft renders pages in a cloud headless browser and dithers grayscale text edges into "fog" on the mono panel; to defeat that, the Worker uses **Cloudflare Browser Rendering** (`[browser]` binding + `@cloudflare/puppeteer`, `nodejs_compat`) to screenshot the Inter-styled HTML source (`?variant=src`) at 2×, supersample to 800×480, and threshold to pure black/white itself — so the cloud has no gray to fog and the panel shows crisp proportional type with full names. The image is cached `wc:image:v4` with stale-while-revalidate (14-min soft TTL) + a 6-h cron warm, so the device always gets an instant response despite the ~10 s browser launch; a cold cache falls back to the Inter HTML so the panel never blanks. Inter is inlined as base64 in `src/worldcup-fonts.ts`.
+- **B&W `/worldcup`** is served as a **server-pre-dithered 1-bit PNG**, not live HTML. SenseCraft renders pages in a cloud headless browser and dithers grayscale text edges into "fog" on the mono panel; to defeat that, the Worker uses **Cloudflare Browser Rendering** (`[browser]` binding + `@cloudflare/puppeteer`, `nodejs_compat`) to screenshot the Inter-styled HTML source (`?variant=src`) at 2×, supersample to 800×480, and threshold to pure black/white itself — so the cloud has no gray to fog and the panel shows crisp proportional type with full names. The image is cached `wc:image:v5` with stale-while-revalidate (14-min soft TTL) + a 6-h cron warm, so the device always gets an instant response despite the ~10 s browser launch; a cold cache falls back to the Inter HTML so the panel never blanks. Inter is inlined as base64 in `src/worldcup-fonts.ts`.
 - **Color `/color/worldcup`** is live HTML with the Spectra-6 palette + flags. All text is pure `#000`; color comes only from the pre-dithered flag images (colored type smudges on Spectra-6), and accents are carried by weight + the ▶/✓ markers.
 
 The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `COLOR_STYLE`, `MONO_STYLE_BASE`), passed via `WcTheme.styleCSS`, so a change to one display's CSS can't affect the other. Structure and logic (`worldcup-ui.ts`) stay shared.

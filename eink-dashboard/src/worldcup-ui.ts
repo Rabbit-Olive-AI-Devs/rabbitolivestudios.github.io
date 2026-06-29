@@ -320,7 +320,7 @@ function header(data: WorldCupData): string {
   </div>`;
 }
 
-/** Split layout (group + r32): today + results on top, group table / R32 list below. */
+/** Group-stage layout: today + results on top, a rotating group table below. */
 function splitLayout(data: WorldCupData, theme: WcTheme): string {
   const today = data.todayMatches.length > 0
     ? data.todayMatches.map((mm) => matchRow(mm, theme)).join("")
@@ -329,15 +329,9 @@ function splitLayout(data: WorldCupData, theme: WcTheme): string {
     ? data.recentResults.map((mm) => matchRow(mm, theme)).join("")
     : `<div class="wc-empty">—</div>`;
 
-  let bottom = "";
-  if (data.phase === "r32") {
-    const list = data.knockout.filter((m) => m.stage === "R32").map((mm) => matchRow(mm, theme)).join("");
-    bottom = `<div class="wc-bottom"><div class="wc-panel-label">ROUND OF 32</div><div class="wc-r32">${list || `<div class="wc-empty">—</div>`}</div></div>`;
-  } else {
-    const epochMin = Math.floor(Date.now() / 60000);
-    const group = pickRotatingGroup(data.groups, data.todayMatches, FAVORITE_TEAM, epochMin);
-    bottom = `<div class="wc-bottom">${group ? groupTable(group, theme) : `<div class="wc-empty">Standings unavailable</div>`}</div>`;
-  }
+  const epochMin = Math.floor(Date.now() / 60000);
+  const group = pickRotatingGroup(data.groups, data.todayMatches, FAVORITE_TEAM, epochMin);
+  const bottom = `<div class="wc-bottom">${group ? groupTable(group, theme) : `<div class="wc-empty">Standings unavailable</div>`}</div>`;
 
   return `${header(data)}
   <div class="wc-split">
@@ -345,6 +339,25 @@ function splitLayout(data: WorldCupData, theme: WcTheme): string {
     <div class="wc-col"><div class="wc-panel-label">LATEST RESULTS</div><div class="wc-rowlist">${results}</div></div>
   </div>
   ${bottom}`;
+}
+
+/**
+ * Round-of-32 layout: the full 16-match round as a 2-column grid filling the screen.
+ * A today/results split would be redundant here (this list already carries scores for
+ * played ties, kickoff times for upcoming ones, and the ▶ on the favorite) and would not
+ * fit alongside 16 rows. Sorted by kickoff so finished/today ties lead.
+ */
+function r32Layout(data: WorldCupData, theme: WcTheme): string {
+  const matches = data.knockout
+    .filter((m) => m.stage === "R32")
+    .slice()
+    .sort((a, b) => a.kickoffISO.localeCompare(b.kickoffISO));
+  const rows = matches.length > 0
+    ? matches.map((mm) => matchRow(mm, theme)).join("")
+    : `<div class="wc-empty">Round of 32 fixtures not available yet</div>`;
+  return `${header(data)}
+  <div class="wc-panel-label">ROUND OF 32</div>
+  <div class="wc-r32full">${rows}</div>`;
 }
 
 /** Bracket layout (R16 → Final). */
@@ -386,9 +399,10 @@ function championLayout(data: WorldCupData, theme: WcTheme): string {
 export function renderWorldCupHTML(data: WorldCupData, theme: WcTheme): string {
   let body: string;
   switch (data.phase) {
+    case "r32": body = r32Layout(data, theme); break;
     case "knockout": body = bracketLayout(data, theme); break;
     case "champion": body = championLayout(data, theme); break;
-    default: body = splitLayout(data, theme); break; // group + r32
+    default: body = splitLayout(data, theme); break; // group
   }
   return `<!DOCTYPE html>
 <html lang="en">
