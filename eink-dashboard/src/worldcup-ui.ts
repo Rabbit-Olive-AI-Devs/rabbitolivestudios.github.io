@@ -8,7 +8,7 @@
 
 import { escapeHTML } from "./escape";
 import type {
-  WcMatch, WcStage, WcStatus, WcPhase, WcGroup, WorldCupData,
+  WcMatch, WcStage, WcStatus, WcPhase, WcGroup, WcTeam, WorldCupData,
 } from "./types";
 
 export const STAGE_LABELS: Record<WcStage, string> = {
@@ -353,13 +353,55 @@ function splitLayout(data: WorldCupData, theme: WcTheme): string {
 const teamKnown = (t: { name: string; code: string } | undefined): boolean =>
   !!(t && ((t.name && t.name.trim()) || (t.code && t.code.trim())));
 
+const EMPTY_TEAM: WcTeam = { name: "", code: "" };
+
+/** The winning team of a finished knockout match, or null (not finished / level on our fullTime score). */
+export function winnerTeam(m: WcMatch | undefined): WcTeam | null {
+  if (m && m.status === "FINISHED" && m.homeScore !== null && m.awayScore !== null) {
+    if (m.homeScore > m.awayScore) return m.home;
+    if (m.awayScore > m.homeScore) return m.away;
+  }
+  return null;
+}
+
 /**
- * One bracket box. If neither team is decided yet (future round), it shows just the
- * round date as a faint placeholder, leaving room for the eventual teams. Once the source
- * seeds a team, it renders two team lines (flags on the color theme), the favorite accent,
- * a per-team score + bold winner on finished ties, and otherwise a date·time line.
+ * Build the next knockout round (bracket order) from the previous round's winners.
+ * The data source publishes later-round matches with EMPTY teams until it seeds them, so we
+ * advance winners ourselves: slot i is fed by prev[2i] (home) and prev[2i+1] (away). When the
+ * source HAS already seeded a match's teams (i.e. once it's been played/drawn), we prefer it
+ * (it carries the real teams + score). Dates/ids come from the source match at that position.
  */
-function bracketBox(mm: WcMatch, theme: WcTheme, extraClass = ""): string {
+export function advanceRound(prev: WcMatch[], source: WcMatch[]): WcMatch[] {
+  const out: WcMatch[] = [];
+  const n = Math.floor(prev.length / 2);
+  for (let i = 0; i < n; i++) {
+    const src = source[i];
+    if (src && (teamKnown(src.home) || teamKnown(src.away))) { out.push(src); continue; }
+    out.push({
+      id: src?.id ?? -(1000 + i),
+      stage: src?.stage ?? "R16",
+      group: undefined,
+      status: src?.status ?? "SCHEDULED",
+      kickoffISO: src?.kickoffISO ?? "",
+      dateChicago: src?.dateChicago ?? "",
+      timeChicago: src?.timeChicago ?? "",
+      home: winnerTeam(prev[2 * i]) ?? EMPTY_TEAM,
+      away: winnerTeam(prev[2 * i + 1]) ?? EMPTY_TEAM,
+      homeScore: null,
+      awayScore: null,
+    });
+  }
+  return out;
+}
+
+/**
+ * One bracket box. If neither team is decided yet, it shows just the round date as a faint
+ * placeholder, leaving room for the eventual teams. Once a team is known it renders two team
+ * lines, the favorite accent, a per-team score + bold winner on finished ties, otherwise a
+ * date·time line. `compact` (inner rounds, where boxes are narrow) shows the 3-letter code
+ * instead of the full name (the color theme still draws the flag); R32 uses full names.
+ */
+function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = ""): string {
   const cls = `wc-ktie${extraClass ? ` ${extraClass}` : ""}`;
   if (!teamKnown(mm.home) && !teamKnown(mm.away)) {
     const d = shortChicagoDate(mm.dateChicago);
@@ -370,14 +412,22 @@ function bracketBox(mm: WcMatch, theme: WcTheme, extraClass = ""): string {
   const live = mm.status === "LIVE";
   const homeWon = finished && mm.homeScore! > mm.awayScore!;
   const awayWon = finished && mm.awayScore! > mm.homeScore!;
+  // Compact (inner rounds, narrow boxes): color shows the flag only (no text — full names and
+  // even 3-letter codes overflow), mono shows the 3-letter code. R32 (wide) shows full names.
+  const label = (team: WcMatch["home"], code: string) => {
+    if (!compact) return teamLabel(team, 13);
+    if (theme.flag) return "";                                   // color: flag carries identity
+    return escapeHTML(teamKnown(team) ? code : "TBD");           // mono: 3-letter code
+  };
   const line = (team: WcMatch["home"], code: string, won: boolean, score: number | null) => {
     const fav = isFav(code) ? `color:${theme.fav};` : "";
-    const w = won ? "font-weight:800;" : "";
+    const w = won ? "font-weight:700;" : "";
     const sc = finished ? `<span class="wc-kscore">${score}</span>` : "";
-    return `<div class="wc-kteam" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${teamLabel(team, 13)}</span>${sc}</div>`;
+    return `<div class="wc-kteam" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${label(team, code)}</span>${sc}</div>`;
   };
   const when = live ? "LIVE"
     : finished ? "Full time"
+    : compact ? shortChicagoDate(mm.dateChicago)
     : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
   return `<div class="${cls}${live ? " wc-klive" : ""}">
     ${line(mm.home, h, homeWon, mm.homeScore)}
@@ -387,22 +437,26 @@ function bracketBox(mm: WcMatch, theme: WcTheme, extraClass = ""): string {
 }
 
 /**
- * Round-of-32 layout: the full knockout bracket, entirely data-driven. The 16 R32 ties sit
- * on the two outer edges and the R16→SF columns converge toward a center Final box, mirroring
- * a tournament bracket. EVERY round is rendered from the live match list (not hardcoded
- * placeholders) so the bracket fills itself as the source advances winners — a future-round
- * box shows just its date until its teams are decided, then the teams appear. Each round is
- * split into its left/right halves by match id (the source numbers them in bracket order).
+ * Round-of-32 layout: the full knockout bracket, data-driven and self-advancing. The 16 R32
+ * ties sit on the two outer edges; the R16→SF columns converge toward a center Final box. Each
+ * round past R32 is computed from the previous round's winners (`advanceRound`) so a team that
+ * has won its tie (e.g. Canada) immediately appears in its next-round box, even though the
+ * source leaves those matches' teams empty until later. Inner rounds use compact 3-letter codes
+ * (+ flags on color) since their boxes are narrow; R32 uses full names. Bracket order = match id.
  */
 function r32Layout(data: WorldCupData, theme: WcTheme): string {
   const stage = (s: WcStage) => data.knockout.filter((m) => m.stage === s).slice().sort((a, b) => a.id - b.id);
-  const r32 = stage("R32"), r16 = stage("R16"), qf = stage("QF"), sf = stage("SF");
-  const final = stage("FINAL")[0];
+  const r32 = stage("R32");
 
   if (r32.length === 0) {
     return `${header(data, "Round of 32")}
     <div class="wc-empty">Round of 32 fixtures not available yet</div>`;
   }
+
+  const r16 = advanceRound(r32, stage("R16"));
+  const qf = advanceRound(r16, stage("QF"));
+  const sf = advanceRound(qf, stage("SF"));
+  const final = advanceRound(sf, stage("FINAL"))[0];
 
   const dates = r32.map((m) => m.dateChicago).filter(Boolean).sort();
   const range = dates.length > 0 && dates[0] !== dates[dates.length - 1]
@@ -412,25 +466,25 @@ function r32Layout(data: WorldCupData, theme: WcTheme): string {
 
   const lh = <T,>(arr: T[]): T[] => arr.slice(0, Math.ceil(arr.length / 2));
   const rh = <T,>(arr: T[]): T[] => arr.slice(Math.ceil(arr.length / 2));
-  const col = (matches: WcMatch[], cls = "") =>
-    `<div class="wc-kcol ${cls}">${matches.map((mm) => bracketBox(mm, theme)).join("")}</div>`;
+  const col = (matches: WcMatch[], cls = "", compact = false) =>
+    `<div class="wc-kcol ${cls}">${matches.map((mm) => bracketBox(mm, theme, compact)).join("")}</div>`;
 
   return `${header(data, subtitle)}
   <div class="wc-kbracket">
     <div class="wc-kside">
       ${col(lh(r32), "wc-kr32")}
-      ${col(lh(r16))}
-      ${col(lh(qf))}
-      ${col(lh(sf))}
+      ${col(lh(r16), "", true)}
+      ${col(lh(qf), "", true)}
+      ${col(lh(sf), "", true)}
     </div>
     <div class="wc-kcenter">
       <div class="wc-kcenter-label">FINAL</div>
-      ${final ? bracketBox(final, theme, "wc-kfinal") : ""}
+      ${final ? bracketBox(final, theme, true, "wc-kfinal") : ""}
     </div>
     <div class="wc-kside wc-kside-right">
-      ${col(rh(sf))}
-      ${col(rh(qf))}
-      ${col(rh(r16))}
+      ${col(rh(sf), "", true)}
+      ${col(rh(qf), "", true)}
+      ${col(rh(r16), "", true)}
       ${col(rh(r32), "wc-kr32")}
     </div>
   </div>`;

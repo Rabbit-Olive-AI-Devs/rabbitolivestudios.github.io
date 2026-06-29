@@ -18,6 +18,8 @@ const {
   buildBracket,
   chicagoDateOf,
   chicagoTimeOf,
+  winnerTeam,
+  advanceRound,
 } = fromBuild("src/worldcup-ui.js");
 const { normalizeFootballData, mapStage, mapStatus } = fromBuild("src/worldcup-football-data.js");
 const { normalizeOpenFootball } = fromBuild("src/worldcup-openfootball.js");
@@ -136,6 +138,41 @@ test("computePhase: knockout once R32 is all finished and R16 is the active roun
 test("computePhase: champion when final finished", () => {
   const matches = [gm("FINISHED"), km("FINAL", "FINISHED")];
   assert.equal(computePhase(matches), "champion");
+});
+
+const mkMatch = (over) => ({
+  id: 1, stage: "R32", group: undefined, status: "SCHEDULED",
+  kickoffISO: "", dateChicago: "2026-06-28", timeChicago: "1 PM",
+  home: { name: "", code: "" }, away: { name: "", code: "" },
+  homeScore: null, awayScore: null, ...over,
+});
+
+test("winnerTeam picks the higher score, null when not finished or level", () => {
+  const fin = (hs, as) => mkMatch({ status: "FINISHED", home: { name: "A", code: "AAA" }, away: { name: "B", code: "BBB" }, homeScore: hs, awayScore: as });
+  assert.equal(winnerTeam(fin(0, 1)).code, "BBB");
+  assert.equal(winnerTeam(fin(2, 1)).code, "AAA");
+  assert.equal(winnerTeam(fin(1, 1)), null);
+  assert.equal(winnerTeam(mkMatch({ status: "SCHEDULED" })), null);
+});
+
+test("advanceRound feeds winners forward; undecided side stays empty; date from source", () => {
+  const a = mkMatch({ id: 73, status: "FINISHED", home: { name: "South Africa", code: "RSA" }, away: { name: "Canada", code: "CAN" }, homeScore: 0, awayScore: 1 });
+  const b = mkMatch({ id: 74, status: "SCHEDULED", home: { name: "Brazil", code: "BRA" }, away: { name: "Japan", code: "JPN" } });
+  const src = [mkMatch({ id: 89, stage: "R16", dateChicago: "2026-07-04" })];
+  const r16 = advanceRound([a, b], src);
+  assert.equal(r16.length, 1);
+  assert.equal(r16[0].home.code, "CAN");          // winner of a advances
+  assert.equal(r16[0].away.code, "");             // b not finished -> TBD
+  assert.equal(r16[0].dateChicago, "2026-07-04"); // date carried from the source match
+});
+
+test("advanceRound prefers the source match once it carries real teams + score", () => {
+  const a = mkMatch({ id: 73, status: "FINISHED", home: { name: "Canada", code: "CAN" }, away: { name: "RSA", code: "RSA" }, homeScore: 1, awayScore: 0 });
+  const b = mkMatch({ id: 74, status: "FINISHED", home: { name: "Brazil", code: "BRA" }, away: { name: "Japan", code: "JPN" }, homeScore: 2, awayScore: 0 });
+  const src = [mkMatch({ id: 89, stage: "R16", status: "FINISHED", home: { name: "Canada", code: "CAN" }, away: { name: "Brazil", code: "BRA" }, homeScore: 1, awayScore: 3 })];
+  const r16 = advanceRound([a, b], src);
+  assert.equal(r16[0].away.code, "BRA");
+  assert.equal(r16[0].awayScore, 3);              // real result from the source, not recomputed
 });
 
 test("teamCode prefers code, falls back to first 3 letters", () => {
