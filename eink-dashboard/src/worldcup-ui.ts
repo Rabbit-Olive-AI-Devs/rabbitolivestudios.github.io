@@ -305,6 +305,25 @@ function shortChicagoDate(dateChicago: string): string {
   return `${SHORT_MONTHS[m - 1]} ${d}`;
 }
 
+/** Compact kickoff time for the narrow inner boxes: "4:00 PM" → "4PM", "8:30 PM" → "8:30PM". */
+function shortTime(t: string): string {
+  return t && t !== "TBD" ? t.replace(":00", "").replace(/\s+/g, "") : "";
+}
+
+/**
+ * Schedule label HTML for a not-yet-played box: "Jun 30 · 4:00 PM" on one line for the wide R32
+ * boxes; date over a compact time (two lines) for the narrow inner boxes so the time always fits.
+ */
+function whenDateTime(mm: WcMatch, compact: boolean): string {
+  const d = escapeHTML(shortChicagoDate(mm.dateChicago));
+  if (!compact) {
+    const t = mm.timeChicago && mm.timeChicago !== "TBD" ? ` · ${escapeHTML(mm.timeChicago)}` : "";
+    return d ? `${d}${t}` : escapeHTML(mm.timeChicago || "");
+  }
+  const t = escapeHTML(shortTime(mm.timeChicago));
+  return d && t ? `${d}<br>${t}` : d || t;
+}
+
 /** Group-stage layout: today + results on top, a rotating group table below. */
 function splitLayout(data: WorldCupData, theme: WcTheme): string {
   const today = data.todayMatches.length > 0
@@ -339,8 +358,8 @@ const teamKnown = (t: { name: string; code: string } | undefined): boolean =>
 function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = ""): string {
   const cls = `wc-ktie${extraClass ? ` ${extraClass}` : ""}`;
   if (!teamKnown(mm.home) && !teamKnown(mm.away)) {
-    const d = shortChicagoDate(mm.dateChicago);
-    return `<div class="${cls} wc-kempty">${d ? `<span class="wc-ktbd">${escapeHTML(d)}</span>` : ""}</div>`;
+    const dt = whenDateTime(mm, compact); // pre-escaped HTML (may carry a <br>)
+    return `<div class="${cls} wc-kempty">${dt ? `<span class="wc-ktbd">${dt}</span>` : ""}</div>`;
   }
   const h = teamCode(mm.home), a = teamCode(mm.away);
   const finished = mm.status === "FINISHED" && mm.homeScore !== null && mm.awayScore !== null;
@@ -372,10 +391,10 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
     if (pen == null) return `${full}`;
     return compact ? `${full - pen}(${pen})` : `${full - pen} (${pen})`;
   };
+  // `when` is HTML (whenDateTime is pre-escaped and may carry a <br>); the other branches are safe literals.
   const when = live ? "LIVE"
     : finished ? (pens ? "Penalties" : "Full time")
-    : compact ? shortChicagoDate(mm.dateChicago)
-    : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
+    : whenDateTime(mm, compact);
   // In compact (inner) boxes, only render a side once it's decided — so a single advanced
   // team shows as one prominent centered flag/code rather than a blank second line.
   const homeLine = (!compact || teamKnown(mm.home)) ? line(mm.home, h, homeWon, teamScore(mm.homeScore, mm.penaltyHome)) : "";
@@ -383,7 +402,7 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
   return `<div class="${cls}${live ? " wc-klive" : ""}">
     ${homeLine}
     ${awayLine}
-    <div class="wc-kwhen">${escapeHTML(when)}</div>
+    <div class="wc-kwhen">${when}</div>
   </div>`;
 }
 
