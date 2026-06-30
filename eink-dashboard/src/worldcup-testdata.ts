@@ -85,12 +85,16 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
       m(87, "R32", "SCHEDULED", "5:00 PM", COL, GHA, null, null, undefined, "2026-07-03"),
       m(88, "R32", "SCHEDULED", "8:30 PM", SRB, CMR, null, null, undefined, "2026-07-03"),
     ];
-    // Future rounds exist with empty teams + dates (as the source provides them) so the
-    // bracket renders the full frame and fills in as winners advance.
+    // football-data seeds each R16 match with the advancing team the moment its R32 tie finishes
+    // (and its bracket order is NOT a 2i pairing), so we render the source seeds directly. Here the
+    // four finished R32 ties have seeded their R16 slots (BRA at idx2, mirroring the real feed);
+    // the rest are still TBD. Later rounds stay empty until the source seeds them.
     const TBD = T("", "");
     const future: WcMatch[] = [
-      ...[89, 90, 91, 92].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-04")),
-      ...[93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
+      m(89, "R16", "SCHEDULED", "TBD", CAN, TBD, null, null, undefined, "2026-07-04"), // winner of RSA-CAN
+      m(90, "R16", "SCHEDULED", "TBD", GER, NED, null, null, undefined, "2026-07-04"), // winners of GER-PAR, NED-MAR
+      m(91, "R16", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-05"), // winner of BRA-JPN
+      ...[92, 93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
       ...[97, 98].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-09")),
       ...[99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-11")),
       m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
@@ -101,9 +105,10 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
   }
 
   if (phase === "knockout") {
-    // Full knockout bracket: all 16 R32 finished, R16 underway (one played), QF+ pending.
-    // The bracket computes R16/QF teams from the R32 winners (advanceRound), so this exercises
-    // the 2-team inner boxes (both flags/codes) and winner propagation into the QF.
+    // Full knockout bracket: all 16 R32 finished; the source has seeded all 8 R16 matches with the
+    // advancing teams (one already played — the CAN-BRA pens box) and the winner of that R16 into
+    // its QF slot. We render the source seeds directly (no advancement computed), so this exercises
+    // the compact inner boxes (codes/flags) + a per-team shootout score + source-driven advancement.
     const TBD = T("", "");
     const W = (id: number, h: WcTeam, a: WcTeam, hs: number, as: number, date: string) =>
       m(id, "R32", "FINISHED", "—", h, a, hs, as, undefined, date);
@@ -118,13 +123,19 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
       W(87, COL, GHA, 1, 0, "2026-07-03"), W(88, SRB, CMR, 2, 0, "2026-07-03"),
     ];
     const r16 = [
-      // slot 0 played, penalty shootout: 1-1, Brazil through 4-3 on pens (compact inner-round box).
+      // idx0 played, penalty shootout: 1-1, Brazil through 4-3 on pens (compact inner-round box).
       m(89, "R16", "FINISHED", "—", CAN, BRA, 4, 5, undefined, "2026-07-04", 3, 4),
-      ...[90, 91, 92].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-04")),
-      ...[93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
+      m(90, "R16", "SCHEDULED", "TBD", GER, NED, null, null, undefined, "2026-07-04"),
+      m(91, "R16", "SCHEDULED", "TBD", CIV, FRA, null, null, undefined, "2026-07-05"),
+      m(92, "R16", "SCHEDULED", "TBD", MEX, ENG, null, null, undefined, "2026-07-05"),
+      m(93, "R16", "SCHEDULED", "TBD", BEL, USA, null, null, undefined, "2026-07-06"),
+      m(94, "R16", "SCHEDULED", "TBD", POR, ESP, null, null, undefined, "2026-07-06"),
+      m(95, "R16", "SCHEDULED", "TBD", SUI, ARG, null, null, undefined, "2026-07-07"),
+      m(96, "R16", "SCHEDULED", "TBD", COL, SRB, null, null, undefined, "2026-07-07"),
     ];
     const rest = [
-      ...[97, 98, 99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-10")),
+      m(97, "QF", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-09"), // BRA advanced from R16 idx0
+      ...[98, 99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-10")),
       m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
       m(102, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-15"),
       m(104, "FINAL", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-19"),

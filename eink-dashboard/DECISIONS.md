@@ -1583,3 +1583,24 @@ The first knockout results came in and penalty-decided ties showed only the shoo
 - **Bracket rendering — per team, vertically, at every round (v3.15.12):** the shootout is shown per team in the regular vertical score layout — each side shows its goals with the shootout total in parens (`Germany 1 (4)` / `Paraguay 1 (2)`), winner bold, "Penalties" on the when-line. This now applies to **all knockout rounds**, not just R32 (penalties can happen through the semis), so the narrow inner-round boxes (R16/QF/SF) also carry a per-team score — tight `1(4)` form, a smaller score font, and the R32 columns narrowed (color 158→146px, mono 152→128px) to give the inner boxes the width (the user OK'd shrinking R32). The score only right-aligns when present (`.wc-kteam-scored .wc-kname{flex:1}`), so an undecided advancing flag/code still centers. The center **Final** box is only 50px — too small for a per-team score — but a finished final flips the page to the champion card, which shows the matchup with its own pens-aware `scoreText` (`"1-1 (4-2)"`), so the final is covered there. (Evolution: v3.15.10 put a combined `"1-1 (4-2)"` on the when-line and suppressed per-team scores; v3.15.11 made R32 per-team but left inner rounds on the when-line; v3.15.12 unified all rounds.)
 - Verified at 800×480 on both displays and both phases via the `?test-phase=r32` (wide R32 shootout) and `?test-phase=knockout` (compact inner-round shootout) fixtures, which seed penalty ties.
 - Cache bumps: `wc:data:v3→v4` (new field on the blob), `wc:image:v10→v13` (mono pre-dithered image re-renders).
+
+---
+
+## 51. World Cup Knockout Bracket: Render Source Seeds Directly, Don't Compute Advancement (v3.15.13, 2026-06-30)
+
+Once R32 results came in, a team appeared in **two different R16 boxes** (Brazil showed on both sides). This was a real logic bug in the v3.15.7 "self-advancing" bracket (DECISIONS #49).
+
+**Root cause (confirmed against the live feed via a temporary `?debug=ko` dump).** `advanceRound` computed each later round from the previous round's winners, pairing `prev[2i]/prev[2i+1] → slot i`, and used the source-seeded match *only when it already had teams*. Two false assumptions broke this:
+
+1. **football-data's bracket is not a `2i` pairing.** Real data: Brazil's R32 tie (BRA-JPN) sorts to R32 idx8, but football-data seeds Brazil's R16 match at R16 **idx2** — the id orderings of consecutive rounds don't line up, and the actual WC bracket tree isn't recoverable from match ids alone.
+2. **football-data seeds later rounds promptly.** It fills each R16 match's home/away with the advancing team the moment the feeder R32 finishes (e.g. `R16 537377 = "BRA vs TBD"`), so computing advancement was never needed.
+
+Together these duplicated a team: the source seeded Brazil at idx2, while `advanceRound` independently computed Brazil into idx4 (from the R32 winner, because that source slot was still empty) → Brazil in two R16 boxes.
+
+**Fix.** Render every knockout round **directly from the source matches** (id order) — deleted `advanceRound`, `winnerTeam`, and `EMPTY_TEAM`. football-data is the single source of truth for which team is in which slot; an unseeded slot shows its date placeholder until the source fills it. This is simpler and correct. Each team now appears once per round (still once per round across rounds it's reached — normal bracket progression).
+
+**Caveat (accepted):** because the round id-orderings don't align, a team can render on visually opposite sides between rounds (e.g. R32 box on the right, R16 box on the left). Without connector lines this reads as schematic grouping, not a defect; reconstructing a perfectly side-consistent tree would require hardcoding the FIFA bracket structure, which the feed doesn't expose pre-results. Deferred.
+
+**Test gap that let it ship:** the old `?test-phase` fixtures seeded R16 in a way that *happened* to align with the `2i` computation, so the duplication never showed locally. The fixtures now mirror the real feed (Brazil seeded at a non-aligned slot), and a regression test asserts an advancing team's code renders exactly once. **Lesson:** test fixtures must mirror the source's real cardinality *and ordering*, not an idealized bracket.
+
+- Cache bump: `wc:image:v13→v14` (bracket renders differently). `wc:data` unchanged.

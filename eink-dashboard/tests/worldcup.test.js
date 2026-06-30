@@ -18,8 +18,7 @@ const {
   pickRotatingGroup,
   chicagoDateOf,
   chicagoTimeOf,
-  winnerTeam,
-  advanceRound,
+  renderWorldCupHTML,
 } = fromBuild("src/worldcup-ui.js");
 const { normalizeFootballData, mapStage, mapStatus } = fromBuild("src/worldcup-football-data.js");
 const { normalizeOpenFootball } = fromBuild("src/worldcup-openfootball.js");
@@ -147,20 +146,6 @@ const mkMatch = (over) => ({
   homeScore: null, awayScore: null, ...over,
 });
 
-test("winnerTeam picks the higher score, null when not finished or level", () => {
-  const fin = (hs, as) => mkMatch({ status: "FINISHED", home: { name: "A", code: "AAA" }, away: { name: "B", code: "BBB" }, homeScore: hs, awayScore: as });
-  assert.equal(winnerTeam(fin(0, 1)).code, "BBB");
-  assert.equal(winnerTeam(fin(2, 1)).code, "AAA");
-  assert.equal(winnerTeam(fin(1, 1)), null);
-  assert.equal(winnerTeam(mkMatch({ status: "SCHEDULED" })), null);
-});
-
-test("winnerTeam uses fullTime (penalty winner advances on a shootout)", () => {
-  // 1-1, home wins 4-2 on pens -> fullTime folds to 5-3, so home advances.
-  const m = mkMatch({ status: "FINISHED", home: { name: "A", code: "AAA" }, away: { name: "B", code: "BBB" }, homeScore: 5, awayScore: 3, penaltyHome: 4, penaltyAway: 2 });
-  assert.equal(winnerTeam(m).code, "AAA");
-});
-
 test("scoreText shows the match result with the shootout in parens", () => {
   assert.equal(scoreText({ homeScore: 2, awayScore: 1 }), "2-1");
   // 1-1 (4-2 pens): fullTime 5-3 minus penalties recovers the 1-1 match result.
@@ -170,24 +155,27 @@ test("scoreText shows the match result with the shootout in parens", () => {
   assert.equal(scoreText({ homeScore: null, awayScore: null }), "");
 });
 
-test("advanceRound feeds winners forward; undecided side stays empty; date from source", () => {
-  const a = mkMatch({ id: 73, status: "FINISHED", home: { name: "South Africa", code: "RSA" }, away: { name: "Canada", code: "CAN" }, homeScore: 0, awayScore: 1 });
-  const b = mkMatch({ id: 74, status: "SCHEDULED", home: { name: "Brazil", code: "BRA" }, away: { name: "Japan", code: "JPN" } });
-  const src = [mkMatch({ id: 89, stage: "R16", dateChicago: "2026-07-04" })];
-  const r16 = advanceRound([a, b], src);
-  assert.equal(r16.length, 1);
-  assert.equal(r16[0].home.code, "CAN");          // winner of a advances
-  assert.equal(r16[0].away.code, "");             // b not finished -> TBD
-  assert.equal(r16[0].dateChicago, "2026-07-04"); // date carried from the source match
-});
-
-test("advanceRound prefers the source match once it carries real teams + score", () => {
-  const a = mkMatch({ id: 73, status: "FINISHED", home: { name: "Canada", code: "CAN" }, away: { name: "RSA", code: "RSA" }, homeScore: 1, awayScore: 0 });
-  const b = mkMatch({ id: 74, status: "FINISHED", home: { name: "Brazil", code: "BRA" }, away: { name: "Japan", code: "JPN" }, homeScore: 2, awayScore: 0 });
-  const src = [mkMatch({ id: 89, stage: "R16", status: "FINISHED", home: { name: "Canada", code: "CAN" }, away: { name: "Brazil", code: "BRA" }, homeScore: 1, awayScore: 3 })];
-  const r16 = advanceRound([a, b], src);
-  assert.equal(r16[0].away.code, "BRA");
-  assert.equal(r16[0].awayScore, 3);              // real result from the source, not recomputed
+test("knockout bracket renders an advancing team once — no duplication (#50 Brazil bug)", () => {
+  // Reproduces the real football-data shape: Brazil's R32 tie sorts to idx8, but the source seeds
+  // Brazil into its R16 slot at idx2 (its bracket isn't a naive 2i pairing). The old advanceRound
+  // also computed Brazil into the idx4 slot from the R32 winner, so "BRA" rendered in two R16 boxes.
+  // Rendering the source directly must show it exactly once.
+  const TBD = { name: "", code: "" };
+  const BRA = { name: "Brazil", code: "BRA" };
+  const r32 = Array.from({ length: 16 }, (_, i) =>
+    mkMatch({ id: 100 + i, stage: "R32", status: "SCHEDULED", home: TBD, away: TBD }));
+  r32[8] = mkMatch({ id: 108, stage: "R32", status: "FINISHED", home: BRA, away: { name: "Japan", code: "JPN" }, homeScore: 2, awayScore: 1 });
+  const r16 = Array.from({ length: 8 }, (_, i) =>
+    mkMatch({ id: 200 + i, stage: "R16", status: "SCHEDULED", home: TBD, away: TBD }));
+  r16[2] = mkMatch({ id: 202, stage: "R16", status: "SCHEDULED", home: BRA, away: TBD });
+  const data = {
+    source: "football-data", phase: "knockout", todayMatches: [], recentResults: [],
+    groups: [], knockout: [...r32, ...r16], champion: null, generatedAt: 0,
+  };
+  const monoTheme = { rootCSS: "", styleCSS: "", fav: "#000", win: "#000", live: "#000" }; // no flag -> codes
+  const html = renderWorldCupHTML(data, monoTheme);
+  // R32 wide boxes show the full name ("Brazil"); the compact R16 box shows the code ">BRA<".
+  assert.equal(html.split(">BRA<").length - 1, 1);
 });
 
 test("teamCode prefers code, falls back to first 3 letters", () => {

@@ -328,47 +328,6 @@ function splitLayout(data: WorldCupData, theme: WcTheme): string {
 const teamKnown = (t: { name: string; code: string } | undefined): boolean =>
   !!(t && ((t.name && t.name.trim()) || (t.code && t.code.trim())));
 
-const EMPTY_TEAM: WcTeam = { name: "", code: "" };
-
-/** The winning team of a finished knockout match, or null (not finished / level on our fullTime score). */
-export function winnerTeam(m: WcMatch | undefined): WcTeam | null {
-  if (m && m.status === "FINISHED" && m.homeScore !== null && m.awayScore !== null) {
-    if (m.homeScore > m.awayScore) return m.home;
-    if (m.awayScore > m.homeScore) return m.away;
-  }
-  return null;
-}
-
-/**
- * Build the next knockout round (bracket order) from the previous round's winners.
- * The data source publishes later-round matches with EMPTY teams until it seeds them, so we
- * advance winners ourselves: slot i is fed by prev[2i] (home) and prev[2i+1] (away). When the
- * source HAS already seeded a match's teams (i.e. once it's been played/drawn), we prefer it
- * (it carries the real teams + score). Dates/ids come from the source match at that position.
- */
-export function advanceRound(prev: WcMatch[], source: WcMatch[]): WcMatch[] {
-  const out: WcMatch[] = [];
-  const n = Math.floor(prev.length / 2);
-  for (let i = 0; i < n; i++) {
-    const src = source[i];
-    if (src && (teamKnown(src.home) || teamKnown(src.away))) { out.push(src); continue; }
-    out.push({
-      id: src?.id ?? -(1000 + i),
-      stage: src?.stage ?? "R16",
-      group: undefined,
-      status: src?.status ?? "SCHEDULED",
-      kickoffISO: src?.kickoffISO ?? "",
-      dateChicago: src?.dateChicago ?? "",
-      timeChicago: src?.timeChicago ?? "",
-      home: winnerTeam(prev[2 * i]) ?? EMPTY_TEAM,
-      away: winnerTeam(prev[2 * i + 1]) ?? EMPTY_TEAM,
-      homeScore: null,
-      awayScore: null,
-    });
-  }
-  return out;
-}
-
 /**
  * One bracket box. If neither team is decided yet, it shows just the round date as a faint
  * placeholder, leaving room for the eventual teams. Once a team is known it renders two team
@@ -437,12 +396,16 @@ function dateRange(matches: WcMatch[]): string {
 }
 
 /**
- * The full knockout bracket, data-driven and self-advancing — used for the whole knockout
- * phase (R32 → Final), not just R32. The 16 R32 ties sit on the two outer edges; the R16→SF
- * columns converge toward a center Final box. Each round past R32 is computed from the previous
- * round's winners (`advanceRound`) so a team that has won (e.g. Canada) immediately appears in
- * its next-round box, even though the source leaves those matches' teams empty until later; once
- * a later round is actually played, its real source teams + scores take over. Inner rounds use
+ * The full knockout bracket, used for the whole knockout phase (R32 → Final), not just R32. The
+ * 16 R32 ties sit on the two outer edges; the R16→SF columns converge toward a center Final box.
+ *
+ * Every round is rendered DIRECTLY from the source matches (id order) — we do NOT compute
+ * advancement ourselves. football-data seeds each later-round match with the real teams as soon
+ * as its feeders finish (e.g. Brazil appears in its R16 match the moment it wins its R32 tie), and
+ * its bracket structure does NOT follow a naive `prev[2i]/prev[2i+1]` pairing — so computing
+ * advancement (the old `advanceRound`) placed a winner in the wrong slot AND duplicated it
+ * alongside the source-seeded one (a team showing twice in one round). Trusting the source is both
+ * correct and simpler; until a slot is seeded it shows its date placeholder. Inner rounds use
  * compact codes (mono) / flags (color) since their boxes are narrow; R32 uses full names. The
  * header names the current round (earliest unfinished) + that round's date span. Order = match id.
  */
@@ -455,10 +418,10 @@ function knockoutBracket(data: WorldCupData, theme: WcTheme): string {
     <div class="wc-empty">Knockout bracket not available yet</div>`;
   }
 
-  const r16 = advanceRound(r32, stage("R16"));
-  const qf = advanceRound(r16, stage("QF"));
-  const sf = advanceRound(qf, stage("SF"));
-  const final = advanceRound(sf, stage("FINAL"))[0];
+  const r16 = stage("R16");
+  const qf = stage("QF");
+  const sf = stage("SF");
+  const final = stage("FINAL")[0];
 
   // Subtitle: the current round (earliest with an unfinished match) + that round's dates.
   const rounds: { stage: WcStage; matches: WcMatch[] }[] = [
