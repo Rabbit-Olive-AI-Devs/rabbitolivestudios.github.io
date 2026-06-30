@@ -124,10 +124,28 @@ export function qualifiedFlags(
   return safe;
 }
 
-/** Score ("2-1") when finished/live, else the Chicago kickoff time. */
-export function matchCell(m: { status: WcStatus; homeScore: number | null; awayScore: number | null; timeChicago: string }): string {
+type ScoreLike = {
+  homeScore: number | null; awayScore: number | null;
+  penaltyHome?: number | null; penaltyAway?: number | null;
+};
+
+/**
+ * Final score as text. For a penalty shootout, football-data's homeScore/awayScore fold the
+ * shootout in, so we subtract the penalties to recover the match result and show the shootout
+ * in parens — "1-1 (4-2)", the way sports sources report it. Otherwise just "2-1".
+ */
+export function scoreText(m: ScoreLike): string {
+  if (m.homeScore === null || m.awayScore === null) return "";
+  if (m.penaltyHome != null && m.penaltyAway != null) {
+    return `${m.homeScore - m.penaltyHome}-${m.awayScore - m.penaltyAway} (${m.penaltyHome}-${m.penaltyAway})`;
+  }
+  return `${m.homeScore}-${m.awayScore}`;
+}
+
+/** Score ("2-1", or "1-1 (4-2)" for a shootout) when finished/live, else the Chicago kickoff time. */
+export function matchCell(m: { status: WcStatus; homeScore: number | null; awayScore: number | null; timeChicago: string; penaltyHome?: number | null; penaltyAway?: number | null }): string {
   if ((m.status === "FINISHED" || m.status === "LIVE") && m.homeScore !== null && m.awayScore !== null) {
-    return `${m.homeScore}-${m.awayScore}`;
+    return scoreText(m);
   }
   return m.timeChicago;
 }
@@ -366,6 +384,7 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
   }
   const h = teamCode(mm.home), a = teamCode(mm.away);
   const finished = mm.status === "FINISHED" && mm.homeScore !== null && mm.awayScore !== null;
+  const pens = finished && mm.penaltyHome != null && mm.penaltyAway != null;
   const live = mm.status === "LIVE";
   const homeWon = finished && mm.homeScore! > mm.awayScore!;
   const awayWon = finished && mm.awayScore! > mm.homeScore!;
@@ -381,11 +400,13 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
     const w = won ? "font-weight:700;" : "";
     // Per-team inline score only on the wide R32 boxes; compact boxes put the score on the
     // when-line instead (a code + inline score overflows the narrow inner boxes → truncation).
-    const sc = finished && !compact ? `<span class="wc-kscore">${score}</span>` : "";
+    // Shootouts have no per-team score — the folded fullTime number is misleading, so the whole
+    // "1-1 (4-2)" goes on the when-line for both layouts; the winner is still shown bold.
+    const sc = finished && !compact && !pens ? `<span class="wc-kscore">${score}</span>` : "";
     return `<div class="wc-kteam" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${label(team, code)}</span>${sc}</div>`;
   };
   const when = live ? "LIVE"
-    : finished ? (compact ? `${mm.homeScore}-${mm.awayScore}` : "Full time")
+    : finished ? (pens ? scoreText(mm) : compact ? `${mm.homeScore}-${mm.awayScore}` : "Full time")
     : compact ? shortChicagoDate(mm.dateChicago)
     : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
   // In compact (inner) boxes, only render a side once it's decided — so a single advanced
@@ -475,7 +496,7 @@ function championLayout(data: WorldCupData, theme: WcTheme): string {
   const bigFlag = data.champion && theme.flag
     ? theme.flag(champCode).replace('class="wc-flag"', 'class="wc-flag-big"')
     : "";
-  const score = final ? `${final.homeScore}-${final.awayScore}` : "";
+  const score = final ? scoreText(final) : "";
   const matchup = final ? `${teamLabel(final.home, 20)} ${escapeHTML(score)} ${teamLabel(final.away, 20)}` : "";
   return `${header(data)}
   <div class="wc-champion">

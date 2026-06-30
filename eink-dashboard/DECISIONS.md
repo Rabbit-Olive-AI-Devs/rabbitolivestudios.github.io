@@ -1568,3 +1568,18 @@ The split layout had only ever been exercised with a 2-match R32 test fixture, w
 ### Design decision: no connector lines
 
 The bracket converges via box placement and column alignment; it deliberately does **not** draw the elbow connector *lines* between rounds — the user reviewed it and decided the lines aren't needed (drawing them on the dense mono panel risks noise for little gain). Not a TODO. (The earlier "R16 clips on mono" follow-up is also obsolete — that was the old `bracketLayout`, now deleted; the unified `knockoutBracket` is verified clipping-free on both displays at 800×480.)
+
+---
+
+## 50. World Cup Penalty Shootouts Show "Match (Pens)" (v3.15.10, 2026-06-30)
+
+The first knockout results came in and penalty-decided ties showed only the shootout number, hiding the actual match result (a 0-0 won 4-2 on penalties read as a bare "4-2").
+
+**Root cause — football-data folds the shootout into `fullTime`.** Per [football-data.org's "Dealing with scores"](https://docs.football-data.org/general/v4/overtime.html), for a `PENALTY_SHOOTOUT` match `fullTime = regularTime + extraTime + penalties` (their example: 1-1 a.e.t., 6-5 pens → `fullTime 7-6`), with the shootout also exposed separately as a `penalties` object. We were reading only `fullTime` into `homeScore`/`awayScore` and rendering it directly, so a 0-0 (4-2 pens) tie surfaced its `fullTime` of 4-2 — indistinguishable from a 4-2 regulation win.
+
+**Fix.** Parse the separate `penalties` object into new optional `WcMatch.penaltyHome`/`penaltyAway` fields (football-data adapter only — the openfootball fallback parses group stage only, never penalties). A new `scoreText(m)` helper renders the result the way sports sources do: **match result first, shootout in parens** — `"1-1 (4-2)"`. The match result is recovered as `fullTime − penalties` (= regulation + extra time), so it stays correct even when goals were scored in extra time; non-shootout matches are unchanged (`"2-1"`). Used by the bracket boxes, the champion final line, and `matchCell`.
+
+- **`homeScore`/`awayScore` stay as `fullTime`** (penalty-inclusive) so `winnerTeam`/`advanceRound` keep advancing the shootout winner unchanged (the penalty winner always has the higher `fullTime`; a finished KO tie is never level).
+- **Bracket rendering:** on a shootout the misleading folded per-team score is **suppressed** and the whole `"1-1 (4-2)"` goes on the when-line (both the wide R32 boxes and the narrow inner-round boxes); the winner is still shown bold. Non-shootout boxes keep their per-team scores + "Full time".
+- Verified at 800×480 on both displays and both phases via the `?test-phase=r32` (wide R32 shootout) and `?test-phase=knockout` (compact inner-round shootout) fixtures, which now seed penalty ties.
+- Cache bumps: `wc:data:v3→v4` (new field on the blob), `wc:image:v10→v11` (mono pre-dithered image re-renders).

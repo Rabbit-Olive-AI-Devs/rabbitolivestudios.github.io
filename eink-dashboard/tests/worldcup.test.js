@@ -13,6 +13,7 @@ const {
   displayName,
   qualifiedFlags,
   matchCell,
+  scoreText,
   STAGE_LABELS,
   pickRotatingGroup,
   chicagoDateOf,
@@ -94,7 +95,7 @@ test("FLAGS map covers participants and is well-formed", () => {
 });
 
 test("worldCupCacheKey is stable", () => {
-  assert.equal(worldCupCacheKey(), "wc:data:v3");
+  assert.equal(worldCupCacheKey(), "wc:data:v4");
 });
 
 const gm = (status) => ({ stage: "GROUP", status });
@@ -154,6 +155,21 @@ test("winnerTeam picks the higher score, null when not finished or level", () =>
   assert.equal(winnerTeam(mkMatch({ status: "SCHEDULED" })), null);
 });
 
+test("winnerTeam uses fullTime (penalty winner advances on a shootout)", () => {
+  // 1-1, home wins 4-2 on pens -> fullTime folds to 5-3, so home advances.
+  const m = mkMatch({ status: "FINISHED", home: { name: "A", code: "AAA" }, away: { name: "B", code: "BBB" }, homeScore: 5, awayScore: 3, penaltyHome: 4, penaltyAway: 2 });
+  assert.equal(winnerTeam(m).code, "AAA");
+});
+
+test("scoreText shows the match result with the shootout in parens", () => {
+  assert.equal(scoreText({ homeScore: 2, awayScore: 1 }), "2-1");
+  // 1-1 (4-2 pens): fullTime 5-3 minus penalties recovers the 1-1 match result.
+  assert.equal(scoreText({ homeScore: 5, awayScore: 3, penaltyHome: 4, penaltyAway: 2 }), "1-1 (4-2)");
+  // 0-0 (3-1 pens): the case the user reported — fullTime 3-1 looks like the shootout.
+  assert.equal(scoreText({ homeScore: 3, awayScore: 1, penaltyHome: 3, penaltyAway: 1 }), "0-0 (3-1)");
+  assert.equal(scoreText({ homeScore: null, awayScore: null }), "");
+});
+
 test("advanceRound feeds winners forward; undecided side stays empty; date from source", () => {
   const a = mkMatch({ id: 73, status: "FINISHED", home: { name: "South Africa", code: "RSA" }, away: { name: "Canada", code: "CAN" }, homeScore: 0, awayScore: 1 });
   const b = mkMatch({ id: 74, status: "SCHEDULED", home: { name: "Brazil", code: "BRA" }, away: { name: "Japan", code: "JPN" } });
@@ -184,6 +200,7 @@ test("matchCell shows score when finished, time otherwise", () => {
   assert.equal(matchCell({ status: "FINISHED", homeScore: 2, awayScore: 1, timeChicago: "1 PM" }), "2-1");
   assert.equal(matchCell({ status: "LIVE", homeScore: 0, awayScore: 0, timeChicago: "1 PM" }), "0-0");
   assert.equal(matchCell({ status: "SCHEDULED", homeScore: null, awayScore: null, timeChicago: "1 PM" }), "1 PM");
+  assert.equal(matchCell({ status: "FINISHED", homeScore: 5, awayScore: 3, penaltyHome: 4, penaltyAway: 2, timeChicago: "1 PM" }), "1-1 (4-2)");
 });
 
 test("STAGE_LABELS covers all knockout stages", () => {
@@ -266,6 +283,25 @@ test("normalizeFootballData maps matches + standings to WorldCupData", () => {
   assert.equal(data.recentResults.length, 1);
   assert.equal(data.recentResults[0].home.code, "BRA");
   assert.equal(data.recentResults[0].homeScore, 3);
+});
+
+test("normalizeFootballData carries the penalty shootout result", () => {
+  const matchesJson = {
+    matches: [{
+      id: 75, stage: "LAST_32", status: "FINISHED",
+      utcDate: "2026-06-29T18:00:00Z",
+      homeTeam: { name: "Germany", tla: "GER" }, awayTeam: { name: "Paraguay", tla: "PAR" },
+      // fullTime folds the shootout in (1-1 + pens 4-2 => 5-3); penalties exposed separately.
+      score: { winner: "HOME_TEAM", duration: "PENALTY_SHOOTOUT", fullTime: { home: 5, away: 3 }, penalties: { home: 4, away: 2 } },
+    }],
+  };
+  const data = normalizeFootballData(matchesJson, { standings: [] });
+  const ko = data.knockout[0];
+  assert.equal(ko.homeScore, 5);
+  assert.equal(ko.awayScore, 3);
+  assert.equal(ko.penaltyHome, 4);
+  assert.equal(ko.penaltyAway, 2);
+  assert.equal(scoreText(ko), "1-1 (4-2)");
 });
 
 test("normalizeOpenFootball maps rounds/matches and derives simple standings", () => {

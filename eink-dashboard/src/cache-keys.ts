@@ -7,7 +7,7 @@ export const COLOR_MOMENT_CACHE_VERSION = "v2";
 export const COLOR_BIRTHDAY_CACHE_VERSION = "v1";
 export const MOMENT_CACHE_VERSION = "v1";
 export const SKYLINE_CACHE_VERSION = "v3";
-export const WORLDCUP_CACHE_VERSION = "v3"; // v3: current-round phase (earliest active KO round) (DECISIONS #49); v2: fixture-aware top-2 flags (#47)
+export const WORLDCUP_CACHE_VERSION = "v4"; // v4: penalty shootout result on the data blob (DECISIONS #50); v3: current-round phase (earliest active KO round) (#49); v2: fixture-aware top-2 flags (#47)
 
 export function fact4CacheKey(dateStr: string): string {
   return `fact4:${FACT4_CACHE_VERSION}:${dateStr}`;

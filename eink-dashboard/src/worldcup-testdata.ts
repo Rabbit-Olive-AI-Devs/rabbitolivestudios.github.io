@@ -11,12 +11,13 @@ function m(
   id: number, stage: WcStage, status: WcStatus, time: string,
   home: WcTeam, away: WcTeam, hs: number | null, as: number | null,
   group?: string, dateChicago = "2026-06-23",
+  ph: number | null = null, pa: number | null = null,
 ): WcMatch {
   return {
     id, stage, group, status,
     kickoffISO: `${dateChicago}T${id.toString().padStart(2, "0")}:00:00Z`,
     dateChicago, timeChicago: time,
-    home, away, homeScore: hs, awayScore: as,
+    home, away, homeScore: hs, awayScore: as, penaltyHome: ph, penaltyAway: pa,
   };
 }
 
@@ -68,7 +69,8 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
     const knockout = [
       m(73, "R32", "FINISHED", "—", RSA, CAN, 0, 1, undefined, "2026-06-28"),
       m(74, "R32", "FINISHED", "—", BRA, JPN, 2, 0, undefined, "2026-06-29"),
-      m(75, "R32", "FINISHED", "—", GER, PAR, 2, 1, undefined, "2026-06-29"),
+      // Penalty shootout: 1-1, Germany through 4-2 on pens (fullTime folds it to 5-3).
+      m(75, "R32", "FINISHED", "—", GER, PAR, 5, 3, undefined, "2026-06-29", 4, 2),
       m(76, "R32", "FINISHED", "—", NED, MAR, 1, 0, undefined, "2026-06-29"),
       m(77, "R32", "SCHEDULED", "12:00 PM", CIV, NOR, null, null, undefined, "2026-06-30"),
       m(78, "R32", "SCHEDULED", "4:00 PM", FRA, SWE, null, null, undefined, "2026-06-30"),
@@ -116,7 +118,8 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
       W(87, COL, GHA, 1, 0, "2026-07-03"), W(88, SRB, CMR, 2, 0, "2026-07-03"),
     ];
     const r16 = [
-      m(89, "R16", "FINISHED", "—", CAN, BRA, 0, 2, undefined, "2026-07-04"), // slot 0 played: Brazil through
+      // slot 0 played, penalty shootout: 1-1, Brazil through 4-3 on pens (compact inner-round box).
+      m(89, "R16", "FINISHED", "—", CAN, BRA, 4, 5, undefined, "2026-07-04", 3, 4),
       ...[90, 91, 92].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-04")),
       ...[93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
     ];

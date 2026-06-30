@@ -160,8 +160,10 @@ export interface WcMatch {
   timeChicago: string;       // "1:00 PM" in America/Chicago
   home: WcTeam;
   away: WcTeam;
-  homeScore: number | null;
+  homeScore: number | null;       // football-data fullTime = regulation + extra time + penalties
   awayScore: number | null;
+  penaltyHome?: number | null;    // shootout goals (present only when decided on penalties)
+  penaltyAway?: number | null;
 }
 
 export interface WcStandingRow {

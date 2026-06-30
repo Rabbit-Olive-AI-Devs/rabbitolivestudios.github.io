@@ -57,8 +57,12 @@ function normalizeMatch(m: any): WcMatch {
     timeChicago: chicagoTimeOf(iso),
     home: team(m.homeTeam),
     away: team(m.awayTeam),
+    // fullTime folds the shootout in (e.g. a 0-0 won 4-2 on pens reports 4-2); penalties are
+    // exposed separately so the UI can show "0-0 (4-2)". See DECISIONS #50.
     homeScore: m.score?.fullTime?.home ?? null,
     awayScore: m.score?.fullTime?.away ?? null,
+    penaltyHome: m.score?.penalties?.home ?? null,
+    penaltyAway: m.score?.penalties?.away ?? null,
   };
 }
 
