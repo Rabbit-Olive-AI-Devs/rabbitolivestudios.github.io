@@ -48,14 +48,17 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-kwhen { font-size: 9px; font-weight: 600; line-height: 11px; white-space: nowrap; overflow: hidden; opacity: 0.85; }
   .wc-ktie .wc-flag { height: 11px; width: auto; border: 1px solid #000; margin: 0; flex: 0 0 auto; }
   .wc-kempty { flex: 0 0 auto; min-height: 46px; align-items: center; justify-content: center; }
-  .wc-ktbd { font-size: 11px; font-weight: 700; }
-  /* Inner rounds (everything but the wide R32 columns): a centered flag for an advancing team, or
-     flag + per-team score on a finished tie. Flag sized to leave room for the score. */
+  .wc-ktbd { font-size: 8px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; }
+  /* Inner rounds (everything but the wide R32 columns): bigger centered flags for an advancing team
+     (the date/time sits on one line below to leave them the room); the date/time is centered. */
   .wc-kcol:not(.wc-kr32) .wc-ktie, .wc-kfinal { min-height: 58px; }
-  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; line-height: 20px; }
+  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; line-height: 24px; }
   .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { gap: 4px; }
-  .wc-kcol:not(.wc-kr32) .wc-flag, .wc-kfinal .wc-flag { height: 16px; }
+  .wc-kcol:not(.wc-kr32) .wc-flag, .wc-kfinal .wc-flag { height: 22px; }
+  /* a finished tie shows a per-team score next to the flag — keep that flag smaller so the score fits. */
+  .wc-kcol:not(.wc-kr32) .wc-kteam-scored .wc-flag, .wc-kfinal .wc-kteam-scored .wc-flag { height: 16px; }
   .wc-kcol:not(.wc-kr32) .wc-kscore, .wc-kfinal .wc-kscore { font-size: 11px; padding-left: 2px; }
+  .wc-kcol:not(.wc-kr32) .wc-kwhen, .wc-kfinal .wc-kwhen { text-align: center; font-size: 8px; }
   .wc-klive { border-width: 2.5px; }
   .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
@@ -111,13 +114,14 @@ export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing
   .wc-kscore { font-weight: 800; flex: 0 0 auto; padding-left: 4px; }
   .wc-kwhen { font-size: 10px; font-weight: 600; line-height: 12px; white-space: nowrap; overflow: hidden; }
   .wc-kempty { flex: 0 0 auto; min-height: 44px; align-items: center; justify-content: center; }
-  .wc-ktbd { font-size: 12px; font-weight: 700; }
+  .wc-ktbd { font-size: 9px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; }
   /* Inner rounds: centered 3-letter code for an advancing team, or code + per-team score on a
      finished tie. Slightly smaller, with a smaller score, so "GER 1(4)" fits without truncating
-     the code. */
+     the code; the date/time is one line, centered. */
   .wc-kcol:not(.wc-kr32) .wc-ktie, .wc-kfinal { min-height: 52px; }
   .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; font-size: 13px; line-height: 16px; }
   .wc-kcol:not(.wc-kr32) .wc-kscore, .wc-kfinal .wc-kscore { font-size: 11px; padding-left: 2px; }
+  .wc-kcol:not(.wc-kr32) .wc-kwhen, .wc-kfinal .wc-kwhen { text-align: center; font-size: 9px; }
   .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
   .wc-champ-team { font-size: 104px; font-weight: 700; line-height: 1; }

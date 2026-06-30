@@ -311,17 +311,15 @@ function shortTime(t: string): string {
 }
 
 /**
- * Schedule label HTML for a not-yet-played box: "Jun 30 · 4:00 PM" on one line for the wide R32
- * boxes; date over a compact time (two lines) for the narrow inner boxes so the time always fits.
+ * Schedule label for a not-yet-played box, on a single line: "Jun 30 · 4:00 PM" (wide R32) or the
+ * compact form "Jul 6 · 2PM" on the narrow inner boxes (so the date/time stays one line and the
+ * flags get the vertical room). Returns escaped text — `·` is a literal, safe to inline.
  */
 function whenDateTime(mm: WcMatch, compact: boolean): string {
   const d = escapeHTML(shortChicagoDate(mm.dateChicago));
-  if (!compact) {
-    const t = mm.timeChicago && mm.timeChicago !== "TBD" ? ` · ${escapeHTML(mm.timeChicago)}` : "";
-    return d ? `${d}${t}` : escapeHTML(mm.timeChicago || "");
-  }
-  const t = escapeHTML(shortTime(mm.timeChicago));
-  return d && t ? `${d}<br>${t}` : d || t;
+  const t = escapeHTML(compact ? shortTime(mm.timeChicago) : (mm.timeChicago && mm.timeChicago !== "TBD" ? mm.timeChicago : ""));
+  if (!d) return t;
+  return t ? `${d} · ${t}` : d;
 }
 
 /** Group-stage layout: today + results on top, a rotating group table below. */
