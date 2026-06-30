@@ -48,7 +48,7 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-kwhen { font-size: 9px; font-weight: 600; line-height: 11px; white-space: nowrap; overflow: hidden; opacity: 0.85; }
   .wc-ktie .wc-flag { height: 11px; width: auto; border: 1px solid #000; margin: 0; flex: 0 0 auto; }
   .wc-kempty { flex: 0 0 auto; min-height: 46px; align-items: center; justify-content: center; }
-  .wc-ktbd { font-size: 8px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; }
+  .wc-ktbd { font-size: 11px; font-weight: 700; line-height: 13px; text-align: center; white-space: nowrap; overflow: hidden; }
   /* Inner rounds (everything but the wide R32 columns): bigger centered flags for an advancing team
      (the date/time sits on one line below to leave them the room); the date/time is centered. */
   .wc-kcol:not(.wc-kr32) .wc-ktie, .wc-kfinal { min-height: 58px; }
@@ -114,7 +114,7 @@ export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing
   .wc-kscore { font-weight: 800; flex: 0 0 auto; padding-left: 4px; }
   .wc-kwhen { font-size: 10px; font-weight: 600; line-height: 12px; white-space: nowrap; overflow: hidden; }
   .wc-kempty { flex: 0 0 auto; min-height: 44px; align-items: center; justify-content: center; }
-  .wc-ktbd { font-size: 9px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; }
+  .wc-ktbd { font-size: 12px; font-weight: 700; line-height: 14px; text-align: center; white-space: nowrap; overflow: hidden; }
   /* Inner rounds: centered 3-letter code for an advancing team, or code + per-team score on a
      finished tie. Slightly smaller, with a smaller score, so "GER 1(4)" fits without truncating
      the code; the date/time is one line, centered. */

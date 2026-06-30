@@ -311,15 +311,17 @@ function shortTime(t: string): string {
 }
 
 /**
- * Schedule label for a not-yet-played box, on a single line: "Jun 30 · 4:00 PM" (wide R32) or the
- * compact form "Jul 6 · 2PM" on the narrow inner boxes (so the date/time stays one line and the
- * flags get the vertical room). Returns escaped text — `·` is a literal, safe to inline.
+ * Schedule label HTML for a not-yet-played box. Wide R32 boxes and the narrow inner boxes that have
+ * at least one team show it on ONE line ("Jun 30 · 4:00 PM" / compact "Jul 6 · 2PM") so the flags
+ * keep their room; an inner box with NO team yet (`twoLine`) stacks the date over the time, since it
+ * has the empty space. Returns escaped text — `·`/`<br>` are literals, safe to inline.
  */
-function whenDateTime(mm: WcMatch, compact: boolean): string {
+function whenDateTime(mm: WcMatch, compact: boolean, twoLine = false): string {
   const d = escapeHTML(shortChicagoDate(mm.dateChicago));
   const t = escapeHTML(compact ? shortTime(mm.timeChicago) : (mm.timeChicago && mm.timeChicago !== "TBD" ? mm.timeChicago : ""));
   if (!d) return t;
-  return t ? `${d} · ${t}` : d;
+  if (!t) return d;
+  return twoLine ? `${d}<br>${t}` : `${d} · ${t}`;
 }
 
 /** Group-stage layout: today + results on top, a rotating group table below. */
@@ -356,7 +358,7 @@ const teamKnown = (t: { name: string; code: string } | undefined): boolean =>
 function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = ""): string {
   const cls = `wc-ktie${extraClass ? ` ${extraClass}` : ""}`;
   if (!teamKnown(mm.home) && !teamKnown(mm.away)) {
-    const dt = whenDateTime(mm, compact); // pre-escaped HTML (may carry a <br>)
+    const dt = whenDateTime(mm, compact, compact); // no team yet: stack date over time on the inner boxes
     return `<div class="${cls} wc-kempty">${dt ? `<span class="wc-ktbd">${dt}</span>` : ""}</div>`;
   }
   const h = teamCode(mm.home), a = teamCode(mm.away);
