@@ -395,24 +395,28 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
     if (theme.flag) return "";                                   // color: flag carries identity
     return escapeHTML(teamKnown(team) ? code : "TBD");           // mono: 3-letter code
   };
-  const line = (team: WcMatch["home"], code: string, won: boolean, score: number | null) => {
+  const line = (team: WcMatch["home"], code: string, won: boolean, scoreStr: string) => {
     const fav = isFav(code) ? `color:${theme.fav};` : "";
     const w = won ? "font-weight:700;" : "";
-    // Per-team inline score only on the wide R32 boxes; compact boxes put the score on the
-    // when-line instead (a code + inline score overflows the narrow inner boxes → truncation).
-    // Shootouts have no per-team score — the folded fullTime number is misleading, so the whole
-    // "1-1 (4-2)" goes on the when-line for both layouts; the winner is still shown bold.
-    const sc = finished && !compact && !pens ? `<span class="wc-kscore">${score}</span>` : "";
+    const sc = scoreStr ? `<span class="wc-kscore">${scoreStr}</span>` : "";
     return `<div class="wc-kteam" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${label(team, code)}</span>${sc}</div>`;
   };
+  // Per-team score, kept vertical on the wide R32 boxes (compact inner boxes are too narrow — a
+  // code + inline score overflows, so their score lives on the when-line). On a shootout each
+  // side shows its goals with the shootout total in parens — "1 (4)" / "1 (2)" — the way scores
+  // read on TV; fullTime folds the shootout in, so the goals are fullTime − penalties. Winner bold.
+  const teamScore = (full: number | null, pen: number | null | undefined): string => {
+    if (!finished || compact || full === null) return "";
+    return pen != null ? `${full - pen} (${pen})` : `${full}`;
+  };
   const when = live ? "LIVE"
-    : finished ? (pens ? scoreText(mm) : compact ? `${mm.homeScore}-${mm.awayScore}` : "Full time")
+    : finished ? (compact ? scoreText(mm) : pens ? "Penalties" : "Full time")
     : compact ? shortChicagoDate(mm.dateChicago)
     : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
   // In compact (inner) boxes, only render a side once it's decided — so a single advanced
   // team shows as one prominent centered flag/code rather than a blank second line.
-  const homeLine = (!compact || teamKnown(mm.home)) ? line(mm.home, h, homeWon, mm.homeScore) : "";
-  const awayLine = (!compact || teamKnown(mm.away)) ? line(mm.away, a, awayWon, mm.awayScore) : "";
+  const homeLine = (!compact || teamKnown(mm.home)) ? line(mm.home, h, homeWon, teamScore(mm.homeScore, mm.penaltyHome)) : "";
+  const awayLine = (!compact || teamKnown(mm.away)) ? line(mm.away, a, awayWon, teamScore(mm.awayScore, mm.penaltyAway)) : "";
   return `<div class="${cls}${live ? " wc-klive" : ""}">
     ${homeLine}
     ${awayLine}

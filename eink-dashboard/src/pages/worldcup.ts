@@ -18,7 +18,7 @@ import { renderWorldCupBrowserPNG } from "../worldcup-browser-image";
 import { pngToBase64 } from "../png";
 
 const WC_ORIGIN = "https://eink-dashboard.thiago-oliveira77.workers.dev";
-const IMG_KEY = "wc:image:v11"; // v11: penalty shootout "1-1 (4-2)" on KO boxes (DECISIONS #50); v10: full bracket for whole KO phase + narrower R32 (#49); v9: bigger flag
+const IMG_KEY = "wc:image:v12"; // v12: per-team vertical shootout score "1 (4)" (DECISIONS #50); v11: shootout on when-line; v10: full bracket for whole KO phase + narrower R32 (#49)
 const IMG_SOFT_TTL_MS = 14 * 60 * 1000; // refresh the rendered image at most ~every 14 min
 const IMG_THRESHOLD = 160;              // gray cutoff for the 1-bit threshold
 
