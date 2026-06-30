@@ -34,23 +34,28 @@ export const COLOR_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box;
   .wc-kbracket { flex: 1; min-height: 0; display: flex; gap: 3px; align-items: stretch; overflow: hidden; }
   .wc-kside { flex: 1; display: flex; gap: 3px; min-width: 0; }
   .wc-kcol { display: flex; flex-direction: column; justify-content: space-around; min-width: 0; }
-  .wc-kr32 { flex: 0 0 158px; }
+  .wc-kr32 { flex: 0 0 146px; }
   .wc-kside .wc-kcol:not(.wc-kr32) { flex: 1; }
   .wc-kcenter { flex: 0 0 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
   .wc-kcenter-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
   .wc-ktie { border: 1.5px solid #000; border-radius: 4px; padding: 1px 6px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
   .wc-kteam { font-size: 14px; font-weight: 600; line-height: 16px; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
-  .wc-kname { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  /* name only grows (pushing the score to the right edge) when a score is present; otherwise it
+     collapses so an advancing flag/code stays centered by the box's justify-content. */
+  .wc-kname { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .wc-kteam-scored .wc-kname { flex: 1 1 auto; }
   .wc-kscore { font-weight: 800; flex: 0 0 auto; padding-left: 4px; }
   .wc-kwhen { font-size: 9px; font-weight: 600; line-height: 11px; white-space: nowrap; overflow: hidden; opacity: 0.85; }
   .wc-ktie .wc-flag { height: 11px; width: auto; border: 1px solid #000; margin: 0; flex: 0 0 auto; }
   .wc-kempty { flex: 0 0 auto; min-height: 46px; align-items: center; justify-content: center; }
   .wc-ktbd { font-size: 11px; font-weight: 700; }
-  /* Inner rounds (everything but the wide R32 columns): roomy boxes with a big, centered flag
-     so an advancing team reads clearly on the color panel. */
+  /* Inner rounds (everything but the wide R32 columns): a centered flag for an advancing team, or
+     flag + per-team score on a finished tie. Flag sized to leave room for the score. */
   .wc-kcol:not(.wc-kr32) .wc-ktie, .wc-kfinal { min-height: 58px; }
-  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; line-height: 26px; }
-  .wc-kcol:not(.wc-kr32) .wc-flag, .wc-kfinal .wc-flag { height: 24px; }
+  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; line-height: 20px; }
+  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { gap: 4px; }
+  .wc-kcol:not(.wc-kr32) .wc-flag, .wc-kfinal .wc-flag { height: 16px; }
+  .wc-kcol:not(.wc-kr32) .wc-kscore, .wc-kfinal .wc-kscore { font-size: 11px; padding-left: 2px; }
   .wc-klive { border-width: 2.5px; }
   .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
@@ -93,20 +98,26 @@ export const MONO_STYLE_BASE = `  /* E-ink crispness: disable font anti-aliasing
   .wc-kbracket { flex: 1; min-height: 0; display: flex; gap: 3px; align-items: stretch; overflow: hidden; }
   .wc-kside { flex: 1; display: flex; gap: 3px; min-width: 0; }
   .wc-kcol { display: flex; flex-direction: column; justify-content: space-around; min-width: 0; }
-  .wc-kr32 { flex: 0 0 152px; }
+  .wc-kr32 { flex: 0 0 128px; }
   .wc-kside .wc-kcol:not(.wc-kr32) { flex: 1; }
   .wc-kcenter { flex: 0 0 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
   .wc-kcenter-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; }
   .wc-ktie { border: 1.5px solid #000; border-radius: 4px; padding: 1px 7px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
   .wc-kteam { font-size: 15px; font-weight: 600; line-height: 17px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; }
-  .wc-kname { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  /* name only grows (pushing the score right) when a score is present; otherwise it collapses so
+     an advancing 3-letter code stays centered by the box's justify-content. */
+  .wc-kname { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+  .wc-kteam-scored .wc-kname { flex: 1 1 auto; }
   .wc-kscore { font-weight: 800; flex: 0 0 auto; padding-left: 4px; }
   .wc-kwhen { font-size: 10px; font-weight: 600; line-height: 12px; white-space: nowrap; overflow: hidden; }
   .wc-kempty { flex: 0 0 auto; min-height: 44px; align-items: center; justify-content: center; }
   .wc-ktbd { font-size: 12px; font-weight: 700; }
-  /* Inner rounds: roomy boxes; bigger centered 3-letter codes since R32 is narrower now. */
+  /* Inner rounds: centered 3-letter code for an advancing team, or code + per-team score on a
+     finished tie. Slightly smaller, with a smaller score, so "GER 1(4)" fits without truncating
+     the code. */
   .wc-kcol:not(.wc-kr32) .wc-ktie, .wc-kfinal { min-height: 52px; }
-  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; }
+  .wc-kcol:not(.wc-kr32) .wc-kteam, .wc-kfinal .wc-kteam { justify-content: center; font-size: 13px; line-height: 16px; }
+  .wc-kcol:not(.wc-kr32) .wc-kscore, .wc-kfinal .wc-kscore { font-size: 11px; padding-left: 2px; }
   .wc-champion { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   .wc-champ-label { font-size: 22px; font-weight: 700; letter-spacing: 4px; }
   .wc-champ-team { font-size: 104px; font-weight: 700; line-height: 1; }

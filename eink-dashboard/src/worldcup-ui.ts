@@ -399,18 +399,21 @@ function bracketBox(mm: WcMatch, theme: WcTheme, compact = false, extraClass = "
     const fav = isFav(code) ? `color:${theme.fav};` : "";
     const w = won ? "font-weight:700;" : "";
     const sc = scoreStr ? `<span class="wc-kscore">${scoreStr}</span>` : "";
-    return `<div class="wc-kteam" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${label(team, code)}</span>${sc}</div>`;
+    const scored = scoreStr ? " wc-kteam-scored" : "";          // flex the name so the score right-aligns
+    return `<div class="wc-kteam${scored}" style="${fav}${w}">${flagImg(theme, code)}<span class="wc-kname">${label(team, code)}</span>${sc}</div>`;
   };
-  // Per-team score, kept vertical on the wide R32 boxes (compact inner boxes are too narrow — a
-  // code + inline score overflows, so their score lives on the when-line). On a shootout each
-  // side shows its goals with the shootout total in parens — "1 (4)" / "1 (2)" — the way scores
-  // read on TV; fullTime folds the shootout in, so the goals are fullTime − penalties. Winner bold.
+  // Per-team score, vertical, on every finished box at every round (R32 → SF), so a shootout reads
+  // the same everywhere: each side shows its goals with the shootout total in parens, "1 (4)" / "1
+  // (2)" (tight "1(4)" on the narrow inner boxes), winner bold. fullTime folds the shootout in, so
+  // the goals are fullTime − penalties. (The center Final box is too small; a finished final flips
+  // the page to the champion card, which carries its own pens-aware score.)
   const teamScore = (full: number | null, pen: number | null | undefined): string => {
-    if (!finished || compact || full === null) return "";
-    return pen != null ? `${full - pen} (${pen})` : `${full}`;
+    if (!finished || full === null) return "";
+    if (pen == null) return `${full}`;
+    return compact ? `${full - pen}(${pen})` : `${full - pen} (${pen})`;
   };
   const when = live ? "LIVE"
-    : finished ? (compact ? scoreText(mm) : pens ? "Penalties" : "Full time")
+    : finished ? (pens ? "Penalties" : "Full time")
     : compact ? shortChicagoDate(mm.dateChicago)
     : `${shortChicagoDate(mm.dateChicago)} · ${mm.timeChicago}`;
   // In compact (inner) boxes, only render a side once it's decided — so a single advanced
