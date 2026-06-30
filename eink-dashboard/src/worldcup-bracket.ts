@@ -23,6 +23,17 @@ export const BRACKET_R32: [string, string][] = [
   ["ARG", "CPV"], ["AUS", "EGY"], ["SUI", "ALG"], ["COL", "GHA"],
 ];
 
+/**
+ * America/Chicago calendar date of each bracket SLOT (same top-to-bottom / left-then-right order as
+ * above), from the official FIFA bracket. Used to place UNPLAYED matches into the right slot: the
+ * feed gives each its real date but not its slot, so we match the feed match's `dateChicago` to the
+ * slot's date here. (Two slots can share a date — fine, they show the same date.) DECISIONS #53.
+ */
+const R16_DATES = ["2026-07-04", "2026-07-04", "2026-07-06", "2026-07-06", "2026-07-05", "2026-07-05", "2026-07-07", "2026-07-07"];
+const QF_DATES = ["2026-07-09", "2026-07-10", "2026-07-11", "2026-07-11"];
+const SF_DATES = ["2026-07-14", "2026-07-15"];
+const FINAL_DATES = ["2026-07-19"];
+
 export interface OrderedBracket {
   r32: (WcMatch | null)[];   // 16, bracket order (left 8, right 8)
   r16: (WcMatch | null)[];   // 8
@@ -46,22 +57,29 @@ const sameTeams = (m: WcMatch, a: string, b: string): boolean => {
 };
 
 /**
- * Place each later-round source match into its true bracket slot by matching the seeded team(s) to
- * the slot's feeder winners. Slots whose feeders aren't decided yet take the leftover source matches
- * (all-TBD placeholders) in order, so every slot still shows a real date.
+ * Place each later-round source match into its true bracket slot.
+ *  1. by the seeded team(s) matching the slot's feeder winners (played/seeded matches → real result);
+ *  2. otherwise by the match's date matching the slot's official date (unplayed matches → right date);
+ *  3. otherwise fill remaining slots in order (last-resort, e.g. a reschedule we haven't pinned).
  */
-function orderRound(feeders: (WcMatch | null)[], pool: WcMatch[], n: number): (WcMatch | null)[] {
+function orderRound(feeders: (WcMatch | null)[], pool: WcMatch[], slotDates: string[]): (WcMatch | null)[] {
+  const n = slotDates.length;
   const out: (WcMatch | null)[] = new Array(n).fill(null);
   const used = new Set<number>();
+  const take = (i: number, m: WcMatch | undefined) => { if (m) { out[i] = m; used.add(m.id); } };
+  // 1. seeded → by feeder winners
   for (let i = 0; i < n; i++) {
     const known = [winnerCode(feeders[2 * i]), winnerCode(feeders[2 * i + 1])].filter((c): c is string => !!c);
-    if (known.length === 0) continue;
-    const m = pool.find((x) => !used.has(x.id) && known.every((c) => hasCode(x, c)));
-    if (m) { out[i] = m; used.add(m.id); }
+    if (known.length) take(i, pool.find((x) => !used.has(x.id) && known.every((c) => hasCode(x, c))));
   }
-  const leftover = pool.filter((x) => !used.has(x.id));
-  let li = 0;
-  for (let i = 0; i < n; i++) if (!out[i] && li < leftover.length) out[i] = leftover[li++];
+  // 2. unplayed → by official slot date
+  for (let i = 0; i < n; i++) {
+    if (!out[i]) take(i, pool.find((x) => !used.has(x.id) && x.dateChicago === slotDates[i]));
+  }
+  // 3. leftover → fill in order
+  for (let i = 0; i < n; i++) {
+    if (!out[i]) take(i, pool.find((x) => !used.has(x.id)));
+  }
   return out;
 }
 
@@ -74,9 +92,9 @@ export function orderKnockout(knockout: WcMatch[]): OrderedBracket {
   const byStage = (s: WcStage) => knockout.filter((m) => m.stage === s);
   const r32pool = byStage("R32");
   const r32 = BRACKET_R32.map(([a, b]) => r32pool.find((m) => sameTeams(m, a, b)) ?? null);
-  const r16 = orderRound(r32, byStage("R16"), 8);
-  const qf = orderRound(r16, byStage("QF"), 4);
-  const sf = orderRound(qf, byStage("SF"), 2);
-  const final = orderRound(sf, byStage("FINAL"), 1)[0];
+  const r16 = orderRound(r32, byStage("R16"), R16_DATES);
+  const qf = orderRound(r16, byStage("QF"), QF_DATES);
+  const sf = orderRound(qf, byStage("SF"), SF_DATES);
+  const final = orderRound(sf, byStage("FINAL"), FINAL_DATES)[0];
   return { r32, r16, qf, sf, final };
 }

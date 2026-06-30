@@ -92,8 +92,16 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
       m(89, "R16", "SCHEDULED", "TBD", PAR, TBD, null, null, undefined, "2026-07-04"), // winner GER-PAR (left)
       m(90, "R16", "SCHEDULED", "TBD", CAN, MAR, null, null, undefined, "2026-07-04"), // winners RSA-CAN, NED-MAR (left)
       m(91, "R16", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-05"), // winner BRA-JPN (RIGHT)
-      ...[92, 93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
-      ...[97, 98, 99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-09")),
+      // remaining R16 are TBD; their official dates place them by date (left Jul6×2, right Jul5+Jul7×2).
+      m(92, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-06"),
+      m(93, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-06"),
+      m(94, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05"),
+      m(95, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-07"),
+      m(96, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-07"),
+      m(97, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-09"),
+      m(98, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-10"),
+      m(99, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-11"),
+      m(100, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-11"),
       m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
       m(102, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-15"),
       m(104, "FINAL", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-19"),
@@ -120,18 +128,20 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
     ];
     const r16 = [
       // RIGHT-bracket tie played, penalty shootout: 1-1, Brazil through 4-2 on pens (compact box).
-      m(89, "R16", "FINISHED", "—", BRA, CIV, 5, 3, undefined, "2026-07-04", 4, 2),
-      m(90, "R16", "SCHEDULED", "TBD", GER, FRA, null, null, undefined, "2026-07-04"),
-      m(91, "R16", "SCHEDULED", "TBD", CAN, NED, null, null, undefined, "2026-07-04"),
-      m(92, "R16", "SCHEDULED", "TBD", POR, ESP, null, null, undefined, "2026-07-05"),
-      m(93, "R16", "SCHEDULED", "TBD", USA, BEL, null, null, undefined, "2026-07-05"),
-      m(94, "R16", "SCHEDULED", "TBD", MEX, ENG, null, null, undefined, "2026-07-06"),
-      m(95, "R16", "SCHEDULED", "TBD", ARG, AUS, null, null, undefined, "2026-07-06"),
-      m(96, "R16", "SCHEDULED", "TBD", SUI, COL, null, null, undefined, "2026-07-07"),
+      m(89, "R16", "FINISHED", "—", BRA, CIV, 5, 3, undefined, "2026-07-05", 4, 2), // slot4 (right)
+      m(90, "R16", "SCHEDULED", "TBD", GER, FRA, null, null, undefined, "2026-07-04"), // slot0 (left)
+      m(91, "R16", "SCHEDULED", "TBD", CAN, NED, null, null, undefined, "2026-07-04"), // slot1 (left)
+      m(92, "R16", "SCHEDULED", "TBD", POR, ESP, null, null, undefined, "2026-07-06"), // slot2 (left)
+      m(93, "R16", "SCHEDULED", "TBD", USA, BEL, null, null, undefined, "2026-07-06"), // slot3 (left)
+      m(94, "R16", "SCHEDULED", "TBD", MEX, ENG, null, null, undefined, "2026-07-05"), // slot5 (right)
+      m(95, "R16", "SCHEDULED", "TBD", ARG, AUS, null, null, undefined, "2026-07-07"), // slot6 (right)
+      m(96, "R16", "SCHEDULED", "TBD", SUI, COL, null, null, undefined, "2026-07-07"), // slot7 (right)
     ];
     const rest = [
-      m(97, "QF", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-09"), // BRA advanced from its R16
-      ...[98, 99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-10")),
+      m(97, "QF", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-11"), // BRA advanced (R-QF-0, Jul 11)
+      m(98, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-09"),
+      m(99, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-10"),
+      m(100, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-11"),
       m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
       m(102, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-15"),
       m(104, "FINAL", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-19"),

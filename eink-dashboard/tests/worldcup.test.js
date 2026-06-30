@@ -169,12 +169,17 @@ test("orderKnockout places each team on its real bracket side, no duplicate (#52
     Object.assign(r32[idx], { status: "FINISHED", homeScore: homeWon ? 1 : 0, awayScore: homeWon ? 0 : 1 });
   };
   finish(0, "PAR"); finish(2, "CAN"); finish(3, "MAR"); finish(8, "BRA");
-  // R16 seeded by football-data in a NON-bracket id order: Brazil (right-bracket) sorts early.
+  // R16: 3 seeded (placed by teams) + 5 unplayed dated per the official schedule (placed by date).
+  const d = (date) => ({ dateChicago: date });
   const r16 = [
-    mkR(200, "R16", "SCHEDULED", t("PAR"), empty),
-    mkR(201, "R16", "SCHEDULED", t("CAN"), t("MAR")),
-    mkR(202, "R16", "SCHEDULED", t("BRA"), empty),
-    ...[203, 204, 205, 206, 207].map((id) => mkR(id, "R16", "SCHEDULED", empty, empty)),
+    mkR(200, "R16", "SCHEDULED", t("PAR"), empty, d("2026-07-04")),
+    mkR(201, "R16", "SCHEDULED", t("CAN"), t("MAR"), d("2026-07-04")),
+    mkR(202, "R16", "SCHEDULED", t("BRA"), empty, d("2026-07-05")),
+    mkR(203, "R16", "SCHEDULED", empty, empty, d("2026-07-06")),
+    mkR(204, "R16", "SCHEDULED", empty, empty, d("2026-07-06")),
+    mkR(205, "R16", "SCHEDULED", empty, empty, d("2026-07-05")),
+    mkR(206, "R16", "SCHEDULED", empty, empty, d("2026-07-07")),
+    mkR(207, "R16", "SCHEDULED", empty, empty, d("2026-07-07")),
   ];
   const ord = orderKnockout([...r32, ...r16]);
   const codes = (m) => (m ? [m.home.code, m.away.code] : []);
@@ -183,6 +188,9 @@ test("orderKnockout places each team on its real bracket side, no duplicate (#52
   assert.ok(codes(ord.r16[4]).includes("BRA"));                                  // RIGHT half (slot 4)
   assert.equal(ord.r16.filter((m) => codes(m).includes("BRA")).length, 1);       // exactly once
   assert.equal(ord.r32[8].home.code, "BRA");                                     // BRA-JPN stays right-bracket
+  // Unplayed slots land on their official dates (slot 2 = Jul 6, slot 5 = Jul 5 — the bug that swapped).
+  assert.deepEqual(ord.r16.map((m) => m.dateChicago),
+    ["2026-07-04", "2026-07-04", "2026-07-06", "2026-07-06", "2026-07-05", "2026-07-05", "2026-07-07", "2026-07-07"]);
 });
 
 test("teamCode prefers code, falls back to first 3 letters", () => {

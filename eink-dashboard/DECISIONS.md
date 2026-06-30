@@ -1622,3 +1622,15 @@ The result feeds the existing converging layout directly (left half, then right 
 **Why hardcoding is acceptable:** the R32 field is fixed once the groups finish, so the 16 matchups are stable for the rest of the tournament; it's a seasonal feature. Matching by teams (not ids) is robust to any feed reordering.
 
 **Lesson:** when a layout needs structure the feed doesn't provide, get the structure from an authoritative source (here the official bracket image) and pin it — don't infer a tree from match ordering. And verify external summaries against ground truth (the live feed contradicted two of them). Unit-tested via `orderKnockout` (Brazil lands in the right half, exactly once); fixtures rebuilt with the real 2026 teams in bracket order, seeding R16 in a non-bracket id order to exercise the reordering. Cache `wc:image:v14→v15`; `wc:data` unchanged. (Supersedes #51's id-order rendering and #49's computed advancement.)
+
+---
+
+## 53. World Cup Knockout: Date Unplayed Slots from the Official Bracket (v3.15.15, 2026-06-30)
+
+After #52 put teams on the correct side, the **dates** of the *unplayed* R16 slots could still be wrong: `orderKnockout` filled the not-yet-seeded slots with leftover feed matches in id order, which doesn't match the bracket position. On the live data this swapped two R16 dates — the Portugal/Croatia–Spain/Austria slot showed **Jul 5** (should be **Jul 6**) and the Mexico/Ecuador–England/Congo slot showed **Jul 6** (should be **Jul 5**).
+
+**Why id order fails:** the feed gives every knockout match a correct date but no bracket position; its id order doesn't track the bracket, so an unseeded slot grabbed a match with the wrong date.
+
+**Fix.** Hardcode each bracket slot's official **America/Chicago date** (`R16_DATES`/`QF_DATES`/`SF_DATES`/`FINAL_DATES` in `worldcup-bracket.ts`, read straight off the official FIFA bracket on fifa.com). `orderRound` now places matches in three passes: (1) seeded matches by feeder-winner teams (real result), (2) unplayed matches by `dateChicago` matching the slot's official date, (3) anything left in order. Two slots can share a date — fine, they show the same date. Result: every slot shows the correct date even before its teams are known.
+
+The dates are in **Chicago time** (the device's timezone), which is why a late game can read a day earlier than a UTC/venue listing (a Jul 6 00:00 UTC kickoff is Jul 5 evening in Chicago) — that's correct for this display, and the feed's `dateChicago` agrees with the FIFA bracket times (which render in the viewer's local tz). Verified the official bracket structure also matches `BRACKET_R32` exactly. Unit test asserts the eight R16 slots land on `Jul 4,4,6,6,5,5,7,7`. Cache `wc:image:v15→v16`; `wc:data` unchanged.
