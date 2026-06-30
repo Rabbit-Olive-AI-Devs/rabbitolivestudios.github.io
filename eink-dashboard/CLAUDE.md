@@ -294,6 +294,7 @@ eink-dashboard/
     worldcup-football-data.ts — football-data.org adapter (primary source)
     worldcup-openfootball.ts  — openfootball/worldcup.json adapter (no-key fallback)
     worldcup-ui.ts        — WC shared LOGIC (qualifiedFlags fixture-aware, computePhase, pickRotatingGroup) + HTML section builders + renderWorldCupHTML(data, theme)
+    worldcup-bracket.ts   — HARDCODED official 2026 knockout tree (BRACKET_R32) + orderKnockout(): places KO matches by the real bracket, matched by teams (DECISIONS #52)
     worldcup-styles.ts    — SEPARATE per-display stylesheets: COLOR_STYLE (E1002, pristine) + MONO_STYLE_BASE (E1001 crisp). Never share CSS (DECISIONS #48)
     worldcup-browser-image.ts — B&W: Browser Rendering screenshot of /worldcup?variant=src → supersample → 1-bit PNG
     worldcup-fonts.ts     — GENERATED: inlined Inter 500/700 WOFF2 (base64) for the B&W image source

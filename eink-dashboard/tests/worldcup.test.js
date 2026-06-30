@@ -18,8 +18,8 @@ const {
   pickRotatingGroup,
   chicagoDateOf,
   chicagoTimeOf,
-  renderWorldCupHTML,
 } = fromBuild("src/worldcup-ui.js");
+const { orderKnockout, BRACKET_R32 } = fromBuild("src/worldcup-bracket.js");
 const { normalizeFootballData, mapStage, mapStatus } = fromBuild("src/worldcup-football-data.js");
 const { normalizeOpenFootball } = fromBuild("src/worldcup-openfootball.js");
 const { FLAGS } = fromBuild("src/worldcup-flags.js");
@@ -155,27 +155,34 @@ test("scoreText shows the match result with the shootout in parens", () => {
   assert.equal(scoreText({ homeScore: null, awayScore: null }), "");
 });
 
-test("knockout bracket renders an advancing team once — no duplication (#50 Brazil bug)", () => {
-  // Reproduces the real football-data shape: Brazil's R32 tie sorts to idx8, but the source seeds
-  // Brazil into its R16 slot at idx2 (its bracket isn't a naive 2i pairing). The old advanceRound
-  // also computed Brazil into the idx4 slot from the R32 winner, so "BRA" rendered in two R16 boxes.
-  // Rendering the source directly must show it exactly once.
-  const TBD = { name: "", code: "" };
-  const BRA = { name: "Brazil", code: "BRA" };
-  const r32 = Array.from({ length: 16 }, (_, i) =>
-    mkMatch({ id: 100 + i, stage: "R32", status: "SCHEDULED", home: TBD, away: TBD }));
-  r32[8] = mkMatch({ id: 108, stage: "R32", status: "FINISHED", home: BRA, away: { name: "Japan", code: "JPN" }, homeScore: 2, awayScore: 1 });
-  const r16 = Array.from({ length: 8 }, (_, i) =>
-    mkMatch({ id: 200 + i, stage: "R16", status: "SCHEDULED", home: TBD, away: TBD }));
-  r16[2] = mkMatch({ id: 202, stage: "R16", status: "SCHEDULED", home: BRA, away: TBD });
-  const data = {
-    source: "football-data", phase: "knockout", todayMatches: [], recentResults: [],
-    groups: [], knockout: [...r32, ...r16], champion: null, generatedAt: 0,
+test("orderKnockout places each team on its real bracket side, no duplicate (#52 Brazil bug)", () => {
+  const t = (code) => ({ name: code, code });
+  const empty = { name: "", code: "" };
+  const mkR = (id, stage, status, home, away, over = {}) => ({
+    id, stage, group: undefined, status, kickoffISO: "", dateChicago: "2026-07-01",
+    timeChicago: "1 PM", home, away, homeScore: null, awayScore: null, ...over,
+  });
+  // R32 in bracket order; finish the four ties that have seeded R16 (PAR, CAN, MAR, BRA win).
+  const r32 = BRACKET_R32.map(([a, b], i) => mkR(100 + i, "R32", "SCHEDULED", t(a), t(b)));
+  const finish = (idx, winner) => {
+    const homeWon = r32[idx].home.code === winner;
+    Object.assign(r32[idx], { status: "FINISHED", homeScore: homeWon ? 1 : 0, awayScore: homeWon ? 0 : 1 });
   };
-  const monoTheme = { rootCSS: "", styleCSS: "", fav: "#000", win: "#000", live: "#000" }; // no flag -> codes
-  const html = renderWorldCupHTML(data, monoTheme);
-  // R32 wide boxes show the full name ("Brazil"); the compact R16 box shows the code ">BRA<".
-  assert.equal(html.split(">BRA<").length - 1, 1);
+  finish(0, "PAR"); finish(2, "CAN"); finish(3, "MAR"); finish(8, "BRA");
+  // R16 seeded by football-data in a NON-bracket id order: Brazil (right-bracket) sorts early.
+  const r16 = [
+    mkR(200, "R16", "SCHEDULED", t("PAR"), empty),
+    mkR(201, "R16", "SCHEDULED", t("CAN"), t("MAR")),
+    mkR(202, "R16", "SCHEDULED", t("BRA"), empty),
+    ...[203, 204, 205, 206, 207].map((id) => mkR(id, "R16", "SCHEDULED", empty, empty)),
+  ];
+  const ord = orderKnockout([...r32, ...r16]);
+  const codes = (m) => (m ? [m.home.code, m.away.code] : []);
+  assert.ok(codes(ord.r16[0]).includes("PAR"));                                  // left slot 0
+  assert.ok(codes(ord.r16[1]).includes("CAN") && codes(ord.r16[1]).includes("MAR")); // left slot 1
+  assert.ok(codes(ord.r16[4]).includes("BRA"));                                  // RIGHT half (slot 4)
+  assert.equal(ord.r16.filter((m) => codes(m).includes("BRA")).length, 1);       // exactly once
+  assert.equal(ord.r32[8].home.code, "BRA");                                     // BRA-JPN stays right-bracket
 });
 
 test("teamCode prefers code, falls back to first 3 letters", () => {

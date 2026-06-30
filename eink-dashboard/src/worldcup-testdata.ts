@@ -30,6 +30,7 @@ const JPN = T("Japan", "JPN"), SWE = T("Sweden", "SWE"), CIV = T("Ivory Coast", 
 const MEX = T("Mexico", "MEX"), ECU = T("Ecuador", "ECU"), COD = T("Congo DR", "COD"), BIH = T("Bosnia-Herzegovina", "BIH");
 const BEL = T("Belgium", "BEL"), SEN = T("Senegal", "SEN"), CRO = T("Croatia", "CRO"), AUT = T("Austria", "AUT");
 const ALG = T("Algeria", "ALG"), CPV = T("Cape Verde", "CPV"), COL = T("Colombia", "COL"), GHA = T("Ghana", "GHA");
+const AUS = T("Australia", "AUS"), EGY = T("Egypt", "EGY");
 
 function groupA(): WcGroup {
   return {
@@ -65,38 +66,34 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
   }
 
   if (phase === "r32") {
-    // Full 16-match Round of 32 (one finished, the rest scheduled across the round).
+    // 16-match Round of 32 in the official bracket order (left 8, then right 8). Four ties finished;
+    // football-data has seeded their R16 slots. Brazil's R16 (id 91) sorts into the left half by id
+    // but belongs on the RIGHT — orderKnockout repositions it by the real bracket tree (#52).
     const knockout = [
-      m(73, "R32", "FINISHED", "—", RSA, CAN, 0, 1, undefined, "2026-06-28"),
-      m(74, "R32", "FINISHED", "—", BRA, JPN, 2, 0, undefined, "2026-06-29"),
-      // Penalty shootout: 1-1, Germany through 4-2 on pens (fullTime folds it to 5-3).
-      m(75, "R32", "FINISHED", "—", GER, PAR, 5, 3, undefined, "2026-06-29", 4, 2),
-      m(76, "R32", "FINISHED", "—", NED, MAR, 1, 0, undefined, "2026-06-29"),
-      m(77, "R32", "SCHEDULED", "12:00 PM", CIV, NOR, null, null, undefined, "2026-06-30"),
-      m(78, "R32", "SCHEDULED", "4:00 PM", FRA, SWE, null, null, undefined, "2026-06-30"),
-      m(79, "R32", "SCHEDULED", "8:00 PM", MEX, ECU, null, null, undefined, "2026-06-30"),
-      m(80, "R32", "SCHEDULED", "11:00 AM", ENG, COD, null, null, undefined, "2026-07-01"),
-      m(81, "R32", "SCHEDULED", "3:00 PM", BEL, SEN, null, null, undefined, "2026-07-01"),
-      m(82, "R32", "SCHEDULED", "7:00 PM", USA, BIH, null, null, undefined, "2026-07-01"),
-      m(83, "R32", "SCHEDULED", "2:00 PM", POR, CRO, null, null, undefined, "2026-07-02"),
-      m(84, "R32", "SCHEDULED", "6:00 PM", ESP, AUT, null, null, undefined, "2026-07-02"),
-      m(85, "R32", "SCHEDULED", "10:00 PM", SUI, ALG, null, null, undefined, "2026-07-02"),
-      m(86, "R32", "SCHEDULED", "1:00 PM", ARG, CPV, null, null, undefined, "2026-07-03"),
-      m(87, "R32", "SCHEDULED", "5:00 PM", COL, GHA, null, null, undefined, "2026-07-03"),
-      m(88, "R32", "SCHEDULED", "8:30 PM", SRB, CMR, null, null, undefined, "2026-07-03"),
+      m(73, "R32", "FINISHED", "—", GER, PAR, 3, 5, undefined, "2026-06-29", 2, 4), // PAR on pens (1-1)
+      m(74, "R32", "SCHEDULED", "4:00 PM", FRA, SWE, null, null, undefined, "2026-06-30"),
+      m(75, "R32", "FINISHED", "—", RSA, CAN, 0, 1, undefined, "2026-06-28"),
+      m(76, "R32", "FINISHED", "—", NED, MAR, 4, 5, undefined, "2026-06-29", 3, 4), // MAR on pens (1-1)
+      m(77, "R32", "SCHEDULED", "6:00 PM", POR, CRO, null, null, undefined, "2026-07-02"),
+      m(78, "R32", "SCHEDULED", "2:00 PM", ESP, AUT, null, null, undefined, "2026-07-02"),
+      m(79, "R32", "SCHEDULED", "7:00 PM", USA, BIH, null, null, undefined, "2026-07-01"),
+      m(80, "R32", "SCHEDULED", "3:00 PM", BEL, SEN, null, null, undefined, "2026-07-01"),
+      m(81, "R32", "FINISHED", "—", BRA, JPN, 2, 1, undefined, "2026-06-29"),
+      m(82, "R32", "SCHEDULED", "12:00 PM", CIV, NOR, null, null, undefined, "2026-06-30"),
+      m(83, "R32", "SCHEDULED", "8:00 PM", MEX, ECU, null, null, undefined, "2026-06-30"),
+      m(84, "R32", "SCHEDULED", "11:00 AM", ENG, COD, null, null, undefined, "2026-07-01"),
+      m(85, "R32", "SCHEDULED", "1:00 PM", ARG, CPV, null, null, undefined, "2026-07-03"),
+      m(86, "R32", "SCHEDULED", "5:00 PM", AUS, EGY, null, null, undefined, "2026-07-03"),
+      m(87, "R32", "SCHEDULED", "10:00 PM", SUI, ALG, null, null, undefined, "2026-07-02"),
+      m(88, "R32", "SCHEDULED", "8:30 PM", COL, GHA, null, null, undefined, "2026-07-03"),
     ];
-    // football-data seeds each R16 match with the advancing team the moment its R32 tie finishes
-    // (and its bracket order is NOT a 2i pairing), so we render the source seeds directly. Here the
-    // four finished R32 ties have seeded their R16 slots (BRA at idx2, mirroring the real feed);
-    // the rest are still TBD. Later rounds stay empty until the source seeds them.
     const TBD = T("", "");
     const future: WcMatch[] = [
-      m(89, "R16", "SCHEDULED", "TBD", CAN, TBD, null, null, undefined, "2026-07-04"), // winner of RSA-CAN
-      m(90, "R16", "SCHEDULED", "TBD", GER, NED, null, null, undefined, "2026-07-04"), // winners of GER-PAR, NED-MAR
-      m(91, "R16", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-05"), // winner of BRA-JPN
+      m(89, "R16", "SCHEDULED", "TBD", PAR, TBD, null, null, undefined, "2026-07-04"), // winner GER-PAR (left)
+      m(90, "R16", "SCHEDULED", "TBD", CAN, MAR, null, null, undefined, "2026-07-04"), // winners RSA-CAN, NED-MAR (left)
+      m(91, "R16", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-05"), // winner BRA-JPN (RIGHT)
       ...[92, 93, 94, 95, 96].map((id) => m(id, "R16", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-05")),
-      ...[97, 98].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-09")),
-      ...[99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-11")),
+      ...[97, 98, 99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-09")),
       m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
       m(102, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-15"),
       m(104, "FINAL", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-19"),
@@ -105,36 +102,35 @@ export function testWorldCupData(phase: WcPhase): WorldCupData {
   }
 
   if (phase === "knockout") {
-    // Full knockout bracket: all 16 R32 finished; the source has seeded all 8 R16 matches with the
-    // advancing teams (one already played — the CAN-BRA pens box) and the winner of that R16 into
-    // its QF slot. We render the source seeds directly (no advancement computed), so this exercises
-    // the compact inner boxes (codes/flags) + a per-team shootout score + source-driven advancement.
+    // Full knockout: all 16 R32 finished (bracket order); the source has seeded all 8 R16 matches.
+    // The BRA-CIV R16 (id 89, played, penalty shootout) sorts FIRST by id but is a RIGHT-bracket tie
+    // — orderKnockout (#52) places it on the right by the tree, and seeds its winner into the QF.
     const TBD = T("", "");
     const W = (id: number, h: WcTeam, a: WcTeam, hs: number, as: number, date: string) =>
       m(id, "R32", "FINISHED", "—", h, a, hs, as, undefined, date);
     const r32 = [
-      W(73, RSA, CAN, 0, 1, "2026-06-28"), W(74, BRA, JPN, 2, 0, "2026-06-29"),
-      W(75, GER, PAR, 2, 1, "2026-06-29"), W(76, NED, MAR, 1, 0, "2026-06-29"),
-      W(77, CIV, NOR, 2, 0, "2026-06-30"), W(78, FRA, SWE, 3, 1, "2026-06-30"),
-      W(79, MEX, ECU, 1, 0, "2026-06-30"), W(80, ENG, COD, 2, 0, "2026-07-01"),
-      W(81, BEL, SEN, 1, 0, "2026-07-01"), W(82, USA, BIH, 2, 1, "2026-07-01"),
-      W(83, POR, CRO, 1, 0, "2026-07-02"), W(84, ESP, AUT, 3, 0, "2026-07-02"),
-      W(85, SUI, ALG, 2, 1, "2026-07-02"), W(86, ARG, CPV, 4, 0, "2026-07-03"),
-      W(87, COL, GHA, 1, 0, "2026-07-03"), W(88, SRB, CMR, 2, 0, "2026-07-03"),
+      W(73, GER, PAR, 2, 1, "2026-06-29"), W(74, FRA, SWE, 3, 1, "2026-06-30"),
+      W(75, RSA, CAN, 0, 1, "2026-06-28"), W(76, NED, MAR, 1, 0, "2026-06-29"),
+      W(77, POR, CRO, 1, 0, "2026-07-02"), W(78, ESP, AUT, 3, 0, "2026-07-02"),
+      W(79, USA, BIH, 2, 1, "2026-07-01"), W(80, BEL, SEN, 1, 0, "2026-07-01"),
+      W(81, BRA, JPN, 2, 0, "2026-06-29"), W(82, CIV, NOR, 2, 0, "2026-06-30"),
+      W(83, MEX, ECU, 1, 0, "2026-06-30"), W(84, ENG, COD, 2, 0, "2026-07-01"),
+      W(85, ARG, CPV, 4, 0, "2026-07-03"), W(86, AUS, EGY, 1, 0, "2026-07-03"),
+      W(87, SUI, ALG, 2, 1, "2026-07-02"), W(88, COL, GHA, 1, 0, "2026-07-03"),
     ];
     const r16 = [
-      // idx0 played, penalty shootout: 1-1, Brazil through 4-3 on pens (compact inner-round box).
-      m(89, "R16", "FINISHED", "—", CAN, BRA, 4, 5, undefined, "2026-07-04", 3, 4),
-      m(90, "R16", "SCHEDULED", "TBD", GER, NED, null, null, undefined, "2026-07-04"),
-      m(91, "R16", "SCHEDULED", "TBD", CIV, FRA, null, null, undefined, "2026-07-05"),
-      m(92, "R16", "SCHEDULED", "TBD", MEX, ENG, null, null, undefined, "2026-07-05"),
-      m(93, "R16", "SCHEDULED", "TBD", BEL, USA, null, null, undefined, "2026-07-06"),
-      m(94, "R16", "SCHEDULED", "TBD", POR, ESP, null, null, undefined, "2026-07-06"),
-      m(95, "R16", "SCHEDULED", "TBD", SUI, ARG, null, null, undefined, "2026-07-07"),
-      m(96, "R16", "SCHEDULED", "TBD", COL, SRB, null, null, undefined, "2026-07-07"),
+      // RIGHT-bracket tie played, penalty shootout: 1-1, Brazil through 4-2 on pens (compact box).
+      m(89, "R16", "FINISHED", "—", BRA, CIV, 5, 3, undefined, "2026-07-04", 4, 2),
+      m(90, "R16", "SCHEDULED", "TBD", GER, FRA, null, null, undefined, "2026-07-04"),
+      m(91, "R16", "SCHEDULED", "TBD", CAN, NED, null, null, undefined, "2026-07-04"),
+      m(92, "R16", "SCHEDULED", "TBD", POR, ESP, null, null, undefined, "2026-07-05"),
+      m(93, "R16", "SCHEDULED", "TBD", USA, BEL, null, null, undefined, "2026-07-05"),
+      m(94, "R16", "SCHEDULED", "TBD", MEX, ENG, null, null, undefined, "2026-07-06"),
+      m(95, "R16", "SCHEDULED", "TBD", ARG, AUS, null, null, undefined, "2026-07-06"),
+      m(96, "R16", "SCHEDULED", "TBD", SUI, COL, null, null, undefined, "2026-07-07"),
     ];
     const rest = [
-      m(97, "QF", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-09"), // BRA advanced from R16 idx0
+      m(97, "QF", "SCHEDULED", "TBD", BRA, TBD, null, null, undefined, "2026-07-09"), // BRA advanced from its R16
       ...[98, 99, 100].map((id) => m(id, "QF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-10")),
       m(101, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-14"),
       m(102, "SF", "SCHEDULED", "TBD", TBD, TBD, null, null, undefined, "2026-07-15"),

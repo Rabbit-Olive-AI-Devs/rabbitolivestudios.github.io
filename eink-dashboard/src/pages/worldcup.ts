@@ -18,7 +18,7 @@ import { renderWorldCupBrowserPNG } from "../worldcup-browser-image";
 import { pngToBase64 } from "../png";
 
 const WC_ORIGIN = "https://eink-dashboard.thiago-oliveira77.workers.dev";
-const IMG_KEY = "wc:image:v14"; // v14: render KO rounds direct from source seeds, no advanceRound dup (DECISIONS #51); v13: per-team shootout at all rounds (#50); v12: per-team shootout on R32; v11: shootout on when-line
+const IMG_KEY = "wc:image:v15"; // v15: place KO matches by the real hardcoded bracket tree, correct sides (DECISIONS #52); v14: source-direct (#51); v13: per-team shootout all rounds (#50)
 const IMG_SOFT_TTL_MS = 14 * 60 * 1000; // refresh the rendered image at most ~every 14 min
 const IMG_THRESHOLD = 160;              // gray cutoff for the 1-bit threshold
 

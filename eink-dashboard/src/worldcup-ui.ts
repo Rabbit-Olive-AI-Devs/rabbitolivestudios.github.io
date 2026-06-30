@@ -7,6 +7,7 @@
  */
 
 import { escapeHTML } from "./escape";
+import { orderKnockout } from "./worldcup-bracket";
 import type {
   WcMatch, WcStage, WcStatus, WcPhase, WcGroup, WcTeam, WorldCupData,
 } from "./types";
@@ -399,44 +400,39 @@ function dateRange(matches: WcMatch[]): string {
  * The full knockout bracket, used for the whole knockout phase (R32 → Final), not just R32. The
  * 16 R32 ties sit on the two outer edges; the R16→SF columns converge toward a center Final box.
  *
- * Every round is rendered DIRECTLY from the source matches (id order) — we do NOT compute
- * advancement ourselves. football-data seeds each later-round match with the real teams as soon
- * as its feeders finish (e.g. Brazil appears in its R16 match the moment it wins its R32 tie), and
- * its bracket structure does NOT follow a naive `prev[2i]/prev[2i+1]` pairing — so computing
- * advancement (the old `advanceRound`) placed a winner in the wrong slot AND duplicated it
- * alongside the source-seeded one (a team showing twice in one round). Trusting the source is both
- * correct and simpler; until a slot is seeded it shows its date placeholder. Inner rounds use
- * compact codes (mono) / flags (color) since their boxes are narrow; R32 uses full names. The
- * header names the current round (earliest unfinished) + that round's date span. Order = match id.
+ * Matches are placed by the REAL bracket tree (`orderKnockout`, hardcoded from the official 2026
+ * bracket — see worldcup-bracket.ts / DECISIONS #52), NOT by football-data's match-id order. The
+ * feed's id order does not encode the tree (its R16/QF order doesn't line up with R32), so ordering
+ * by id put teams on the wrong side (e.g. Brazil's R32 on the right but its R16 box on the left).
+ * Ordering by the tree keeps every team on its correct side with its real opponent/date. Inner
+ * rounds use compact codes (mono) / flags (color); R32 uses full names. The header names the
+ * current round (earliest with an undecided match) + that round's date span.
  */
 function knockoutBracket(data: WorldCupData, theme: WcTheme): string {
-  const stage = (s: WcStage) => data.knockout.filter((m) => m.stage === s).slice().sort((a, b) => a.id - b.id);
-  const r32 = stage("R32");
-
-  if (r32.length === 0) {
+  if (data.knockout.filter((m) => m.stage === "R32").length === 0) {
     return `${header(data, "Knockouts")}
     <div class="wc-empty">Knockout bracket not available yet</div>`;
   }
-
-  const r16 = stage("R16");
-  const qf = stage("QF");
-  const sf = stage("SF");
-  const final = stage("FINAL")[0];
+  const { r32, r16, qf, sf, final } = orderKnockout(data.knockout);
 
   // Subtitle: the current round (earliest with an unfinished match) + that round's dates.
-  const rounds: { stage: WcStage; matches: WcMatch[] }[] = [
+  const unfinished = (m: WcMatch | null): boolean => !!m && m.status !== "FINISHED";
+  const rounds: { stage: WcStage; matches: (WcMatch | null)[] }[] = [
     { stage: "R32", matches: r32 }, { stage: "R16", matches: r16 },
     { stage: "QF", matches: qf }, { stage: "SF", matches: sf },
     { stage: "FINAL", matches: final ? [final] : [] },
   ];
-  const current = rounds.find((r) => r.matches.some((m) => m.status !== "FINISHED")) ?? rounds[rounds.length - 1];
-  const range = dateRange(current.matches.filter((m) => m.status !== "FINISHED").length ? current.matches : r32);
+  const current = rounds.find((r) => r.matches.some(unfinished)) ?? rounds[rounds.length - 1];
+  const dated = current.matches.some(unfinished) ? current.matches : r32;
+  const range = dateRange(dated.filter((m): m is WcMatch => !!m));
   const subtitle = `${STAGE_LABELS[current.stage]}${range ? ` · ${range}` : ""} · times CT`;
 
   const lh = <T,>(arr: T[]): T[] => arr.slice(0, Math.ceil(arr.length / 2));
   const rh = <T,>(arr: T[]): T[] => arr.slice(Math.ceil(arr.length / 2));
-  const col = (matches: WcMatch[], cls = "", compact = false) =>
-    `<div class="wc-kcol ${cls}">${matches.map((mm) => bracketBox(mm, theme, compact)).join("")}</div>`;
+  const box = (mm: WcMatch | null, compact: boolean) =>
+    mm ? bracketBox(mm, theme, compact) : `<div class="wc-ktie wc-kempty"></div>`;
+  const col = (matches: (WcMatch | null)[], cls = "", compact = false) =>
+    `<div class="wc-kcol ${cls}">${matches.map((mm) => box(mm, compact)).join("")}</div>`;
 
   return `${header(data, subtitle)}
   <div class="wc-kbracket">
@@ -448,7 +444,7 @@ function knockoutBracket(data: WorldCupData, theme: WcTheme): string {
     </div>
     <div class="wc-kcenter">
       <div class="wc-kcenter-label">FINAL</div>
-      ${final ? bracketBox(final, theme, true, "wc-kfinal") : ""}
+      ${final ? bracketBox(final, theme, true, "wc-kfinal") : `<div class="wc-ktie wc-kfinal wc-kempty"></div>`}
     </div>
     <div class="wc-kside wc-kside-right">
       ${col(rh(sf), "", true)}

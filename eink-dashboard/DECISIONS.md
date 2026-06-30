@@ -1604,3 +1604,21 @@ Together these duplicated a team: the source seeded Brazil at idx2, while `advan
 **Test gap that let it ship:** the old `?test-phase` fixtures seeded R16 in a way that *happened* to align with the `2i` computation, so the duplication never showed locally. The fixtures now mirror the real feed (Brazil seeded at a non-aligned slot), and a regression test asserts an advancing team's code renders exactly once. **Lesson:** test fixtures must mirror the source's real cardinality *and ordering*, not an idealized bracket.
 
 - Cache bump: `wc:image:v13→v14` (bracket renders differently). `wc:data` unchanged.
+
+---
+
+## 52. World Cup Knockout Bracket: Position by a Hardcoded Tree, Not Match-ID Order (v3.15.14, 2026-06-30)
+
+#51 fixed the *duplication* but introduced a worse problem: with real R32 results, teams rendered on the **wrong side** (Brazil's R32 box on the right, but its R16 box on the left) and the dates looked scrambled. The user (rightly) flagged it.
+
+**Root cause.** The converging 2-sided bracket needs the bracket *tree* — which R32 feeds which R16, and which side each match is on. football-data exposes matches and seeds advancing teams, but gives **no feeder links**, and its match-id order does **not** encode the tree: its R32 order happens to match the bracket, but its R16/QF order does not (e.g. Brazil's R16 match sorts among the first ids — the left half — though Brazil is a right-bracket team). Splitting each round by id therefore put teams on the wrong side. Neither id-order (#51) nor a naive `2i` computation (#49) reconstructs the real, irregular FIFA bracket.
+
+**Fix (`src/worldcup-bracket.ts`).** Hardcode the official 2026 bracket: `BRACKET_R32` is the R32 order top-to-bottom (left 8, then right 8), taken from the official bracket and verified against the live feed (it correctly pairs Canada vs Morocco, etc. — note two web-text summaries gave *wrong* R16 feeders; the authoritative bracket graphic the user supplied was right). `orderKnockout(knockout)` then:
+- places each **R32** match at its hardcoded position by matching team codes (order-independent);
+- places each later-round match into its true slot by matching the **seeded team(s)** to the slot's feeder winners (`slot i` ← positions `2i`,`2i+1` within the bracket order); unmatched (all-TBD) slots take the leftover source matches so every box still shows a real date.
+
+The result feeds the existing converging layout directly (left half, then right half), so a team now stays on its correct side across rounds with its real opponent and date. Deleted the data-shape that relied on id order. Each team still appears once per round (no duplication — every match is placed exactly once).
+
+**Why hardcoding is acceptable:** the R32 field is fixed once the groups finish, so the 16 matchups are stable for the rest of the tournament; it's a seasonal feature. Matching by teams (not ids) is robust to any feed reordering.
+
+**Lesson:** when a layout needs structure the feed doesn't provide, get the structure from an authoritative source (here the official bracket image) and pin it — don't infer a tree from match ordering. And verify external summaries against ground truth (the live feed contradicted two of them). Unit-tested via `orderKnockout` (Brazil lands in the right half, exactly once); fixtures rebuilt with the real 2026 teams in bracket order, seeding R16 in a non-bracket id order to exercise the reordering. Cache `wc:image:v14→v15`; `wc:data` unchanged. (Supersedes #51's id-order rendering and #49's computed advancement.)
