@@ -1634,3 +1634,29 @@ After #52 put teams on the correct side, the **dates** of the *unplayed* R16 slo
 **Fix.** Hardcode each bracket slot's official **America/Chicago date** (`R16_DATES`/`QF_DATES`/`SF_DATES`/`FINAL_DATES` in `worldcup-bracket.ts`, read straight off the official FIFA bracket on fifa.com). `orderRound` now places matches in three passes: (1) seeded matches by feeder-winner teams (real result), (2) unplayed matches by `dateChicago` matching the slot's official date, (3) anything left in order. Two slots can share a date — fine, they show the same date. Result: every slot shows the correct date even before its teams are known.
 
 The dates are in **Chicago time** (the device's timezone), which is why a late game can read a day earlier than a UTC/venue listing (a Jul 6 00:00 UTC kickoff is Jul 5 evening in Chicago) — that's correct for this display, and the feed's `dateChicago` agrees with the FIFA bracket times (which render in the viewer's local tz). Verified the official bracket structure also matches `BRACKET_R32` exactly. Unit test asserts the eight R16 slots land on `Jul 4,4,6,6,5,5,7,7`. Cache `wc:image:v15→v16`; `wc:data` unchanged.
+
+---
+
+## 54. World Cup Results Auto-Refresh on a 15-min Cron (v3.15.19, 2026-06-30)
+
+### Symptom: today's finished matches weren't showing on the bracket
+
+The user reported the France R32 result (and then "none of today's games") not updating on the device, and asked that results + the bracket update **automatically without being reminded**.
+
+### Root cause: refresh was request-triggered SWR + a 6-hour cron — no frequent proactive refresh
+
+Investigation (KV inspection + rendering both displays with the live feed) showed the **data and render were correct** — with fresh data the bracket shows France 3-0 and every other result; it was purely a **staleness/cadence** problem:
+
+- World Cup freshness relied on **stale-while-revalidate** across two stacked caches — `wc:data` (12-min soft TTL) → `wc:image` (14-min soft TTL) — each of which *serves the previous value and revalidates in the background*. So a device poll returns the **old** render and only kicks off the refresh; the new result appears a poll (or two, because the layers stack) later. The user's own page-load was often what triggered the refresh.
+- The only **proactive** refresh was the every-6h cron (`5 0,6,12,18`). Between crons, if requests were sparse (or hit the `public, max-age=300/900` edge/client cache), the data could sit frozen for hours — hence "none of today's games updated."
+
+Nothing was broken; there was simply no frequent proactive refresh, so it *felt* like it needed manual nudging.
+
+### Fix: a dedicated every-15-min World Cup cron that re-renders only on a real change
+
+- Added `"*/15 * * * *"` to `wrangler.toml` crons. `handleScheduled` routes it to `refreshWorldCup(env)` **before** the 6h/daily blocks and returns (it does WC only, not the expensive weather/headlines/image-everything work). WC was **removed** from the 6h block (the 15-min cron supersedes it).
+- `refreshWorldCup`: pull fresh data (`getWorldCupData(env)` with no `ctx` → synchronous KV update), compute `worldCupSignature(data)` (a stable string over phase + every match's status/score/shootout/teams + each group row), and re-render the bracket image **only if the signature changed or the image cache is gone**. This keeps Browser-Rendering cost proportional to actual results (a few renders per match day) instead of ~96/day.
+- Guarded by `dateStr > "2026-07-19"` → the 15-min refresh no-ops once the tournament is over (no perpetual football-data fetches / renders off-season).
+- `worldCupSignature` is exported from `worldcup-ui.ts` and unit-tested (stable when unchanged, changes when a score comes in). `IMG_KEY` is exported from `pages/worldcup.ts` so the cron can check image presence. New KV key `wc:image:sig` stores the last-rendered signature.
+
+**Result:** both caches stay current on their own, so the device's ~15-min poll always shows recent results — no reminders, no redeploys. Verified both displays show today's results (incl. France 3-0 and the penalty shootouts) live on prod. 48 tests.

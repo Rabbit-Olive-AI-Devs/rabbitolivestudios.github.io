@@ -6,9 +6,10 @@ import { generateMomentBefore, getOrGenerateMoment } from "./moment";
 import { handleWeatherPageV2 } from "./pages/weather2";
 import { handleFactPage } from "./pages/fact";
 import { handleColorWeatherPage } from "./pages/color-weather";
-import { handleWorldCupPage, warmWorldCupImage } from "./pages/worldcup";
+import { handleWorldCupPage, warmWorldCupImage, IMG_KEY as WC_IMAGE_KEY } from "./pages/worldcup";
 import { handleColorWorldCupPage } from "./pages/color-worldcup";
 import { getWorldCupData } from "./worldcup";
+import { worldCupSignature } from "./worldcup-ui";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
@@ -53,7 +54,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.15.18";
+const VERSION = "3.15.19";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -657,7 +658,44 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 
 // --- Scheduled handler (Cron) ---
 
+const WC_SIG_KEY = "wc:image:sig";
+const WC_LAST_DATE = "2026-07-19"; // tournament final; after this, stop the 15-min WC refresh
+
+/**
+ * World Cup refresh for the every-15-min cron: pull fresh data (synchronous — no ctx — so KV is
+ * updated in place), then re-render the bracket image ONLY when a result actually changed (or the
+ * image cache is gone). The change check (worldCupSignature) keeps Browser-Rendering cost
+ * proportional to real results instead of ~96 renders/day. No-ops once the tournament is over. (#54)
+ */
+async function refreshWorldCup(env: Env): Promise<void> {
+  try {
+    const { dateStr } = getChicagoDateParts();
+    if (dateStr > WC_LAST_DATE) return; // tournament finished — nothing to refresh
+    const data = await getWorldCupData(env);
+    const sig = worldCupSignature(data);
+    const prevSig = await env.CACHE.get(WC_SIG_KEY);
+    const haveImage = (await env.CACHE.get(WC_IMAGE_KEY)) !== null;
+    if (sig !== prevSig || !haveImage) {
+      await warmWorldCupImage(env);
+      await env.CACHE.put(WC_SIG_KEY, sig, { expirationTtl: 86400 });
+      console.log(`Cron: WC image re-rendered (${sig === prevSig ? "cold image" : "result changed"})`);
+    } else {
+      console.log("Cron: WC unchanged, skipped image render");
+    }
+  } catch (e) {
+    console.error("Cron: WC 15-min refresh failed:", e);
+  }
+}
+
 async function handleScheduled(env: Env, cronExpression: string): Promise<void> {
+  // Every 15 min: World Cup only — keep its data + bracket image current so the device's
+  // ~15-min poll always shows recent results, with no manual nudging. Cheap: re-renders the
+  // image only when a result actually changed (see refreshWorldCup). (#54)
+  if (cronExpression === "*/15 * * * *") {
+    await refreshWorldCup(env);
+    return;
+  }
+
   const isDaily = cronExpression === "5 6 * * *";
   console.log(`Cron: ${isDaily ? "daily image warm" : "periodic data refresh"} (${cronExpression})`);
 
@@ -668,30 +706,21 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     const dayNum = parseInt(day);
 
     // --- Every-6h: headlines + weather + device (parallel, independent) ---
+    // (World Cup is refreshed by its own every-15-min cron — see refreshWorldCup / #54.)
     const sixHourResults = await Promise.allSettled([
       getHeadlines(env, dateStr, getCurrentPeriod()),
       getWeather(env),
       getWeatherForLocation(env, 41.8781, -87.6298, "60606", "Chicago, IL"),
       fetchDeviceData(env, E1001_DEVICE_ID),
       fetchDeviceData(env, E1002_DEVICE_ID),
-      getWorldCupData(env),
     ]);
-    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002", "worldcup"] as const;
+    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002"] as const;
     for (let i = 0; i < sixHourResults.length; i++) {
       if (sixHourResults[i].status === "rejected") {
         console.error(`Cron: ${labels[i]} warm failed:`, (sixHourResults[i] as PromiseRejectedResult).reason);
       }
     }
     console.log("Cron: warmed 6h data (headlines, weather, devices)");
-
-    // Warm the World Cup image (Browser Rendering screenshot → 1-bit) after its data is fresh,
-    // so the device never hits a cold image cache. Failure is non-fatal. (DECISIONS #48)
-    try {
-      await warmWorldCupImage(env);
-      console.log("Cron: warmed WC image");
-    } catch (e) {
-      console.error("Cron: WC image warm failed:", e);
-    }
 
     // --- Daily only: images + skyline ---
     if (!isDaily) return;

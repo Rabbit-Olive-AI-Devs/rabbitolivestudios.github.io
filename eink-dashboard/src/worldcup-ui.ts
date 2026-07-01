@@ -186,6 +186,22 @@ export function computePhase(matches: { stage: WcStage; status: WcStatus }[]): W
 }
 
 /**
+ * A stable string that changes whenever anything visible on the bracket/page changes:
+ * the phase, every match's status/score/shootout/teams, and each group row's standing.
+ * Used to skip the (expensive) Browser-Rendering image re-render when nothing has changed,
+ * so a frequent refresh cron only re-renders on an actual result. Order-independent per list.
+ */
+export function worldCupSignature(data: WorldCupData): string {
+  const matchSig = (m: WcMatch) =>
+    `${m.id}:${m.status}:${m.homeScore}-${m.awayScore}:${m.penaltyHome ?? ""}-${m.penaltyAway ?? ""}:${m.home.code}${m.home.name}>${m.away.code}${m.away.name}`;
+  const matches = [...data.knockout].sort((a, b) => a.id - b.id).map(matchSig).join("|");
+  const groups = data.groups
+    .map((g) => `${g.name}:${g.rows.map((r) => `${r.team.code}${r.position}/${r.points}${r.qualifying ? "Q" : ""}`).join(",")}`)
+    .join(";");
+  return `${data.phase}#${matches}#${groups}`;
+}
+
+/**
  * Choose one group to show in the bottom panel.
  * Candidate order: groups with a match today first (in array order), then the
  * rest. Within the candidate list, advance by a 15-minute time bucket so the

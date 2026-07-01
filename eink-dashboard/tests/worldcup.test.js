@@ -14,6 +14,7 @@ const {
   qualifiedFlags,
   matchCell,
   scoreText,
+  worldCupSignature,
   STAGE_LABELS,
   pickRotatingGroup,
   chicagoDateOf,
@@ -144,6 +145,23 @@ const mkMatch = (over) => ({
   kickoffISO: "", dateChicago: "2026-06-28", timeChicago: "1 PM",
   home: { name: "", code: "" }, away: { name: "", code: "" },
   homeScore: null, awayScore: null, ...over,
+});
+
+test("worldCupSignature is stable when nothing changes and changes on a new result", () => {
+  const base = {
+    source: "football-data", phase: "r32", todayMatches: [], recentResults: [],
+    champion: null, generatedAt: 0, groups: [],
+    knockout: [
+      mkMatch({ id: 73, status: "FINISHED", home: { name: "S. Africa", code: "RSA" }, away: { name: "Canada", code: "CAN" }, homeScore: 0, awayScore: 1 }),
+      mkMatch({ id: 74, status: "SCHEDULED", home: { name: "France", code: "FRA" }, away: { name: "Sweden", code: "SWE" } }),
+    ],
+  };
+  const sig1 = worldCupSignature(base);
+  // Re-derive from an equivalent object (different array identity, same content) → same signature.
+  assert.equal(worldCupSignature(JSON.parse(JSON.stringify(base))), sig1);
+  // France finishes 3-0 → signature must change (triggers an image re-render).
+  const after = { ...base, knockout: [base.knockout[0], { ...base.knockout[1], status: "FINISHED", homeScore: 3, awayScore: 0 }] };
+  assert.notEqual(worldCupSignature(after), sig1);
 });
 
 test("scoreText shows the match result with the shootout in parens", () => {

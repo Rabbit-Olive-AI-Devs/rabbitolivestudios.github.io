@@ -18,7 +18,7 @@ import { renderWorldCupBrowserPNG } from "../worldcup-browser-image";
 import { pngToBase64 } from "../png";
 
 const WC_ORIGIN = "https://eink-dashboard.thiago-oliveira77.workers.dev";
-const IMG_KEY = "wc:image:v19"; // v19: two-line date/time on no-team boxes; v18: bigger color flags + 1-line date/time; v17: kickoff time on KO boxes; v16: unplayed slots dated from official bracket (#53); v15: place by real bracket tree (#52); v14: source-direct (#51)
+export const IMG_KEY = "wc:image:v19"; // v19: two-line date/time on no-team boxes; v18: bigger color flags + 1-line date/time; v17: kickoff time on KO boxes; v16: unplayed slots dated from official bracket (#53); v15: place by real bracket tree (#52); v14: source-direct (#51)
 const IMG_SOFT_TTL_MS = 14 * 60 * 1000; // refresh the rendered image at most ~every 14 min
 const IMG_THRESHOLD = 160;              // gray cutoff for the 1-bit threshold
 

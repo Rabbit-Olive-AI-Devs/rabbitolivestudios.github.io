@@ -30,5 +30,7 @@ bucket_name = "eink-birthday-photos"
 # Cron schedules:
 #   "5 6 * * *"       — daily image warm at 06:05 UTC (after midnight Chicago in both CST/CDT)
 #   "5 0,6,12,18 * * *" — headlines + weather every 6h
+#   "*/15 * * * *"    — World Cup only: refresh data + re-render bracket image on a result change
+#                       (keeps the device's ~15-min poll current without manual nudging; #54)
 [triggers]
-crons = ["5 6 * * *", "5 0,6,12,18 * * *"]
+crons = ["5 6 * * *", "5 0,6,12,18 * * *", "*/15 * * * *"]

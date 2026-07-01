@@ -104,7 +104,7 @@ npm run dry-run
 npx wrangler deploy
 ```
 
-Your worker URL will be printed. The cron runs daily at 06:05 UTC (images) and every 6 hours (headlines/weather for both locations/device data).
+Your worker URL will be printed. Cron schedule: daily at 06:05 UTC (images), every 6 hours (headlines/weather/device data), and **every 15 minutes** a World Cup-only refresh that pulls fresh results and re-renders the bracket image when a result changes — so the knockout bracket stays current on the device without manual intervention (DECISIONS.md #54).
 
 ### Step 5: Set Secrets (Optional)
 
