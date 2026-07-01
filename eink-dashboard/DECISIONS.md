@@ -1660,3 +1660,32 @@ Nothing was broken; there was simply no frequent proactive refresh, so it *felt*
 - `worldCupSignature` is exported from `worldcup-ui.ts` and unit-tested (stable when unchanged, changes when a score comes in). `IMG_KEY` is exported from `pages/worldcup.ts` so the cron can check image presence. New KV key `wc:image:sig` stores the last-rendered signature.
 
 **Result:** both caches stay current on their own, so the device's ~15-min poll always shows recent results — no reminders, no redeploys. Verified both displays show today's results (incl. France 3-0 and the penalty shootouts) live on prod. 48 tests.
+
+---
+
+## 55. World Cup Knockout: Advance Winners Before the Opponent Is Decided (v3.15.20, 2026-07-01)
+
+### Symptom: Mexico won its R32 tie but didn't appear in the Round of 16
+
+Mexico beat Ecuador 2-0, the result showed on the bracket, but Mexico did **not** advance into its R16 box — the slot stayed a bare date. (Same would happen to every winner whose next-round opponent isn't decided yet.)
+
+### Root cause: the bracket only showed R16 teams the FEED had seeded
+
+Since #51 the bracket renders **source matches directly** and #52 positions them by the hardcoded tree. But football-data **only seeds a knockout match once BOTH sides are known**. Mexico's R16 opponent is the ENG/COD winner (played a day later), so the feed left that R16 match with empty teams — and `orderRound` fell through to a date placeholder. So a team that had clearly advanced was invisible until its opponent also won. (This is the gap left by #51 deleting the computed advancement of #49 — but we now have the hardcoded tree, which #49 lacked.)
+
+Verified with a live-feed dump: `MEX-ECU 2-0 FINISHED` present; the R16 match for that slot (`id 537378`) had `home="" away=""`.
+
+### Considered: pull results from FIFA.com instead
+
+The user suggested sourcing from the official FIFA site (which shows advancement immediately). Rejected after probing: FIFA's standings page is a JS shell with no clean public data API (the old `api.fifa.com/api/v3` paths 404), so a live integration would mean **browser-scraping the SPA every refresh** — heavy and fragile. And it's unnecessary: football-data already has every result fresh (~2-8 min); the defect was purely our advancement rendering. (Decision made with the user.)
+
+### Fix: compute partial advancement from the feeder winners, over the hardcoded tree
+
+`orderRound` (worldcup-bracket.ts) now, for each slot i fed by `feeders[2i]`/`feeders[2i+1]`:
+- prefers a feed match seeded with all known winners (real teams + score) when present;
+- otherwise, if a feeder is decided, **overlays the advancing team(s)** onto the feed's dated-but-unseeded match for that slot (keeping its real id/date/kickoff), with the undecided side as TBD — synthesizing a match only if the feed has none;
+- otherwise shows the feed's unplayed match (date placeholder).
+
+So a winner appears in its next-round box (e.g. `MEX` / `TBD` / `Jul 5`) the moment it wins, and when the opponent is later decided the feed's real seeded match takes over the same slot. No #51 duplicate: positioning is by the hardcoded tree (one match per slot, source ids tracked), and an advanced-but-unplayed slot is `SCHEDULED` so it does not itself advance further. `winnerCode` → `winnerTeam` (returns the team, not just the code). Unit-tested (#55: Mexico advances into slot 5 vs TBD, exactly once, keeps the Jul 5 date) alongside the existing #52 no-dup test.
+
+Rendering changed but the underlying data didn't, so the `worldCupSignature` auto-refresh (#54) wouldn't re-render on its own → bumped `wc:image:v19→v20` to invalidate the stale image; the cron's cold-image check then re-renders. Verified both displays on prod show Mexico in R16. 49 tests.

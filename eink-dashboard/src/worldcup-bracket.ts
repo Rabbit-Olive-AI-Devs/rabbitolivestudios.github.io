@@ -12,8 +12,12 @@
  * positions 2i and 2i+1), which the rendering splits back into left/right halves.
  */
 
-import type { WcMatch, WcStage } from "./types";
+import type { WcMatch, WcStage, WcTeam } from "./types";
 import { teamCode } from "./worldcup-ui";
+
+const EMPTY_TEAM: WcTeam = { name: "", code: "" };
+const teamKnown = (t: WcTeam | null | undefined): boolean =>
+  !!(t && ((t.name && t.name.trim()) || (t.code && t.code.trim())));
 
 /** Official 2026 R32 order (left 8 top-to-bottom, then right 8), by FIFA-code team pairs. */
 export const BRACKET_R32: [string, string][] = [
@@ -42,11 +46,11 @@ export interface OrderedBracket {
   final: WcMatch | null;
 }
 
-/** Winning team's code, or null when not finished / level (fullTime folds penalties, so a shootout winner reads here). */
-function winnerCode(m: WcMatch | null | undefined): string | null {
+/** Winning team, or null when not finished / level (fullTime folds penalties, so a shootout winner reads here). */
+function winnerTeam(m: WcMatch | null | undefined): WcTeam | null {
   if (!m || m.status !== "FINISHED" || m.homeScore == null || m.awayScore == null) return null;
-  if (m.homeScore > m.awayScore) return teamCode(m.home);
-  if (m.awayScore > m.homeScore) return teamCode(m.away);
+  if (m.homeScore > m.awayScore) return m.home;
+  if (m.awayScore > m.homeScore) return m.away;
   return null;
 }
 
@@ -57,28 +61,50 @@ const sameTeams = (m: WcMatch, a: string, b: string): boolean => {
 };
 
 /**
- * Place each later-round source match into its true bracket slot.
- *  1. by the seeded team(s) matching the slot's feeder winners (played/seeded matches → real result);
- *  2. otherwise by the match's date matching the slot's official date (unplayed matches → right date);
- *  3. otherwise fill remaining slots in order (last-resort, e.g. a reschedule we haven't pinned).
+ * Build each slot of a later round, advancing winners so a team appears in its next-round box the
+ * moment it wins — even before its opponent is decided (the feed only seeds a knockout match once
+ * BOTH sides are known, so we can't wait for it). For slot i, fed by feeders[2i] (home) and
+ * feeders[2i+1] (away):
+ *  - If the feed already seeded a real match with both known winners → use it (real teams + score).
+ *  - Else if a feeder is decided → overlay the advancing team(s) (unknown side = TBD) onto the
+ *    feed's dated-but-unseeded match for this slot (keeps its real id/date/kickoff), else a synth.
+ *  - Else (no feeder decided yet) → the feed's unplayed match for this slot (its date placeholder).
+ * Slot ↔ match matching: by teams first (order-independent), then by the slot's official date.
  */
-function orderRound(feeders: (WcMatch | null)[], pool: WcMatch[], slotDates: string[]): (WcMatch | null)[] {
+function orderRound(feeders: (WcMatch | null)[], pool: WcMatch[], slotDates: string[], stage: WcStage): (WcMatch | null)[] {
   const n = slotDates.length;
   const out: (WcMatch | null)[] = new Array(n).fill(null);
   const used = new Set<number>();
-  const take = (i: number, m: WcMatch | undefined) => { if (m) { out[i] = m; used.add(m.id); } };
-  // 1. seeded → by feeder winners
   for (let i = 0; i < n; i++) {
-    const known = [winnerCode(feeders[2 * i]), winnerCode(feeders[2 * i + 1])].filter((c): c is string => !!c);
-    if (known.length) take(i, pool.find((x) => !used.has(x.id) && known.every((c) => hasCode(x, c))));
+    const hw = winnerTeam(feeders[2 * i]);       // team advancing into this slot's home side (or null)
+    const aw = winnerTeam(feeders[2 * i + 1]);   // ... away side
+    const knownCodes = [hw, aw].filter((t): t is WcTeam => !!t).map(teamCode);
+
+    // Best source match for this slot: one seeded with all known winners, else the feed's
+    // dated (but maybe unseeded) match for this slot — gives us its real id/date/kickoff.
+    let src = knownCodes.length
+      ? pool.find((x) => !used.has(x.id) && knownCodes.every((c) => hasCode(x, c)))
+      : undefined;
+    if (!src) src = pool.find((x) => !used.has(x.id) && x.dateChicago === slotDates[i]);
+    if (src) used.add(src.id);
+
+    if (!hw && !aw) { out[i] = src ?? null; continue; }              // no feeder decided → placeholder
+    if (src && (teamKnown(src.home) || teamKnown(src.away))) { out[i] = src; continue; } // feed seeded it
+
+    // A feeder is decided but the feed hasn't seeded this match → advance the winner(s) ourselves.
+    const base: WcMatch = src ?? {
+      id: -(1000 + i), stage, group: undefined, status: "SCHEDULED",
+      kickoffISO: "", dateChicago: slotDates[i], timeChicago: "",
+      home: EMPTY_TEAM, away: EMPTY_TEAM, homeScore: null, awayScore: null,
+    };
+    out[i] = { ...base, home: hw ?? EMPTY_TEAM, away: aw ?? EMPTY_TEAM };
   }
-  // 2. unplayed → by official slot date
+  // Leftover unmatched matches (e.g. a reschedule) fill any still-empty slots in order.
   for (let i = 0; i < n; i++) {
-    if (!out[i]) take(i, pool.find((x) => !used.has(x.id) && x.dateChicago === slotDates[i]));
-  }
-  // 3. leftover → fill in order
-  for (let i = 0; i < n; i++) {
-    if (!out[i]) take(i, pool.find((x) => !used.has(x.id)));
+    if (!out[i]) {
+      const m = pool.find((x) => !used.has(x.id));
+      if (m) { out[i] = m; used.add(m.id); }
+    }
   }
   return out;
 }
@@ -92,9 +118,9 @@ export function orderKnockout(knockout: WcMatch[]): OrderedBracket {
   const byStage = (s: WcStage) => knockout.filter((m) => m.stage === s);
   const r32pool = byStage("R32");
   const r32 = BRACKET_R32.map(([a, b]) => r32pool.find((m) => sameTeams(m, a, b)) ?? null);
-  const r16 = orderRound(r32, byStage("R16"), R16_DATES);
-  const qf = orderRound(r16, byStage("QF"), QF_DATES);
-  const sf = orderRound(qf, byStage("SF"), SF_DATES);
-  const final = orderRound(sf, byStage("FINAL"), FINAL_DATES)[0];
+  const r16 = orderRound(r32, byStage("R16"), R16_DATES, "R16");
+  const qf = orderRound(r16, byStage("QF"), QF_DATES, "QF");
+  const sf = orderRound(qf, byStage("SF"), SF_DATES, "SF");
+  const final = orderRound(sf, byStage("FINAL"), FINAL_DATES, "FINAL")[0];
   return { r32, r16, qf, sf, final };
 }

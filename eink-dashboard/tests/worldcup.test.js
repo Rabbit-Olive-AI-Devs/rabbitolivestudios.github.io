@@ -211,6 +211,37 @@ test("orderKnockout places each team on its real bracket side, no duplicate (#52
     ["2026-07-04", "2026-07-04", "2026-07-06", "2026-07-06", "2026-07-05", "2026-07-05", "2026-07-07", "2026-07-07"]);
 });
 
+test("orderKnockout advances a winner into its R16 slot before the opponent is decided (#55 Mexico bug)", () => {
+  const t = (code) => ({ name: code, code });
+  const empty = { name: "", code: "" };
+  const mkR = (id, stage, status, home, away, over = {}) => ({
+    id, stage, group: undefined, status, kickoffISO: "", dateChicago: "2026-07-01",
+    timeChicago: "8 PM", home, away, homeScore: null, awayScore: null, ...over,
+  });
+  const r32 = BRACKET_R32.map(([a, b], i) => mkR(100 + i, "R32", "SCHEDULED", t(a), t(b)));
+  // Mexico (idx 10 = MEX-ECU) wins; its R16 opponent feeder ENG-COD (idx 11) is NOT played yet.
+  Object.assign(r32[10], { status: "FINISHED", homeScore: 2, awayScore: 0 });
+  // Every R16 match unseeded (both teams empty) with official dates — the real feed shape.
+  const r16 = [
+    mkR(200, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-04" }),
+    mkR(201, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-04" }),
+    mkR(202, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-06" }),
+    mkR(203, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-06" }),
+    mkR(204, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-05" }),
+    mkR(205, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-05" }),
+    mkR(206, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-07" }),
+    mkR(207, "R16", "SCHEDULED", empty, empty, { dateChicago: "2026-07-07" }),
+  ];
+  const ord = orderKnockout([...r32, ...r16]);
+  // MEX-ECU (idx 10) feeds R16 slot 5 (feeders 10 & 11), official date Jul 5.
+  const slot = ord.r16[5];
+  assert.ok(slot, "slot 5 present");
+  assert.ok([slot.home.code, slot.away.code].includes("MEX"), "Mexico shows in its R16 slot");
+  assert.ok(!teamCode || slot.away.code === "" || slot.home.code === "", "opponent still TBD");
+  assert.equal(slot.dateChicago, "2026-07-05", "keeps the official slot date");
+  assert.equal(ord.r16.filter((m) => m && [m.home.code, m.away.code].includes("MEX")).length, 1, "exactly once");
+});
+
 test("teamCode prefers code, falls back to first 3 letters", () => {
   assert.equal(teamCode({ name: "Brazil", code: "BRA" }), "BRA");
   assert.equal(teamCode({ name: "Brazil", code: "" }), "BRA");
