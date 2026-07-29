@@ -1689,3 +1689,25 @@ The user suggested sourcing from the official FIFA site (which shows advancement
 So a winner appears in its next-round box (e.g. `MEX` / `TBD` / `Jul 5`) the moment it wins, and when the opponent is later decided the feed's real seeded match takes over the same slot. No #51 duplicate: positioning is by the hardcoded tree (one match per slot, source ids tracked), and an advanced-but-unplayed slot is `SCHEDULED` so it does not itself advance further. `winnerCode` → `winnerTeam` (returns the team, not just the code). Unit-tested (#55: Mexico advances into slot 5 vs TBD, exactly once, keeps the Jul 5 date) alongside the existing #52 no-dup test.
 
 Rendering changed but the underlying data didn't, so the `worldCupSignature` auto-refresh (#54) wouldn't re-render on its own → bumped `wc:image:v19→v20` to invalidate the stale image; the cron's cold-image check then re-renders. Verified both displays on prod show Mexico in R16. 49 tests.
+
+---
+
+## 56. Screen-Cleaner Endpoint for E-Ink Ghosting (`/clean`, v3.15.21, 2026-07-29)
+
+### Problem: a panel left on one static image for weeks retains a ghost
+
+The E1002 was left powered for ~2 weeks with no network while the user was away. With no fresh fetches it froze on its last frame; holding charged pigment particles in one position that long causes **image retention** — a faint ghost of the old image. (Not true burn-in, which is very rare on e-ink and usually recoverable.) The fix is to drive the panel through several **full-screen full-refresh cycles** so every pixel swings its full range and every pigment is exercised.
+
+### Decision: a tiny `/clean` endpoint that returns solid full-screen fills
+
+`src/clean.ts` + a `/clean` route return an 800x480 solid-color indexed PNG (Spectra-6 palette, reusing `encodePNGIndexed`). The user points the device's SenseCraft "Web Function" at `/clean` with a short refresh interval; each fetch shows the next color.
+
+### Why time-based rotation with a PRIME-length sequence
+
+The device screenshots **one fixed URL** on an interval, so a single page can't animate — the endpoint must return a different color on each fetch. The only thing that varies between identical requests is the clock, so we rotate by `floor(epochSeconds / secondsPerFrame) % N`.
+
+The device's refresh interval is unknown, which creates an **aliasing** trap: if the number of frames `N` divided the interval evenly, the device would land on the *same* color every fetch and never cycle. Common device intervals are even (30s/60s/…), so `N=6` (the raw palette) would collapse on any even interval. Using a **prime** `N=7` sequence means a full collapse only happens when the fetch interval is an exact multiple of 7s; for every other interval, successive fetches walk through all frames. The sequence `[white, black, red, yellow, green, blue, black]` covers all 6 pigments, with black twice for extra full-swing flushes (the most effective at clearing retention).
+
+Overrides: `?c=black|white|red|yellow|green|blue` (or index `0`-`5`) holds one color for manual/deliberate cycling and browser testing; `?s=N` sets seconds-per-frame (default 1, clamped `>=1` so a bad/zero value can't divide by zero). Response is `Cache-Control: no-store` so neither the CDN nor SenseCraft pins one color.
+
+Works on both displays: on the E1002 the fills are true pigment colors; on the E1001 mono panel they render as solid grays — still valid full-screen flushes. No AI, no KV, no auth — it's a harmless static render, protected only by the global rate limit. `pickCleanColorIndex`/`parseCleanColor` are pure and unit-tested (52 tests).

@@ -23,6 +23,7 @@ const {
 } = fromBuild("src/cache-keys.js");
 const { tempColor, batteryIcon } = fromBuild("src/pages/color-weather.js");
 const { withBudget } = fromBuild("src/with-budget.js");
+const { pickCleanColorIndex, parseCleanColor, CLEAN_SEQUENCE } = fromBuild("src/clean.js");
 
 test("query param validators clamp to safe defaults", () => {
   assert.equal(parseMonth("12"), 12);
@@ -108,4 +109,35 @@ test("batteryIcon: red at or below 20%, green above, never yellow", () => {
   assert.ok(batteryIcon(90, false, 20).includes(green));
   // a mid-range level no longer renders yellow
   assert.ok(!batteryIcon(35, false, 20).includes(yellow));
+});
+
+test("clean sequence is prime-length and covers all 6 pigments", () => {
+  // Prime length avoids aliasing with the device's refresh interval.
+  assert.equal(CLEAN_SEQUENCE.length, 7);
+  const covered = new Set(CLEAN_SEQUENCE);
+  for (let i = 0; i < 6; i++) assert.ok(covered.has(i), `pigment ${i} missing`);
+});
+
+test("pickCleanColorIndex rotates through the sequence by time", () => {
+  // secondsPerFrame=1: each second advances one frame, wrapping the sequence.
+  for (let t = 0; t < 14; t++) {
+    assert.equal(pickCleanColorIndex(t, 1), CLEAN_SEQUENCE[t % 7]);
+  }
+  // secondsPerFrame holds each frame longer.
+  assert.equal(pickCleanColorIndex(0, 5), CLEAN_SEQUENCE[0]);
+  assert.equal(pickCleanColorIndex(4, 5), CLEAN_SEQUENCE[0]);
+  assert.equal(pickCleanColorIndex(5, 5), CLEAN_SEQUENCE[1]);
+  // Bad/zero secondsPerFrame falls back to 1 (never divides by zero).
+  assert.equal(pickCleanColorIndex(3, 0), CLEAN_SEQUENCE[3]);
+});
+
+test("parseCleanColor accepts names and indices, rejects garbage", () => {
+  assert.equal(parseCleanColor("black"), 0);
+  assert.equal(parseCleanColor("WHITE"), 1);
+  assert.equal(parseCleanColor(" blue "), 5);
+  assert.equal(parseCleanColor("2"), 2);
+  assert.equal(parseCleanColor(null), null);
+  assert.equal(parseCleanColor(""), null);
+  assert.equal(parseCleanColor("purple"), null);
+  assert.equal(parseCleanColor("9"), null);
 });

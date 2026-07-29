@@ -37,6 +37,7 @@ import {
 } from "./cache-guard";
 import { getHeadlines, getCurrentPeriod } from "./headlines";
 import { pngToBase64 } from "./png";
+import { pickCleanColorIndex, parseCleanColor, renderCleanPNG } from "./clean";
 import {
   parseDateParts,
   pickSkylineCity,
@@ -54,7 +55,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.15.20";
+const VERSION = "3.15.21";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -925,6 +926,25 @@ export default {
         return handleFactImage(env);
       case "/fact1.png":
         return handleFact1BitImage(env);
+      case "/clean": {
+        // Screen-cleaner: solid full-screen fills to clear e-ink ghosting/retention.
+        // Point the device (E1001 or E1002) at this URL with a short refresh
+        // interval; it auto-rotates through all 6 pigments + black/white flushes.
+        // Override: ?c=black|white|red|yellow|green|blue (or 0-5). ?s=seconds-per-frame.
+        const forced = parseCleanColor(url.searchParams.get("c"));
+        const spf = Number(url.searchParams.get("s") ?? "1");
+        const nowSec = Math.floor(Date.now() / 1000);
+        const colorIndex = forced ?? pickCleanColorIndex(nowSec, spf);
+        const cleanPng = await renderCleanPNG(colorIndex);
+        return new Response(cleanPng, {
+          headers: {
+            "Content-Type": "image/png",
+            // Must not cache: each fetch should rotate to the next color.
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+      }
       case "/fact-raw.jpg": {
         const budgetBlockRaw = await checkAiBudget(env);
         if (budgetBlockRaw) return budgetBlockRaw;

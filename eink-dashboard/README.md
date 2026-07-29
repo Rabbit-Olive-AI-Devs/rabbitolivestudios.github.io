@@ -52,6 +52,10 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /skyline-test?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline HTML (forwards params to .png, requires `TEST_AUTH_KEY`) | none |
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/apod` | 301 redirect to `/skyline` (legacy compatibility) | — |
+| **Maintenance** | | |
+| `GET /clean` | 800x480 solid-color screen cleaner for clearing e-ink ghosting/retention. Auto-rotates through all 6 Spectra-6 pigments + black/white flushes across fetches (point the device at it with a short refresh interval). Works on both E1001 and E1002. | none (`no-store`) |
+| `GET /clean?c=black\|white\|red\|yellow\|green\|blue` | Hold one solid color (also accepts index `0`-`5`) | none |
+| `GET /clean?s=N` | Seconds each color is held before rotating (default 1) | none |
 | `GET /health` | Status check | none |
 | `GET /health-detailed` | Cache health, daily image cache status, telemetry age, and AI budget pause status | none |
 
