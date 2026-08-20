@@ -1757,9 +1757,17 @@ going to be granted, failed, and re-armed the block. A self-perpetuating cycle.
 
 ### Decisions
 
-1. **Two daily triggers, `"5 5 * * *"` + `"5 6 * * *"`.** One per Chicago UTC offset. Whichever
-   fires first after the date rolls generates; the other finds a warm cache and no-ops. The
-   cache is warm before the devices ever ask.
+1. **The daily warm fires twice, at 05:05 and 06:05 UTC** — one per Chicago UTC offset.
+   Whichever fires first after the date rolls generates; the other finds a warm cache and
+   no-ops. The cache is warm before the devices ever ask.
+
+   Shipped as a **single `"5 5,6 * * *"` expression with two fire times**, not two entries:
+   Workers Free allows only **5 cron triggers per account**, and the first deploy attempt was
+   rejected with `code: 10072` for exceeding it. Worth knowing that this failure mode uploads
+   the Worker but leaves the *schedules* untouched — production ran the new code on the old
+   schedule until the fix landed. `handleScheduled` matches a `DAILY_CRONS` set containing both
+   the combined and individual forms, so splitting the schedule later can't silently turn the
+   daily warm into a no-op.
 2. **The daily warm is idempotent.** Pipelines A and B regenerated unconditionally (color
    moment and skyline already checked). They now skip when the key exists — otherwise the
    second trigger would have doubled the bill it was added to prevent.

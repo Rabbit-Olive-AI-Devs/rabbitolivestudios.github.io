@@ -724,6 +724,9 @@ async function refreshWorldCup(env: Env): Promise<void> {
   }
 }
 
+/** Cron expressions that trigger the daily image warm (see the isDaily note below). */
+const DAILY_CRONS = new Set(["5 5,6 * * *", "5 5 * * *", "5 6 * * *"]);
+
 async function handleScheduled(env: Env, cronExpression: string): Promise<void> {
   // Every 15 min: World Cup only — keep its data + bracket image current so the device's
   // ~15-min poll always shows recent results, with no manual nudging. Cheap: re-renders the
@@ -733,12 +736,17 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     return;
   }
 
-  // Two daily triggers, one for each Chicago UTC offset: 05:05 UTC lands just after
-  // midnight in CDT, 06:05 UTC just after midnight in CST. Both run year-round — the
-  // one that fires before the date rolls finds yesterday's images already cached and
+  // The daily warm fires twice, once for each Chicago UTC offset: 05:05 UTC lands just
+  // after midnight in CDT, 06:05 UTC just after midnight in CST. Both run year-round —
+  // the one that fires before the date rolls finds yesterday's images already cached and
   // no-ops, so the cost is a few KV reads. The point is that the cache is warm before
   // the devices start polling the new day's keys (DECISIONS #57).
-  const isDaily = cronExpression === "5 5 * * *" || cronExpression === "5 6 * * *";
+  //
+  // Matched as a set rather than one literal: the schedule is a single "5 5,6 * * *"
+  // expression (cron triggers are a scarce per-account resource on the free plan), but
+  // the individual forms are accepted too so a schedule split can't silently turn the
+  // daily warm into a no-op.
+  const isDaily = DAILY_CRONS.has(cronExpression);
   console.log(`Cron: ${isDaily ? "daily image warm" : "periodic data refresh"} (${cronExpression})`);
 
   try {
