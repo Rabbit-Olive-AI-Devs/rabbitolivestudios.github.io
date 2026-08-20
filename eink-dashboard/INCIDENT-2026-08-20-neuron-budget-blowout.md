@@ -183,7 +183,7 @@ That was true in CST (06:05 UTC = 00:05 Chicago) and false in CDT (06:05 UTC = 0
 
 ---
 
-## 7. Remediation (all shipped in v3.15.22)
+## 7. Remediation (v3.15.22, extended in v3.15.23 — see §9b)
 
 | # | Fix | Files |
 |---|---|---|
@@ -191,8 +191,10 @@ That was true in CST (06:05 UTC = 00:05 Chicago) and false in CDT (06:05 UTC = 0
 | 2 | Daily warm is **idempotent**: Pipelines A and B skip when the key already exists. | `src/index.ts` |
 | 3 | Budget block expires at the **next 00:00 UTC** (`nextUtcMidnight()`), not a fixed 6h. | `src/cache-guard.ts` |
 | 4 | AI routes **serve the most recent cached image** (up to 7 days back) instead of 503, with `no-store`. | `src/index.ts` (`findRecentDailyPNG`), `src/pages/color-moment.ts` (`findRecentColorMoment`) |
-| 5 | Skyline daily **TTL 86400 → 604800**; lookback walks 7 days off the *Chicago* date and no longer probes expired rotate keys. | `src/index.ts` |
+| 5 | Skyline daily **TTL 86400 → 604800**; lookback walks 7 days off the *Chicago* date and no longer probes expired rotate keys. | `src/index.ts` *(lookback mechanism later replaced — §9b)* |
 | — | `shiftDateStr()` — UTC-based, DST-proof calendar-day arithmetic used by the lookbacks. | `src/date-utils.ts` |
+| **6** | *(v3.15.23)* Fallbacks resolve keys by **KV prefix**, surviving a cache-key version bump. | `src/stale-cache.ts` |
+| **7** | *(v3.15.23)* Wrapper pages render a **text page** rather than a dead `<img>`. | `src/pages/unavailable.ts`, `pages/fact.ts`, `pages/skyline.ts` |
 
 ### Deploy note (cost us a round trip)
 
@@ -275,6 +277,14 @@ when generation is blocked *and* nothing cached remains. The check is conservati
 on a healthy day still renders the image, because the route will simply generate it. The page
 carries a Chicago timestamp, so a static error screen is distinguishable from a panel frozen on
 an old frame — the failure that caused the image retention in #56.
+
+**Verification.** 63/63 unit tests (56 before; the new ones cover the version-bump case
+explicitly), typecheck and dry-run clean. Against real KV: `/skyline` and `/skyline-bw` served the
+text page while `/fact` correctly still served its `<img>`, since its cache existed. The 800x480
+render was checked in a browser. The prefix lookup was proven by bumping `FACT4_CACHE_VERSION` to
+`v5` with only `v4` keys present — `/fact.png` returned 200 and logged
+`serving stale fallback from fact4:v4:2026-08-19`, where the previous implementation would have
+503'd.
 
 Residual risks 1–5 above are unchanged; these were separate latent faults, not causes of this
 incident.

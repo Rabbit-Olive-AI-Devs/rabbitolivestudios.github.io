@@ -37,6 +37,8 @@ Every session must begin with these steps:
 | Ending a session | Update docs, commit and push, stop dev server if running |
 | Ideas or features discussed but not implemented | Note in commit message or DECISIONS.md |
 | Changing any pipeline or cache behavior | Bump the relevant cache key version |
+| Bumping a cache key version | Safe for the stale-image fallback — it resolves keys by KV prefix, not by rebuilding them (DECISIONS #58). Never reintroduce a fallback that rebuilds keys from `*_CACHE_VERSION` |
+| Adding an HTML page whose body is an `<img>` | Give it a text fallback so a failed image never renders as a broken-image glyph on the panel (DECISIONS #58) |
 | Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying |
 
 ---

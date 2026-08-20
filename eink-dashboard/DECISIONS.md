@@ -1717,6 +1717,11 @@ Works on both displays: on the E1002 the fills are true pigment colors; on the E
 > Full incident report — raw usage data, hour-by-hour timeline, verification log and a
 > diagnosis runbook: [INCIDENT-2026-08-20-neuron-budget-blowout.md](INCIDENT-2026-08-20-neuron-budget-blowout.md)
 
+> **Partly superseded by #58.** The mechanism of decisions 4 and 5 below — walking back through
+> previous days by *rebuilding* each cache key — was replaced with a prefix-based lookup in
+> v3.15.23, because rebuilding embeds the current cache-key version and so broke on every bump.
+> The reasoning recorded here still stands; only the implementation changed.
+
 ### Symptom
 
 Both AI pages on the E1002 died on the same day: `/skyline` rendered a broken `<img>` and

@@ -21,7 +21,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | Endpoint | Description | Cache |
 |----------|-------------|-------|
 | `GET /weather` | 800x480 HTML weather dashboard (night icons, wind direction, sunrise/sunset, moon phase, NWS alerts, rain warnings, indoor temp/humidity, battery level) | 15 min |
-| `GET /fact` | 800x480 HTML page displaying the Moment Before image | 24 hours |
+| `GET /fact` | 800x480 HTML page displaying the Moment Before image. Degrades to a plain text page when the image cannot be produced, so the panel never shows a broken-image glyph (DECISIONS #58) | 24 hours |
 | `GET /fact.png` | 800x480 4-level grayscale "Moment Before" illustration (or birthday portrait on family birthdays) | 24 hours |
 | `GET /fact1.png` | 800x480 1-bit "Moment Before" illustration (6 rotating styles) | 24 hours |
 | `GET /fact.json` | "On This Day" historical event (JSON) | 24 hours |
@@ -46,8 +46,8 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 — live HTML with color flags | 15 min |
 | `GET /worldcup?test-phase=group\|r32\|knockout\|champion` | Preview any phase layout with canned data (also on `/color/worldcup`) | none |
 | **World Skyline Series** | | |
-| `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store) | none |
-| `GET /skyline-bw` | 800x480 HTML skyline page for E1001 mono (`<img src="/skyline.png?bw=1">`, BW styles only) | none |
+| `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store). Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
+| `GET /skyline-bw` | 800x480 HTML skyline page for E1001 mono (`<img src="/skyline.png?bw=1">`, BW styles only). Same text fallback as `/skyline` (DECISIONS #58) | none |
 | `GET /skyline.png?mode=rotate\|daily\|random&rotateMin=N&bw=1` | 800x480 skyline PNG (default: daily; `bw=1` restricts to BW styles; `mode=rotate` for 15-min rotation) | 24 hours |
 | `GET /skyline-test?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline HTML (forwards params to .png, requires `TEST_AUTH_KEY`) | none |
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
@@ -416,7 +416,7 @@ v3.11.2 adds guardrails around expensive AI generation:
 - `/skyline.png` still tries stale skyline caches, and color skyline can serve cached BW skyline as a final visual fallback.
 - **Stale-image fallback (v3.15.22)**: when AI generation is unavailable, `/fact.png`, `/fact1.png` and `/color/moment` walk back up to 7 days for the most recent cached image rather than returning 503. The panel screenshots whatever it gets, so a day-old illustration beats an error page. Daily image caches (including skyline) are kept 7 days so a fallback actually exists — skyline previously used a 24h TTL that expired at the exact moment the next day's key went cold, leaving nothing to serve (DECISIONS.md #57).
 - **Fallbacks survive a cache-key version bump (v3.15.23)**: the lookback resolves keys by **KV prefix** (`src/stale-cache.ts`) instead of rebuilding them with the current version. Rebuilding embedded the live `*_CACHE_VERSION`, so bumping it made every fallback search for keys that never existed — disabling the safety net exactly when a freshly changed pipeline was most likely to fail (DECISIONS.md #58).
-- **Wrapper pages never emit a dead `<img>` (v3.15.23)**: `/fact`, `/skyline` and `/skyline-bw` render a plain 800x480 text page (pure black on white, with a Chicago timestamp so a live panel is distinguishable from a frozen one) when generation is blocked *and* no cached image remains. A cold cache on a healthy day still renders the image normally (DECISIONS.md #58).
+- **Wrapper pages never emit a dead `<img>` (v3.15.23)** (`src/pages/unavailable.ts`): `/fact`, `/skyline` and `/skyline-bw` render a plain 800x480 text page (pure black on white, with a Chicago timestamp so a live panel is distinguishable from a frozen one) when generation is blocked *and* no cached image remains. A cold cache on a healthy day still renders the image normally (DECISIONS.md #58).
 - **Neuron budget**: the Workers AI free tier is 10,000 neurons/day (resets 00:00 UTC). FLUX.2 klein-9b costs ~1,364 neurons/image and is effectively the entire bill; a healthy day is ~5,555 neurons. See [INCIDENT-2026-08-20-neuron-budget-blowout.md](INCIDENT-2026-08-20-neuron-budget-blowout.md) for the diagnosis runbook (including how to query real usage, since Cloudflare has a known false-4006 bug).
 - **AI budget pause** ends at the next 00:00 UTC — when Workers AI actually resets the free neuron allocation — instead of a fixed 6 hours. A block that lifted early just burned neurons on generations that were never going to be granted (DECISIONS.md #57).
 - `/color/headlines` is back on without Workers AI; it ranks RSS/scraped sources deterministically and caches results as `headlines:v3:YYYY-MM-DD:PERIOD`.
