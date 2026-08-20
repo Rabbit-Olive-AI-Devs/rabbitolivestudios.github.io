@@ -1714,6 +1714,9 @@ Works on both displays: on the E1002 the fills are true pigment colors; on the E
 
 ## 57. Neuron Budget Blowout: the Devices Were Generating the Images (v3.15.22, 2026-08-20)
 
+> Full incident report — raw usage data, hour-by-hour timeline, verification log and a
+> diagnosis runbook: [INCIDENT-2026-08-20-neuron-budget-blowout.md](INCIDENT-2026-08-20-neuron-budget-blowout.md)
+
 ### Symptom
 
 Both AI pages on the E1002 died on the same day: `/skyline` rendered a broken `<img>` and

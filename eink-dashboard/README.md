@@ -110,7 +110,9 @@ npx wrangler deploy
 
 Your worker URL will be printed. Cron schedule: daily at **05:05 and 06:05 UTC** (images), every 6 hours (headlines/weather/device data), and **every 15 minutes** a World Cup-only refresh that pulls fresh results and re-renders the bracket image when a result changes — so the knockout bracket stays current on the device without manual intervention (DECISIONS.md #54).
 
-> **Why two daily triggers?** Cache keys are dated in America/Chicago, which is 05:00 UTC in CDT and 06:00 UTC in CST. Both run year-round: whichever fires first after the date rolls generates the day's images, and the other finds a warm cache and no-ops. With a single 06:05 UTC trigger there was a 65-minute hole every summer day where the keys were cold but the cron hadn't run — so the *devices* generated the images on the request path, duplicated the work, and eventually blew the 10,000/day Workers AI free allocation (DECISIONS.md #57).
+> **Why does the daily warm fire twice?** Cache keys are dated in America/Chicago, which rolls over at 05:00 UTC in CDT and 06:00 UTC in CST. Both fire times run year-round: whichever comes first after the date rolls generates the day's images, and the other finds a warm cache and no-ops. With a single 06:05 UTC trigger there was a 65-minute hole every summer day where the keys were cold but the cron hadn't run — so the *devices* generated the images on the request path, duplicated the work, and eventually blew the 10,000/day Workers AI free allocation (DECISIONS.md #57).
+>
+> It is deliberately **one `5 5,6 * * *` expression rather than two entries**: Workers Free allows only 5 cron triggers per account and the slots are full. `handleScheduled` matches a `DAILY_CRONS` set containing both the combined and the individual forms, so splitting the schedule later cannot silently turn the daily warm into a no-op.
 
 ### Step 5: Set Secrets (Optional)
 
@@ -413,6 +415,7 @@ v3.11.2 adds guardrails around expensive AI generation:
 - Workers AI neuron-budget errors set `ai-budget:v1:block` for 6 hours. During that pause, cached images still serve, but new AI generation returns a 503 instead of cascading through fallback models.
 - `/skyline.png` still tries stale skyline caches, and color skyline can serve cached BW skyline as a final visual fallback.
 - **Stale-image fallback (v3.15.22)**: when AI generation is unavailable, `/fact.png`, `/fact1.png` and `/color/moment` walk back up to 7 days for the most recent cached image rather than returning 503. The panel screenshots whatever it gets, so a day-old illustration beats an error page. Daily image caches (including skyline) are kept 7 days so a fallback actually exists — skyline previously used a 24h TTL that expired at the exact moment the next day's key went cold, leaving nothing to serve (DECISIONS.md #57).
+- **Neuron budget**: the Workers AI free tier is 10,000 neurons/day (resets 00:00 UTC). FLUX.2 klein-9b costs ~1,364 neurons/image and is effectively the entire bill; a healthy day is ~5,555 neurons. See [INCIDENT-2026-08-20-neuron-budget-blowout.md](INCIDENT-2026-08-20-neuron-budget-blowout.md) for the diagnosis runbook (including how to query real usage, since Cloudflare has a known false-4006 bug).
 - **AI budget pause** ends at the next 00:00 UTC — when Workers AI actually resets the free neuron allocation — instead of a fixed 6 hours. A block that lifted early just burned neurons on generations that were never going to be granted (DECISIONS.md #57).
 - `/color/headlines` is back on without Workers AI; it ranks RSS/scraped sources deterministically and caches results as `headlines:v3:YYYY-MM-DD:PERIOD`.
 
