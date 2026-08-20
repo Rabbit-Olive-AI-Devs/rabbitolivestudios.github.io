@@ -11,6 +11,7 @@
 import { fetchWithTimeout } from "../fetch-timeout";
 import type { Env, MomentBeforeData } from "../types";
 import { getChicagoDateParts, shiftDateStr } from "../date-utils";
+import { findMostRecentCached } from "../stale-cache";
 import { getTodayEvents } from "../fact";
 import { getOrGenerateMoment, generateMomentBefore } from "../moment";
 import { getBirthdayToday, getBirthdayByKey, getArtStyle } from "../birthday";
@@ -320,28 +321,27 @@ export async function handleColorMomentPage(env: Env, url: URL): Promise<Respons
 }
 
 /**
- * Walk back through the previous days' color-moment caches for a usable image.
+ * Serve the most recent previously cached colour moment.
  *
- * The style is a pure function of the date, so each past day's cache key is
- * reconstructible without storing an index.
+ * Resolved by PREFIX rather than by rebuilding each day's key from its style,
+ * so the fallback survives a COLOR_MOMENT_CACHE_VERSION bump — rebuilding embeds
+ * the *current* version and would search for keys that never existed
+ * (DECISIONS #57).
  */
 async function findRecentColorMoment(
-  env: Env, dateStr: string, maxDaysBack = 7,
+  env: Env, dateStr: string,
 ): Promise<Response | null> {
-  for (let back = 1; back <= maxDaysBack; back++) {
-    const prevStr = shiftDateStr(dateStr, -back);
-    const key = colorMomentCacheKey(prevStr, getColorMomentStyle(prevStr).id);
-    const cached = await env.CACHE.get(key);
-    if (!cached) continue;
-    try {
-      const data = JSON.parse(cached);
-      console.log(`color/moment: serving stale fallback from ${prevStr} (${back}d back)`);
-      const html = renderHTML(data.imageB64, data.moment, data.displayDate, data.birthdayInfo);
-      // no-store so the stale copy never outlives the outage in a downstream cache.
-      return htmlResponse(html, "no-store");
-    } catch { /* corrupted entry — keep walking back */ }
+  const hit = await findMostRecentCached(env, "color-moment:", shiftDateStr(dateStr, -1));
+  if (!hit) return null;
+  try {
+    const data = JSON.parse(hit.value);
+    console.log(`color/moment: serving stale fallback from ${hit.key}`);
+    const html = renderHTML(data.imageB64, data.moment, data.displayDate, data.birthdayInfo);
+    // no-store so the stale copy never outlives the outage in a downstream cache.
+    return htmlResponse(html, "no-store");
+  } catch {
+    return null; // corrupted entry
   }
-  return null;
 }
 
 /** Test endpoint for color moment with custom date. */

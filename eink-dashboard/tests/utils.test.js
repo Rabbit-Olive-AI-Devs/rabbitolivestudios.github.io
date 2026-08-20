@@ -26,6 +26,7 @@ const { withBudget } = fromBuild("src/with-budget.js");
 const { pickCleanColorIndex, parseCleanColor, CLEAN_SEQUENCE } = fromBuild("src/clean.js");
 const { nextUtcMidnight } = fromBuild("src/cache-guard.js");
 const { shiftDateStr } = fromBuild("src/date-utils.js");
+const { pickMostRecentDated } = fromBuild("src/stale-cache.js");
 
 test("query param validators clamp to safe defaults", () => {
   assert.equal(parseMonth("12"), 12);
@@ -197,4 +198,68 @@ test("shiftDateStr is DST-proof (uses UTC, not local time)", () => {
   // US DST transitions — a local-time implementation drifts here.
   assert.equal(shiftDateStr("2026-03-09", -1), "2026-03-08"); // spring forward
   assert.equal(shiftDateStr("2026-11-02", -1), "2026-11-01"); // fall back
+});
+
+// --- Version-agnostic stale-cache lookup (DECISIONS #57) ---
+// The fallback must survive a cache-key version bump: rebuilding past keys with
+// the CURRENT version makes it search for keys that never existed.
+
+test("pickMostRecentDated returns the newest prior day", () => {
+  const keys = [
+    "fact4:v4:2026-08-18",
+    "fact4:v4:2026-08-19",
+    "fact4:v4:2026-08-14",
+  ];
+  assert.equal(pickMostRecentDated(keys, "2026-08-19"), "fact4:v4:2026-08-19");
+});
+
+test("pickMostRecentDated survives a cache-key version bump", () => {
+  // Only OLD-version keys exist (v4) while the code has moved to v5.
+  // A key-rebuilding fallback would look for fact4:v5:* and find nothing.
+  const keys = ["fact4:v4:2026-08-18", "fact4:v4:2026-08-19"];
+  assert.equal(pickMostRecentDated(keys, "2026-08-19"), "fact4:v4:2026-08-19");
+});
+
+test("pickMostRecentDated prefers the higher version on the same day", () => {
+  const keys = ["fact4:v4:2026-08-19", "fact4:v5:2026-08-19"];
+  assert.equal(pickMostRecentDated(keys, "2026-08-19"), "fact4:v5:2026-08-19");
+  // Order of the listing must not matter.
+  assert.equal(pickMostRecentDated(keys.reverse(), "2026-08-19"), "fact4:v5:2026-08-19");
+});
+
+test("pickMostRecentDated ignores dates after the bound", () => {
+  const keys = ["fact4:v4:2026-08-20", "fact4:v4:2026-08-21"];
+  assert.equal(pickMostRecentDated(keys, "2026-08-19"), null);
+});
+
+test("pickMostRecentDated honours the lookback window", () => {
+  const keys = ["fact4:v4:2026-08-01"];
+  // Window is maxDaysBack days ending at the bound, inclusive.
+  assert.equal(pickMostRecentDated(keys, "2026-08-19", { maxDaysBack: 7 }), null);
+  assert.equal(
+    pickMostRecentDated(keys, "2026-08-01", { maxDaysBack: 1 }),
+    "fact4:v4:2026-08-01",
+  );
+});
+
+test("pickMostRecentDated separates bw from colour skylines", () => {
+  const keys = [
+    "skyline:v3:2026-08-19:daily",
+    "skyline:v3:2026-08-19:daily:bw",
+  ];
+  const bw = (n) => n.endsWith(":bw");
+  assert.equal(pickMostRecentDated(keys, "2026-08-19", { accept: bw }),
+    "skyline:v3:2026-08-19:daily:bw");
+  assert.equal(pickMostRecentDated(keys, "2026-08-19", { accept: (n) => !bw(n) }),
+    "skyline:v3:2026-08-19:daily");
+});
+
+test("pickMostRecentDated tolerates undated and unrelated keys", () => {
+  const keys = ["gen-lock:v1:fact4:v4:2026-08-19", "fact4:v4", "", "fact4:v4:2026-08-18"];
+  assert.equal(pickMostRecentDated(keys, "2026-08-19"), "gen-lock:v1:fact4:v4:2026-08-19");
+  // With locks filtered out, the real entry wins.
+  assert.equal(
+    pickMostRecentDated(keys, "2026-08-19", { accept: (n) => !n.startsWith("gen-lock:") }),
+    "fact4:v4:2026-08-18",
+  );
 });

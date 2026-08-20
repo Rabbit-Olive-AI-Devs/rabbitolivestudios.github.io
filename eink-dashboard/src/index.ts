@@ -18,6 +18,7 @@ import { generateBirthdayImage } from "./birthday-image";
 import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID } from "./device";
 import { fetchWithTimeout } from "./fetch-timeout";
 import { getChicagoDateParts, shiftDateStr } from "./date-utils";
+import { findMostRecentCached, hasRecentCached } from "./stale-cache";
 import { parseMonth, parseDay, parseStyleIdx } from "./validate";
 import {
   fact4CacheKey,
@@ -55,7 +56,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.15.22";
+const VERSION = "3.15.23";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -150,32 +151,32 @@ const PNG_HEADERS = {
 };
 
 /**
- * Walk back through previous days' cached PNGs for the most recent usable image.
+ * Serve the most recent previously cached PNG for a date-keyed cache family.
  *
  * Both mono pipelines cache a base64 PNG under a date-keyed key, so a failed
  * generation can fall back to a recent day instead of 503-ing the panel into an
- * error screen. Daily entries live 7 days, so one is normally available
- * (DECISIONS #57).
+ * error screen. Daily entries live 7 days, so one is normally available.
+ *
+ * Resolved by PREFIX rather than by rebuilding the key, so the fallback survives
+ * a cache-key version bump — rebuilding embeds the *current* version and would
+ * search for keys that never existed (DECISIONS #57).
  */
 async function findRecentDailyPNG(
   env: Env,
   dateStr: string,
-  keyFor: (d: string) => string,
+  prefix: string,
   label: string,
-  maxDaysBack = 7,
 ): Promise<Response | null> {
-  for (let back = 1; back <= maxDaysBack; back++) {
-    const prevStr = shiftDateStr(dateStr, -back);
-    const cachedB64 = await env.CACHE.get(keyFor(prevStr));
-    if (!cachedB64) continue;
-    try {
-      const binary = Uint8Array.from(atob(cachedB64), (c) => c.charCodeAt(0));
-      console.log(`${label}: serving stale fallback from ${prevStr} (${back}d back)`);
-      // no-store so the stale copy never outlives the outage downstream.
-      return new Response(binary, { headers: { ...PNG_HEADERS, "Cache-Control": "no-store" } });
-    } catch { /* corrupted entry — keep walking back */ }
+  const hit = await findMostRecentCached(env, prefix, shiftDateStr(dateStr, -1));
+  if (!hit) return null;
+  try {
+    const binary = Uint8Array.from(atob(hit.value), (c) => c.charCodeAt(0));
+    console.log(`${label}: serving stale fallback from ${hit.key}`);
+    // no-store so the stale copy never outlives the outage downstream.
+    return new Response(binary, { headers: { ...PNG_HEADERS, "Cache-Control": "no-store" } });
+  } catch {
+    return null; // corrupted entry
   }
-  return null;
 }
 
 /**
@@ -245,7 +246,7 @@ async function handleFactImage(env: Env): Promise<Response> {
   } catch (err) {
     await markAiBudgetExhausted(env, "fact.png", err);
     console.error("Moment Before image error:", err);
-    const stale = await findRecentDailyPNG(env, dateStr, fact4CacheKey, "fact.png");
+    const stale = await findRecentDailyPNG(env, dateStr, "fact4:", "fact.png");
     if (stale) return stale;
     return new Response("Failed to generate image", { status: 503 });
   }
@@ -283,7 +284,7 @@ async function handleFact1BitImage(env: Env): Promise<Response> {
   } catch (err) {
     await markAiBudgetExhausted(env, "fact1.png", err);
     console.error("1-bit Moment Before image error:", err);
-    const stale = await findRecentDailyPNG(env, dateStr, fact1CacheKey, "fact1.png");
+    const stale = await findRecentDailyPNG(env, dateStr, "fact1:", "fact1.png");
     if (stale) return stale;
     return new Response("Failed to generate image", { status: 503 });
   }
@@ -352,32 +353,19 @@ async function findStaleSkylineCache(
     }
   }
 
-  // Walk back through the previous days' daily keys. Daily entries live 7 days
-  // (DECISIONS #57), so this can still find an image after a multi-day AI outage —
-  // a week-old skyline beats a blank panel. Dates are shifted off the Chicago
-  // dateStr rather than the server clock, which is UTC and drifts a day out of
-  // step for the ~5 hours after Chicago midnight.
-  // Only the daily key is worth checking for past days: rotate entries expire after
-  // rotateMin minutes, so a previous day's rotate bucket can never still be present.
-  // Probing them anyway cost 42 pointless KV reads on the very path that runs during
-  // an outage, when latency matters most.
-  for (let back = 1; back <= 7; back++) {
-    const prevStr = shiftDateStr(dateStr, -back);
-    const prevDaily = await env.CACHE.get(skylineCacheKey(prevStr, "daily", rotateMin, currentBucket, bwOnly));
-    if (prevDaily) {
-      console.log(`Skyline stale fallback: found ${prevStr} daily cache (${back}d back)`);
-      return prevDaily;
-    }
-  }
-
-  // Try v2 keys (pre-upgrade cache) as last resort
-  for (let i = 0; i <= 5; i++) {
-    const key = `skyline:v2:${dateStr}:r${rotateMin}:b${currentBucket - i}${bwSuffix}`;
-    const val = await env.CACHE.get(key);
-    if (val) {
-      console.log(`Skyline stale fallback: found v2 cache b${currentBucket - i}`);
-      return val;
-    }
+  // Look past days up by PREFIX rather than rebuilding the key. Daily entries live
+  // 7 days, so this still finds an image after a multi-day outage — and because it
+  // never names a version, it keeps working across a SKYLINE_CACHE_VERSION bump,
+  // which previously needed the hand-rolled "try v2 keys" block this replaces.
+  // Only daily entries are worth checking: rotate entries expire after rotateMin
+  // minutes, so a previous day's bucket can never still be present. The accept
+  // filter keeps a colour request from serving a :bw entry (DECISIONS #57).
+  const prev = await findMostRecentCached(env, "skyline:", shiftDateStr(dateStr, -1), {
+    accept: (n) => n.includes(":daily") && n.endsWith(":bw") === bwOnly,
+  });
+  if (prev) {
+    console.log(`Skyline stale fallback: found ${prev.key}`);
+    return prev.value;
   }
 
   return null;
@@ -528,8 +516,8 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
   }
 }
 
-function handleSkylinePage(url: URL): Response {
-  return skylinePageResponse(url.search.replace(/^\?/, ""));
+function handleSkylinePage(env: Env, url: URL): Promise<Response> {
+  return skylinePageResponse(env, url.search.replace(/^\?/, ""));
 }
 
 async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
@@ -1119,7 +1107,7 @@ export default {
       case "/weather":
         return handleWeatherPageV2(env, url, ctx);
       case "/fact":
-        return handleFactPage();
+        return handleFactPage(env);
       case "/color/weather":
         return handleColorWeatherPage(env, url, ctx);
       case "/worldcup":
@@ -1146,9 +1134,9 @@ export default {
       case "/skyline.png":
         return handleSkylinePng(env, url);
       case "/skyline":
-        return handleSkylinePage(url);
+        return handleSkylinePage(env, url);
       case "/skyline-bw":
-        return skylineBwPageResponse();
+        return skylineBwPageResponse(env);
       case "/skyline-test.png": {
         const authBlockST = checkTestAuth(url, env);
         if (authBlockST) return authBlockST;

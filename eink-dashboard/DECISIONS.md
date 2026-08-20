@@ -1805,3 +1805,58 @@ going to be granted, failed, and re-armed the block. A self-perpetuating cycle.
 A cron whose schedule is expressed in UTC but whose *cache keys* are expressed in a
 DST-observing local timezone is only correct for half the year. Either derive the trigger from
 the same timezone as the keys, or cover both offsets and make the work idempotent.
+
+## 58. Stale Fallbacks Must Outlive a Cache-Key Version Bump (v3.15.23, 2026-08-20)
+
+Follow-up hardening on the two gaps left open by #57.
+
+### Problem 1: the fallback disabled itself on every version bump
+
+The #57 fallbacks walked back through previous days by *rebuilding* each key —
+`fact4CacheKey(prevDate)`, `colorMomentCacheKey(prevDate, style)`. Those builders embed the
+**current** cache-key version, so the moment anyone bumped `FACT4_CACHE_VERSION` from `v4` to
+`v5` the lookback started searching for `fact4:v5:2026-08-19`, which had never existed. Every
+fallback missed and the route 503'd again.
+
+That is not a hypothetical: CLAUDE.md *requires* bumping the cache-key version after any
+pipeline change — and a freshly changed pipeline is exactly what most often fails. The safety
+net switched itself off at the moment of maximum risk.
+
+**Decision: resolve fallbacks by KV prefix, not by rebuilding the key.** `src/stale-cache.ts`
+lists `fact4:` / `fact1:` / `color-moment:` / `skyline:` and picks the newest entry whose
+embedded date is in range, preferring the higher version when a date exists under two. It needs
+no hand-maintained list of old version strings, self-heals across bumps, and costs one KV list
+instead of one get per candidate day. It also replaced the hand-rolled "try `skyline:v2` keys as
+a last resort" block, which was the same idea done manually for exactly one past version.
+
+The pure picker (`pickMostRecentDated`) is unit-tested, including the version-bump case.
+Verified end-to-end by bumping `FACT4_CACHE_VERSION` to `v5` against real KV holding only `v4`
+keys: `/fact.png` still served `fact4:v4:2026-08-19` instead of 503-ing.
+
+### Problem 2: the HTML wrappers still emitted images known to be dead
+
+`/fact`, `/skyline` and `/skyline-bw` are thin pages whose whole body is an `<img>`. If the
+image route fails, the panel shows a broken-image glyph — which is precisely what the E1002
+displayed on 2026-08-20 and what the user reported as "an HTML error".
+
+**Decision: never emit an `<img>` that is already known to fail.** `imageUnavailable()` reports
+true only when AI generation is blocked **and** nothing cached remains; in that case the wrapper
+serves `unavailableHTML()` — a plain 800x480 page, pure `#000` on `#fff`, no JS, no emoji.
+
+The condition is deliberately conservative. A cold cache on a healthy day is *not* a failure —
+the route will simply generate the image — so the check costs one KV read (the budget marker)
+and only lists keys when generation is actually blocked.
+
+The page carries a **Chicago wall-clock stamp**. A static error screen is indistinguishable from
+a panel frozen on an old frame, and a frozen frame is what caused the image retention in #56;
+the stamp proves the display is still refreshing.
+
+As a last line of defence for the race where an image dies *between* the check and the fetch,
+the `<img>` tags now carry styled `alt` text (`color`, `font`, `text-align`), so a broken image
+degrades to a legible sentence rather than a bare icon.
+
+### Note
+
+Both problems applied equally to the colour and mono displays. The two panels share one
+account-wide neuron pool, so neither is ever independently safe: whichever display exhausts the
+quota blanks the other.

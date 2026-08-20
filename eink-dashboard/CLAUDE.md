@@ -280,6 +280,7 @@ eink-dashboard/
     fetch-timeout.ts      — fetchWithTimeout() utility (AbortController-based)
     validate.ts           — Input validation (parseMonth, parseDay, parseStyleIdx)
     response.ts           — htmlResponse() with security headers
+    stale-cache.ts        — prefix-based lookup of the most recent cached entry; survives cache-key version bumps (DECISIONS #58)
     weather-ui.ts         — Shared weather page helpers (formatDate, formatTime, icon, etc.)
     headlines.ts          — Steel/trade RSS/HTML fetch + deterministic ranking (no LLM)
     moon.ts               — Pure moon phase calculator + parametric SVG icons
@@ -302,7 +303,8 @@ eink-dashboard/
     worldcup-testdata.ts  — canned fixtures for ?test-phase previews
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)
-      fact.ts             — /fact HTML wrapper for fact.png
+      fact.ts             — /fact HTML wrapper for fact.png (falls back to a text page)
+      unavailable.ts      — 800x480 "no image to show" page (e-ink safe: #000 on #fff, no JS)
       worldcup.ts         — /worldcup (E1001): default = pre-dithered image (SWR + cron warm), ?variant=src = HTML source
       color-worldcup.ts   — /color/worldcup (E1002 Spectra 6): live HTML + flags
       color-weather.ts    — /color/weather HTML page (E1002 Spectra 6)

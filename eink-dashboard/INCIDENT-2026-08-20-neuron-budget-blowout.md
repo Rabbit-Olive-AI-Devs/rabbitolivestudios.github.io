@@ -1,7 +1,7 @@
 # Incident Report — Workers AI Neuron Budget Blowout
 
 **Date:** 2026-08-20
-**Version at fault:** v3.15.21 · **Fixed in:** v3.15.22
+**Version at fault:** v3.15.21 · **Fixed in:** v3.15.22, hardened in v3.15.23
 **Decision record:** [DECISIONS.md #57](DECISIONS.md)
 **Severity:** Both displays showed error screens instead of content for ~9 hours; one page (skyline) stayed blank for ~19 hours.
 
@@ -254,6 +254,30 @@ curl -H "Authorization: Bearer $TOKEN" \
 5. **Still no alerting.** Detection depended on the user looking at a display.
 
 ---
+
+## 9b. Follow-up hardening (v3.15.23, DECISIONS #58)
+
+A review of the #57 remediation found two gaps, both since closed.
+
+**The fallback disabled itself on every cache-key version bump.** The lookback *rebuilt* past
+keys via `fact4CacheKey(prevDate)` and friends, which embed the **current** version — so bumping
+`FACT4_CACHE_VERSION` to `v5` made it search for `fact4:v5:…` keys that had never existed. Since
+CLAUDE.md requires a version bump after any pipeline change, and a freshly changed pipeline is
+what most often fails, the safety net switched itself off at the moment of maximum risk. Keys are
+now resolved by **KV prefix** (`src/stale-cache.ts`), which needs no list of old version strings
+and self-heals across bumps. Verified against real KV holding only `v4` keys with the code bumped
+to `v5`: `/fact.png` still served `fact4:v4:2026-08-19`.
+
+**The wrapper pages still emitted images known to be dead.** `/fact`, `/skyline` and
+`/skyline-bw` are thin `<img>` pages; when the image route fails the panel shows a broken-image
+glyph — exactly what was reported as "an HTML error". They now render a plain 800x480 text page
+when generation is blocked *and* nothing cached remains. The check is conservative: a cold cache
+on a healthy day still renders the image, because the route will simply generate it. The page
+carries a Chicago timestamp, so a static error screen is distinguishable from a panel frozen on
+an old frame — the failure that caused the image retention in #56.
+
+Residual risks 1–5 above are unchanged; these were separate latent faults, not causes of this
+incident.
 
 ## 10. Runbook — diagnosing this class of failure again
 
