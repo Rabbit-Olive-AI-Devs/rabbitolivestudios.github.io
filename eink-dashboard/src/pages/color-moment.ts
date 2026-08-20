@@ -10,7 +10,7 @@
 
 import { fetchWithTimeout } from "../fetch-timeout";
 import type { Env, MomentBeforeData } from "../types";
-import { getChicagoDateParts } from "../date-utils";
+import { getChicagoDateParts, shiftDateStr } from "../date-utils";
 import { getTodayEvents } from "../fact";
 import { getOrGenerateMoment, generateMomentBefore } from "../moment";
 import { getBirthdayToday, getBirthdayByKey, getArtStyle } from "../birthday";
@@ -304,11 +304,44 @@ export async function handleColorMomentPage(env: Env, url: URL): Promise<Respons
   } catch (err) {
     await markAiBudgetExhausted(env, "color/moment", err);
     console.error("Color moment page error:", err);
+
+    // Serve the most recent cached moment rather than a 503. The device renders a
+    // failed fetch as an error page, so a day-old illustration is strictly better
+    // than a broken panel — and entries live 7 days, so one is usually there
+    // (DECISIONS #57).
+    const stale = await findRecentColorMoment(env, dateStr);
+    if (stale) return stale;
+
     return new Response("Color moment temporarily unavailable", {
       status: 503,
       headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "300" },
     });
   }
+}
+
+/**
+ * Walk back through the previous days' color-moment caches for a usable image.
+ *
+ * The style is a pure function of the date, so each past day's cache key is
+ * reconstructible without storing an index.
+ */
+async function findRecentColorMoment(
+  env: Env, dateStr: string, maxDaysBack = 7,
+): Promise<Response | null> {
+  for (let back = 1; back <= maxDaysBack; back++) {
+    const prevStr = shiftDateStr(dateStr, -back);
+    const key = colorMomentCacheKey(prevStr, getColorMomentStyle(prevStr).id);
+    const cached = await env.CACHE.get(key);
+    if (!cached) continue;
+    try {
+      const data = JSON.parse(cached);
+      console.log(`color/moment: serving stale fallback from ${prevStr} (${back}d back)`);
+      const html = renderHTML(data.imageB64, data.moment, data.displayDate, data.birthdayInfo);
+      // no-store so the stale copy never outlives the outage in a downstream cache.
+      return htmlResponse(html, "no-store");
+    } catch { /* corrupted entry — keep walking back */ }
+  }
+  return null;
 }
 
 /** Test endpoint for color moment with custom date. */

@@ -108,7 +108,9 @@ npm run dry-run
 npx wrangler deploy
 ```
 
-Your worker URL will be printed. Cron schedule: daily at 06:05 UTC (images), every 6 hours (headlines/weather/device data), and **every 15 minutes** a World Cup-only refresh that pulls fresh results and re-renders the bracket image when a result changes — so the knockout bracket stays current on the device without manual intervention (DECISIONS.md #54).
+Your worker URL will be printed. Cron schedule: daily at **05:05 and 06:05 UTC** (images), every 6 hours (headlines/weather/device data), and **every 15 minutes** a World Cup-only refresh that pulls fresh results and re-renders the bracket image when a result changes — so the knockout bracket stays current on the device without manual intervention (DECISIONS.md #54).
+
+> **Why two daily triggers?** Cache keys are dated in America/Chicago, which is 05:00 UTC in CDT and 06:00 UTC in CST. Both run year-round: whichever fires first after the date rolls generates the day's images, and the other finds a warm cache and no-ops. With a single 06:05 UTC trigger there was a 65-minute hole every summer day where the keys were cold but the cron hadn't run — so the *devices* generated the images on the request path, duplicated the work, and eventually blew the 10,000/day Workers AI free allocation (DECISIONS.md #57).
 
 ### Step 5: Set Secrets (Optional)
 
@@ -410,6 +412,8 @@ v3.11.2 adds guardrails around expensive AI generation:
 - Cached AI routes use short KV-backed generation locks (`gen-lock:v1:*`) so duplicate cold-cache requests usually wait for the first request to fill the cache.
 - Workers AI neuron-budget errors set `ai-budget:v1:block` for 6 hours. During that pause, cached images still serve, but new AI generation returns a 503 instead of cascading through fallback models.
 - `/skyline.png` still tries stale skyline caches, and color skyline can serve cached BW skyline as a final visual fallback.
+- **Stale-image fallback (v3.15.22)**: when AI generation is unavailable, `/fact.png`, `/fact1.png` and `/color/moment` walk back up to 7 days for the most recent cached image rather than returning 503. The panel screenshots whatever it gets, so a day-old illustration beats an error page. Daily image caches (including skyline) are kept 7 days so a fallback actually exists — skyline previously used a 24h TTL that expired at the exact moment the next day's key went cold, leaving nothing to serve (DECISIONS.md #57).
+- **AI budget pause** ends at the next 00:00 UTC — when Workers AI actually resets the free neuron allocation — instead of a fixed 6 hours. A block that lifted early just burned neurons on generations that were never going to be granted (DECISIONS.md #57).
 - `/color/headlines` is back on without Workers AI; it ranks RSS/scraped sources deterministically and caches results as `headlines:v3:YYYY-MM-DD:PERIOD`.
 
 ### Rollback
@@ -454,6 +458,8 @@ npm run dry-run
 | Faint text on display | All text must be pure black (#000). Grays are invisible on e-ink. |
 | Smudged / blurry HTML text on the panel | Two causes (both bit the WC pages — see DECISIONS.md #46): font weights above 700 blob at small sizes (keep body `500`–`600`, emphasis `700`); and stretch-to-fill layouts (`height:100%`, `justify-content:space-evenly/around`) put text on fractional pixels — size rows to content with fixed `gap`/padding + integer `line-height` so baselines land on whole pixels. |
 | Mono panel shows a black, ghosted mess | The mono E1001 was pointed at a `/color/...` route — color fills + flag images render as black mush in 1-bit. Use the mono route (`/worldcup`, not `/color/worldcup`). |
+| All AI pages fail at once ("temporarily unavailable" / broken image) | The Workers AI free neuron allocation (10,000/day) is spent. Check `/health-detailed` → `config.ai_budget`. Confirm real usage rather than trusting the error — Cloudflare has a known false-4006 bug — by querying the GraphQL `aiInferenceAdaptiveGroups` dataset for `totalNeurons` by `modelId`. The quota resets at 00:00 UTC; pages serve the most recent cached image until then. FLUX.2 klein-9b costs ~1,364 neurons/image and is effectively the entire bill. |
+| One page keeps regenerating instead of using the cron's cached image | The daily image warm must run *after* the Chicago date rolls over. Both `05:05` and `06:05` UTC triggers must be present in `wrangler.toml` (CDT and CST respectively) — otherwise the devices generate the images themselves on the request path and duplicate the work (DECISIONS.md #57). |
 
 ---
 

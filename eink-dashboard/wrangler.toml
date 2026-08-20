@@ -28,9 +28,14 @@ binding = "PHOTOS"
 bucket_name = "eink-birthday-photos"
 
 # Cron schedules:
-#   "5 6 * * *"       — daily image warm at 06:05 UTC (after midnight Chicago in both CST/CDT)
+#   "5 5 * * *" + "5 6 * * *" — daily image warm. Chicago midnight is 05:00 UTC in CDT and
+#                       06:00 UTC in CST, so BOTH run: whichever fires first after the date
+#                       rolls generates, and the other no-ops on the now-warm cache. A single
+#                       06:05 UTC trigger left a 65-minute hole every summer day where the
+#                       devices themselves generated the images on the request path — which
+#                       duplicated work and blew the neuron budget (DECISIONS #57).
 #   "5 0,6,12,18 * * *" — headlines + weather every 6h
 #   "*/15 * * * *"    — World Cup only: refresh data + re-render bracket image on a result change
 #                       (keeps the device's ~15-min poll current without manual nudging; #54)
 [triggers]
-crons = ["5 6 * * *", "5 0,6,12,18 * * *", "*/15 * * * *"]
+crons = ["5 5 * * *", "5 6 * * *", "5 0,6,12,18 * * *", "*/15 * * * *"]

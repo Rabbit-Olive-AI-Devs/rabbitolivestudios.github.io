@@ -1711,3 +1711,86 @@ The device's refresh interval is unknown, which creates an **aliasing** trap: if
 Overrides: `?c=black|white|red|yellow|green|blue` (or index `0`-`5`) holds one color for manual/deliberate cycling and browser testing; `?s=N` sets seconds-per-frame (default 1, clamped `>=1` so a bad/zero value can't divide by zero). Response is `Cache-Control: no-store` so neither the CDN nor SenseCraft pins one color.
 
 Works on both displays: on the E1002 the fills are true pigment colors; on the E1001 mono panel they render as solid grays — still valid full-screen flushes. No AI, no KV, no auth — it's a harmless static render, protected only by the global rate limit. `pickCleanColorIndex`/`parseCleanColor` are pure and unit-tested (52 tests).
+
+## 57. Neuron Budget Blowout: the Devices Were Generating the Images (v3.15.22, 2026-08-20)
+
+### Symptom
+
+Both AI pages on the E1002 died on the same day: `/skyline` rendered a broken `<img>` and
+`/color/moment` showed "Color moment temporarily unavailable". `/fact.png` and `/fact1.png`
+on the mono E1001 were 503-ing too.
+
+`/health-detailed` showed `ai_budget.blocked: true`, and the KV marker held Cloudflare's
+canonical text: `4006: you have used up your daily free allocation of 10,000 neurons`. The
+GraphQL analytics API confirmed it was real, not the false-4006 bug that was widely reported
+in the Cloudflare community around this time:
+
+| Date | FLUX.2 calls | Neurons |
+|------|--------------|---------|
+| 2026-08-11 … 08-19 | 4–5 / day | **5,500 / day** |
+| 2026-08-20 | **12** | **12,409** |
+
+Nine stable days, then 3× the calls. Per-call cost was unchanged (~1,364), so the Aug-18
+Workers AI pricing change was **not** the cause — the call *count* was.
+
+### Root cause: a 65-minute hole where the cron hadn't run but the date had rolled
+
+The daily warm cron was a single `"5 6 * * *"` (06:05 UTC). The comment claimed this was
+"after midnight Chicago in both CST/CDT" — true only in CST. **In CDT the Chicago date rolls
+over at 05:00 UTC, so the cron ran 65 minutes late.**
+
+In that window every daily cache key is cold, and two devices polling every 15 minutes hit
+them first. The devices — not the cron — generated the day's images, on the request path.
+`withGenerationLock` is explicitly best-effort (KV has no atomic put-if-absent, and its reads
+are eventually consistent), so concurrent polls duplicated the work. The hourly usage data
+shows it plainly: the calls land in the 05:00 UTC bucket, *before* the cron.
+
+This had been happening every summer day — usually costing 1–2 extra generations, which fit
+under the cap. On 2026-08-20 the race went badly enough to double it and blow the budget.
+
+### Why it then stayed broken
+
+`markAiBudgetExhausted` blocked AI for a **fixed 6 hours**, but Cloudflare resets the free
+allocation at **00:00 UTC**. The block lifted at 12:05 while the quota was still spent, the
+devices immediately retried, burned **2,773 more neurons** on generations that were never
+going to be granted, failed, and re-armed the block. A self-perpetuating cycle.
+
+### Decisions
+
+1. **Two daily triggers, `"5 5 * * *"` + `"5 6 * * *"`.** One per Chicago UTC offset. Whichever
+   fires first after the date rolls generates; the other finds a warm cache and no-ops. The
+   cache is warm before the devices ever ask.
+2. **The daily warm is idempotent.** Pipelines A and B regenerated unconditionally (color
+   moment and skyline already checked). They now skip when the key exists — otherwise the
+   second trigger would have doubled the bill it was added to prevent.
+3. **The budget block expires at the next 00:00 UTC**, via `nextUtcMidnight()`, instead of a
+   fixed 6h. A block that lifts before the real quota resets only burns neurons.
+4. **AI routes serve a stale image instead of 503.** `/fact.png`, `/fact1.png` and
+   `/color/moment` walk back up to 7 days for the most recent cached image
+   (`findRecentDailyPNG` / `findRecentColorMoment`). The panel screenshots whatever it gets,
+   so a day-old illustration beats an error page. Served `no-store` so the stale copy never
+   outlives the outage downstream.
+5. **Skyline daily TTL 86400 → 604800.** This was the reason `/skyline` had *nothing* to fall
+   back to: written at ~05:00 UTC with a 24h TTL, the entry expired at the exact moment the
+   next day's key went cold — zero overlap, so `findStaleSkylineCache` always came up empty
+   and KV held no skyline keys at all. 7 days matches every other daily cache and DECISIONS
+   #24 (`expirationTtl` >> soft TTL). Its lookback now walks 7 days off the *Chicago* dateStr
+   (it previously derived "yesterday" from the server clock, which is UTC and drifts a day out
+   of step for ~5 hours after Chicago midnight), and only probes daily keys for past days —
+   rotate entries expire in 15 minutes, so probing them cost 42 pointless KV reads on the exact
+   path that runs during an outage.
+
+### Rejected
+
+- **Switching FLUX.2 → SDXL.** SDXL has billed 0 neurons every day while FLUX.2 is 100% of the
+  bill, so this is tempting. Deferred: it changes image output, belongs in its own commit, and
+  the observed 0 needs verifying before it's leaned on. Baseline usage fits the cap once
+  duplicate generation is gone.
+- **Clearing the block manually to "fix" the display.** The block was reporting the truth. The
+  quota really was spent; clearing it would only have burned the next day's allocation early.
+
+### Lesson
+
+A cron whose schedule is expressed in UTC but whose *cache keys* are expressed in a
+DST-observing local timezone is only correct for half the year. Either derive the trigger from
+the same timezone as the keys, or cover both offsets and make the work idempotent.

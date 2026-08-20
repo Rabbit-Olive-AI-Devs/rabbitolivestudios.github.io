@@ -2,8 +2,20 @@ import type { Env } from "./types";
 import { generationLockKey } from "./cache-keys";
 
 const AI_BUDGET_BLOCK_KEY = "ai-budget:v1:block";
-const AI_BUDGET_BLOCK_TTL_SECONDS = 6 * 60 * 60;
-const AI_BUDGET_BLOCK_MS = AI_BUDGET_BLOCK_TTL_SECONDS * 1000;
+
+/**
+ * Workers AI resets the free neuron allocation at 00:00 UTC, so that — not a
+ * fixed duration — is when a budget block can usefully lift.
+ *
+ * The old 6h block expired mid-day while the real quota was still spent: every
+ * device poll after it lifted started a fresh generation, burned neurons that
+ * were never going to be granted, failed, and re-armed the block. On 2026-08-20
+ * that cost 2,773 wasted neurons in one afternoon (DECISIONS #57).
+ */
+export function nextUtcMidnight(now: number): number {
+  const d = new Date(now);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0);
+}
 
 export interface AiBudgetBlock {
   source: string;
@@ -36,15 +48,18 @@ export async function markAiBudgetExhausted(
 
   const message = String((err as any)?.message ?? err).slice(0, 300);
   const now = Date.now();
+  const blockUntil = nextUtcMidnight(now);
   const block: AiBudgetBlock = {
     source,
     message,
     createdAt: now,
-    blockUntil: now + AI_BUDGET_BLOCK_MS,
+    blockUntil,
   };
 
+  // KV rejects a TTL under 60s; `blockUntil` stays authoritative either way,
+  // since getAiBudgetBlock compares against it rather than trusting expiry.
   await env.CACHE.put(AI_BUDGET_BLOCK_KEY, JSON.stringify(block), {
-    expirationTtl: AI_BUDGET_BLOCK_TTL_SECONDS,
+    expirationTtl: Math.max(60, Math.ceil((blockUntil - now) / 1000)),
   });
   console.error(`AI budget marker set by ${source}: ${message}`);
   return true;

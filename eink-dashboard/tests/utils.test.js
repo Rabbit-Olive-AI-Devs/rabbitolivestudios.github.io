@@ -24,6 +24,8 @@ const {
 const { tempColor, batteryIcon } = fromBuild("src/pages/color-weather.js");
 const { withBudget } = fromBuild("src/with-budget.js");
 const { pickCleanColorIndex, parseCleanColor, CLEAN_SEQUENCE } = fromBuild("src/clean.js");
+const { nextUtcMidnight } = fromBuild("src/cache-guard.js");
+const { shiftDateStr } = fromBuild("src/date-utils.js");
 
 test("query param validators clamp to safe defaults", () => {
   assert.equal(parseMonth("12"), 12);
@@ -140,4 +142,59 @@ test("parseCleanColor accepts names and indices, rejects garbage", () => {
   assert.equal(parseCleanColor(""), null);
   assert.equal(parseCleanColor("purple"), null);
   assert.equal(parseCleanColor("9"), null);
+});
+
+// --- AI budget block expiry (DECISIONS #57) ---
+// Workers AI resets the free neuron allocation at 00:00 UTC. A fixed-length
+// block that lifts before the reset just burns neurons on doomed retries.
+
+test("nextUtcMidnight returns the next 00:00 UTC boundary", () => {
+  assert.equal(
+    nextUtcMidnight(Date.UTC(2026, 7, 20, 13, 54, 36)),
+    Date.UTC(2026, 7, 21, 0, 0, 0, 0),
+  );
+  // Exactly midnight advances a full day (never returns "now").
+  assert.equal(
+    nextUtcMidnight(Date.UTC(2026, 7, 20, 0, 0, 0)),
+    Date.UTC(2026, 7, 21, 0, 0, 0, 0),
+  );
+  // One second before the reset.
+  assert.equal(
+    nextUtcMidnight(Date.UTC(2026, 7, 20, 23, 59, 59)),
+    Date.UTC(2026, 7, 21, 0, 0, 0, 0),
+  );
+  // Month and year rollover.
+  assert.equal(
+    nextUtcMidnight(Date.UTC(2026, 11, 31, 23, 0, 0)),
+    Date.UTC(2027, 0, 1, 0, 0, 0, 0),
+  );
+});
+
+test("nextUtcMidnight is always in the future and at most 24h out", () => {
+  for (const h of [0, 1, 6, 12, 18, 23]) {
+    const now = Date.UTC(2026, 7, 20, h, 30, 0);
+    const next = nextUtcMidnight(now);
+    assert.ok(next > now, `not in the future at ${h}:30`);
+    assert.ok(next - now <= 24 * 3600 * 1000, `more than 24h out at ${h}:30`);
+  }
+});
+
+// --- Date shifting for stale-cache lookback (DECISIONS #57) ---
+
+test("shiftDateStr walks calendar days without drifting", () => {
+  assert.equal(shiftDateStr("2026-08-20", -1), "2026-08-19");
+  assert.equal(shiftDateStr("2026-08-20", 0), "2026-08-20");
+  assert.equal(shiftDateStr("2026-08-20", -7), "2026-08-13");
+  // Month boundary.
+  assert.equal(shiftDateStr("2026-03-01", -1), "2026-02-28");
+  // Year boundary.
+  assert.equal(shiftDateStr("2026-01-01", -1), "2025-12-31");
+  // Leap day (2028 is a leap year).
+  assert.equal(shiftDateStr("2028-03-01", -1), "2028-02-29");
+});
+
+test("shiftDateStr is DST-proof (uses UTC, not local time)", () => {
+  // US DST transitions — a local-time implementation drifts here.
+  assert.equal(shiftDateStr("2026-03-09", -1), "2026-03-08"); // spring forward
+  assert.equal(shiftDateStr("2026-11-02", -1), "2026-11-01"); // fall back
 });

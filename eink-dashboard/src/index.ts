@@ -17,7 +17,7 @@ import { getBirthdayToday, getBirthdayByKey } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
 import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID } from "./device";
 import { fetchWithTimeout } from "./fetch-timeout";
-import { getChicagoDateParts } from "./date-utils";
+import { getChicagoDateParts, shiftDateStr } from "./date-utils";
 import { parseMonth, parseDay, parseStyleIdx } from "./validate";
 import {
   fact4CacheKey,
@@ -55,7 +55,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.15.21";
+const VERSION = "3.15.22";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -150,6 +150,35 @@ const PNG_HEADERS = {
 };
 
 /**
+ * Walk back through previous days' cached PNGs for the most recent usable image.
+ *
+ * Both mono pipelines cache a base64 PNG under a date-keyed key, so a failed
+ * generation can fall back to a recent day instead of 503-ing the panel into an
+ * error screen. Daily entries live 7 days, so one is normally available
+ * (DECISIONS #57).
+ */
+async function findRecentDailyPNG(
+  env: Env,
+  dateStr: string,
+  keyFor: (d: string) => string,
+  label: string,
+  maxDaysBack = 7,
+): Promise<Response | null> {
+  for (let back = 1; back <= maxDaysBack; back++) {
+    const prevStr = shiftDateStr(dateStr, -back);
+    const cachedB64 = await env.CACHE.get(keyFor(prevStr));
+    if (!cachedB64) continue;
+    try {
+      const binary = Uint8Array.from(atob(cachedB64), (c) => c.charCodeAt(0));
+      console.log(`${label}: serving stale fallback from ${prevStr} (${back}d back)`);
+      // no-store so the stale copy never outlives the outage downstream.
+      return new Response(binary, { headers: { ...PNG_HEADERS, "Cache-Control": "no-store" } });
+    } catch { /* corrupted entry — keep walking back */ }
+  }
+  return null;
+}
+
+/**
  * Generate the "Moment Before" 4-level grayscale image.
  * On family birthdays, generates a portrait instead.
  * Cached in KV for 24 hours per date.
@@ -216,6 +245,8 @@ async function handleFactImage(env: Env): Promise<Response> {
   } catch (err) {
     await markAiBudgetExhausted(env, "fact.png", err);
     console.error("Moment Before image error:", err);
+    const stale = await findRecentDailyPNG(env, dateStr, fact4CacheKey, "fact.png");
+    if (stale) return stale;
     return new Response("Failed to generate image", { status: 503 });
   }
 }
@@ -252,6 +283,8 @@ async function handleFact1BitImage(env: Env): Promise<Response> {
   } catch (err) {
     await markAiBudgetExhausted(env, "fact1.png", err);
     console.error("1-bit Moment Before image error:", err);
+    const stale = await findRecentDailyPNG(env, dateStr, fact1CacheKey, "fact1.png");
+    if (stale) return stale;
     return new Response("Failed to generate image", { status: 503 });
   }
 }
@@ -319,22 +352,21 @@ async function findStaleSkylineCache(
     }
   }
 
-  // Try yesterday's daily + rotation keys
-  const yesterday = new Date(Date.now() - 86400000);
-  const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
-
-  const yDailyVal = await env.CACHE.get(skylineCacheKey(yStr, "daily", rotateMin, currentBucket, bwOnly));
-  if (yDailyVal) {
-    console.log(`Skyline stale fallback: found yesterday ${yStr} daily cache`);
-    return yDailyVal;
-  }
-
-  for (let i = 0; i <= 5; i++) {
-    const key = skylineCacheKey(yStr, "rotate", rotateMin, currentBucket - i, bwOnly);
-    const val = await env.CACHE.get(key);
-    if (val) {
-      console.log(`Skyline stale fallback: found yesterday ${yStr} b${currentBucket - i}`);
-      return val;
+  // Walk back through the previous days' daily keys. Daily entries live 7 days
+  // (DECISIONS #57), so this can still find an image after a multi-day AI outage —
+  // a week-old skyline beats a blank panel. Dates are shifted off the Chicago
+  // dateStr rather than the server clock, which is UTC and drifts a day out of
+  // step for the ~5 hours after Chicago midnight.
+  // Only the daily key is worth checking for past days: rotate entries expire after
+  // rotateMin minutes, so a previous day's rotate bucket can never still be present.
+  // Probing them anyway cost 42 pointless KV reads on the very path that runs during
+  // an outage, when latency matters most.
+  for (let back = 1; back <= 7; back++) {
+    const prevStr = shiftDateStr(dateStr, -back);
+    const prevDaily = await env.CACHE.get(skylineCacheKey(prevStr, "daily", rotateMin, currentBucket, bwOnly));
+    if (prevDaily) {
+      console.log(`Skyline stale fallback: found ${prevStr} daily cache (${back}d back)`);
+      return prevDaily;
     }
   }
 
@@ -426,7 +458,11 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
   // mode=rotate or daily → KV cached
   const bwSuffix = bwOnly ? ":bw" : "";
   const cacheKey = skylineCacheKey(dateStr, mode, rotateMin, bucket, bwOnly);
-  const ttl = mode === "rotate" ? rotateMin * 60 : 86400;
+  // Daily entries are kept for a week, not 24h. At 86400 the day's image expired at
+  // the exact moment the next day's key went cold, so findStaleSkylineCache had
+  // nothing left to serve and the page 503'd into a broken <img>. Matches the other
+  // daily caches and DECISIONS #24 (expirationTtl >> soft TTL). See DECISIONS #57.
+  const ttl = mode === "rotate" ? rotateMin * 60 : 604800;
   const maxAge = mode === "rotate" ? rotateMin * 60 : 86400;
 
   const readSkylineCache = async (): Promise<Response | null> => {
@@ -697,7 +733,12 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     return;
   }
 
-  const isDaily = cronExpression === "5 6 * * *";
+  // Two daily triggers, one for each Chicago UTC offset: 05:05 UTC lands just after
+  // midnight in CDT, 06:05 UTC just after midnight in CST. Both run year-round — the
+  // one that fires before the date rolls finds yesterday's images already cached and
+  // no-ops, so the cost is a few KV reads. The point is that the cache is warm before
+  // the devices start polling the new day's keys (DECISIONS #57).
+  const isDaily = cronExpression === "5 5 * * *" || cronExpression === "5 6 * * *";
   console.log(`Cron: ${isDaily ? "daily image warm" : "periodic data refresh"} (${cronExpression})`);
 
   try {
@@ -755,7 +796,13 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     // 1. Pipeline A (or birthday) — HIGHEST PRIORITY
     if (!budgetExhausted) {
       try {
-        if (birthday) {
+        // Skip if already cached: the day's other daily trigger, or a device that
+        // beat the cron to the new date, may have filled this already. Regenerating
+        // it burned ~1,364 neurons for an identical image (DECISIONS #57).
+        const keyA = birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr);
+        if (await env.CACHE.get(keyA)) {
+          console.log(`Cron: Pipeline A already cached for ${dateStr}`);
+        } else if (birthday) {
           console.log(`Cron: birthday detected — ${birthday.name}`);
           const bdayPng = await generateBirthdayImage(env, birthday, yearNum);
           await env.CACHE.put(birthdayCacheKey(dateStr), pngToBase64(bdayPng), { expirationTtl: 604800 });
@@ -779,9 +826,14 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     // 2. Pipeline B
     if (!budgetExhausted) {
       try {
-        const png1 = await generateMomentImage1Bit(env, sharedMoment, displayDate, dateStr);
-        await env.CACHE.put(fact1CacheKey(dateStr), pngToBase64(png1), { expirationTtl: 604800 });
-        console.log(`Cron: cached 1-bit image for ${dateStr}`);
+        const keyB = fact1CacheKey(dateStr);
+        if (await env.CACHE.get(keyB)) {
+          console.log(`Cron: Pipeline B already cached for ${dateStr}`);
+        } else {
+          const png1 = await generateMomentImage1Bit(env, sharedMoment, displayDate, dateStr);
+          await env.CACHE.put(keyB, pngToBase64(png1), { expirationTtl: 604800 });
+          console.log(`Cron: cached 1-bit image for ${dateStr}`);
+        }
       } catch (err) {
         if (isNeuronError(err)) {
           budgetExhausted = true;
@@ -835,7 +887,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
           const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate);
           const skylinePhotoSeed = djb2(`${dateStr}|photo|daily`);
           const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineSdxlPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
-          await env.CACHE.put(skylineDailyKey, skylineResult.base64, { expirationTtl: 86400 });
+          await env.CACHE.put(skylineDailyKey, skylineResult.base64, { expirationTtl: 604800 });
           console.log(`Cron: cached skyline daily (${skylineCity.name}, ${skylineStyle.label}, ref=${skylineResult.usedRef})`);
         } else {
           console.log(`Cron: skyline already cached for today`);
@@ -866,7 +918,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
           const bwCaption = formatSkylineCaption(bwCity, bwParts.displayDate);
           const bwPhotoSeed = djb2(`${dateStr}|photo|daily-bw`);
           const bwResult = await generateSkylineImage(env, bwRefPrompt, bwSdxlPrompt, bwCaption, bwStyle.colorMode, bwCity.key, bwPhotoSeed, true);
-          await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: 86400 });
+          await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: 604800 });
           console.log(`Cron: cached skyline BW daily (${bwCity.name}, ${bwStyle.label}, sdxlOnly)`);
         } else {
           console.log(`Cron: skyline BW already cached for today`);
