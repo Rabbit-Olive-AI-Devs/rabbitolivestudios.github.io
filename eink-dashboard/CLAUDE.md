@@ -299,7 +299,7 @@ eink-dashboard/
     validate.ts           — Input validation (parseMonth, parseDay, parseStyleIdx)
     response.ts           — htmlResponse() with security headers
     alert.ts              — failure alerting: cache-state check + Email Routing sender (DECISIONS #60)
-    stale-cache.ts        — prefix-based lookup of the most recent cached entry; survives cache-key version bumps (DECISIONS #58)
+    stale-cache.ts        — prefix-based lookup of the most recent cached entry; survives cache-key version bumps (#58). Listings memoised at `stale-idx:v1:<prefix>` 6h so an outage can't exhaust the KV list quota (#62)
     weather-ui.ts         — Shared weather page helpers (formatDate, formatTime, icon, etc.)
     headlines.ts          — Steel/trade RSS/HTML fetch + deterministic ranking (no LLM)
     moon.ts               — Pure moon phase calculator + parametric SVG icons
@@ -326,6 +326,8 @@ eink-dashboard/
       weather2.ts         — /weather HTML page (E1001 mono)
       fact.ts             — /fact HTML wrapper for fact.png (falls back to a text page)
       unavailable.ts      — 800x480 "no image to show" page (e-ink safe: #000 on #fff, no JS)
+      # --- RETIRED 2026-08-21 with the rest of the World Cup code (DECISIONS #61). Unwired
+      # --- from the router; kept for 2030. Do not delete.
       worldcup.ts         — /worldcup (E1001): default = pre-dithered image (SWR + cron warm), ?variant=src = HTML source
       color-worldcup.ts   — /color/worldcup (E1002 Spectra 6): live HTML + flags
       color-weather.ts    — /color/weather HTML page (E1002 Spectra 6)
