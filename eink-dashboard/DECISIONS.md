@@ -2139,10 +2139,30 @@ outage it exists to survive.** Once `CACHE.list()` starts failing, `findMostRece
 nothing, and the panels go back to 503s and broken-image glyphs on day two — the failure #58 was
 written to prevent. Neither August outage ran long enough to reach it, which is why it went unseen.
 
-This is recorded, not yet fixed. The obvious remedy is to stop paying a list per request: resolve
-the most recent cached key **once per day** and store the answer under a small KV key, so an outage
-costs ~1 list/day instead of ~40/hour. That is a change to the #58 path and deserves its own commit
-and its own test, rather than being bolted onto a documentation pass.
+**Fixed the same day.** `listKeysCached` memoises each prefix's key listing in KV under
+`stale-idx:v1:<prefix>` with a 6-hour TTL — long enough to make an outage cheap, far short of the
+7-day life of the entries it describes. A simulated 24-hour outage (two panels, 15-minute polls,
+across the six routes that consult the fallback) goes from **480 list operations to 20** — 48% of
+the daily cap down to 2%. Writes fall by the same factor, since each index refresh is one write.
+A healthy day is unchanged at **zero**: `imageUnavailable` still short-circuits on the budget marker
+before listing, and every `findMostRecentCached` caller sits on a `catch` path.
+
+Two details make it safe rather than merely cheap:
+
+- **Nothing trusts the index blindly.** `resolveMostRecent` verifies each candidate with a real read
+  and walks to the next on a miss. `hasRecentCached` — which decides whether a wrapper page emits an
+  `<img>` — was changed from *picking a name off the listing* to *confirming the entry exists*.
+  Trusting a stale index there would have produced the broken-image glyph #58 exists to prevent.
+  Reads sit at ~1% of their cap, so this is the cheap half of the trade.
+- **A negative result is still a result.** The first attempt re-listed whenever the index yielded
+  nothing, which defeated the memo entirely on families that are legitimately empty — `birthday:` is
+  checked on *every* `/fact` request and is empty on all but a handful of days a year. Measured, that
+  first version only reached a 64% reduction. Re-listing now happens only when the index is
+  *demonstrably* wrong: it named entries in range and every one of them was gone. That took it to 96%.
+
+The lesson worth keeping: **the first version of a cache optimisation was less than half as
+effective as it looked, and only measuring showed it.** The unit tests assert operation *counts*, not
+just return values, so a future change that quietly reintroduces per-request listing fails the suite.
 
 ### Why this was missed
 

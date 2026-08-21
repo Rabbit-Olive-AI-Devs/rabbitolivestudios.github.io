@@ -53,7 +53,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.16.1";
+const VERSION = "3.16.2";
 
 /** Public origin, used for links in alert emails (a cron has no request URL). */
 const WORKER_BASE_URL = "https://eink-dashboard.thiago-oliveira77.workers.dev";
