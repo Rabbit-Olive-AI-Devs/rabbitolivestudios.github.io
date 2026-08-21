@@ -42,6 +42,7 @@ Every session must begin with these steps:
 | Any image pipeline change | Never pass raw bytes to `env.IMAGES.input()` — it throws `undefined (reading 'font')` and burns the AI call before failing (DECISIONS #59) |
 | An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list`) before assuming reads are racing (DECISIONS #59) |
 | Touching World Cup code | It is **retired but preserved** for 2030 — unwired, not deleted. Keep the files and their tests green; see DECISIONS #61 before removing anything |
+| Adding any per-request KV write or `list` | Cost it against the free tier's **1,000 writes/day** — a normal day already uses ~590 (DECISIONS #62). Reads are effectively free; writes and lists are not |
 | Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
 | Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying |
 
@@ -70,6 +71,12 @@ npm run dry-run
 # Local dev server (check port 8787/8790 availability first)
 lsof -ti:8790
 npx wrangler dev --port 8790
+
+# NOTE: `wrangler dev --remote` under the REAL worker name inherits deployed secrets,
+# so TEST_AUTH_KEY gates you out of the test routes (404). To exercise them against real
+# bindings, run under a different name (-c a copy of wrangler.toml with `name` changed)
+# and supply any needed values via .dev.vars (gitignored). Plain `wrangler dev` runs
+# env.IMAGES in LOCAL mode, which does not reproduce edge Images faults (DECISIONS #59).
 
 # Deploy to production
 npx wrangler deploy
@@ -191,6 +198,7 @@ Do not commit documentation updates until you have verified every file.
 - `env.IMAGES.input()` requires a **ReadableStream** — pass `bytesToImageStream()` from `src/images-input.ts`, never a `Uint8Array`/`ArrayBuffer`/`Blob` (DECISIONS.md #59)
 - KV cache dates use America/Chicago timezone
 - All external fetches must use `fetchWithTimeout()` from `src/fetch-timeout.ts`
+- KV free tier: **1,000 writes/day, 1,000 lists/day**, 100,000 reads/day. Baseline is already ~590 writes — see DECISIONS #62 before adding a write path
 - All KV `.put()` calls must include `expirationTtl` (86400 for ephemeral, 604800 for daily) — see DECISIONS.md #24 for why ephemeral must be >>soft TTL
 
 ---

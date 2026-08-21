@@ -2100,3 +2100,67 @@ retirement commit, and `git show` on it is the exact diff to invert.
 This is the counter-case to CLAUDE.md's "no dead code" rule, and the rule stays as written. The
 distinction is that this code is **dormant, not dead**: it has a known future use, a known revival
 date, and tests that keep it honest until then. Code with none of those should still be deleted.
+
+## 62. KV Operations Are a Tighter Budget Than Neurons (2026-08-21)
+
+Cloudflare sent "KV operations are nearing the daily cap" emails during the August outages. They
+were a side effect, not the cause — but chasing them surfaced a constraint nothing in this repo had
+recorded, and a latent fault in the #58 safety net.
+
+### The free-tier KV budget, measured
+
+| Operation | Free cap/day | Observed baseline | Headroom |
+|---|---|---|---|
+| read | 100,000 | ~1,000–1,260 | ~99% — a non-issue |
+| **write** | **1,000** | **410–660 (typically ~590)** | **~40%** |
+| delete | 1,000 | 0–10 | fine |
+| **list** | **1,000** | **0 before v3.15.23** | see below |
+
+**Writes are the real constraint, and always have been.** A normal day already spends ~59% of the
+write cap — which is exactly what tripped the 50% notification email. The writes are dominated by
+the ephemeral caches (weather, alerts, device telemetry) being refreshed on the request path by two
+panels polling every 15 minutes. Nothing is wrong, but the margin is thinner than the neuron budget
+that got all the attention, and **any new per-request write path has to be costed against ~400
+spare writes/day, not against a comfortable void.**
+
+### The list operations are new, and they scale with an outage
+
+`list` was flat at **zero** until v3.15.23, which introduced the prefix-based stale-cache lookup
+(#58). It only runs when AI generation is blocked — so it costs nothing on a healthy day, and on
+2026-08-20/21 it produced **170 and 320 operations**.
+
+That second number is the concerning one. The budget guard was armed from 05:05 to ~13:00 UTC on
+2026-08-21 — about eight hours — so the rate is roughly **40 list operations per hour of outage**,
+driven by two panels polling wrapper routes every 15 minutes. Sustained for a full day that is
+~960 against a cap of 1,000.
+
+**So the stale fallback can exhaust the very quota it depends on, during exactly the prolonged
+outage it exists to survive.** Once `CACHE.list()` starts failing, `findMostRecentCached` finds
+nothing, and the panels go back to 503s and broken-image glyphs on day two — the failure #58 was
+written to prevent. Neither August outage ran long enough to reach it, which is why it went unseen.
+
+This is recorded, not yet fixed. The obvious remedy is to stop paying a list per request: resolve
+the most recent cached key **once per day** and store the answer under a small KV key, so an outage
+costs ~1 list/day instead of ~40/hour. That is a change to the #58 path and deserves its own commit
+and its own test, rather than being bolted onto a documentation pass.
+
+### Why this was missed
+
+The neuron budget had a marker in KV, a `/health-detailed` field and an incident report; the KV
+budget had nothing, so an email from Cloudflare was the first anyone heard of it. A resource with
+no instrument attached is a resource nobody is watching — the same lesson as #60, one layer down.
+The alert check added in #60 does not cover this either: it watches images and the neuron guard, not
+KV operation counts.
+
+### How to measure it
+
+GraphQL `kvOperationsAdaptiveGroups`, grouped by `actionType` — the same auth path as the neuron
+query in the incident runbook:
+
+```graphql
+kvOperationsAdaptiveGroups(limit: 10000, filter: {date_geq: "YYYY-MM-DD"}, orderBy: [date_ASC]) {
+  sum { requests } dimensions { date actionType }
+}
+```
+
+Counts come back sampled and rounded to the nearest ten; treat them as close estimates, not exact.

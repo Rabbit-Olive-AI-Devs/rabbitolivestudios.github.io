@@ -314,7 +314,18 @@ incident.
    npx wrangler kv key get "ai-budget:v1:block" \
      --namespace-id=de97776d35af4df08b13fd2158acebdc --remote
    ```
-3. **Do not trust a 4006 at face value** — Cloudflare has a widely-reported false-4006 bug.
+3. **Check whether anything is being WRITTEN before diagnosing reads** (the step that would have
+   solved this in minutes — see DECISIONS #59):
+   ```bash
+   npx wrangler kv key list --namespace-id=de97776d35af4df08b13fd2158acebdc --remote | grep fact4:
+   ```
+   If the newest key predates today, generation is failing *after* the model call and the neuron
+   spend is a symptom, not the cause.
+4. **Beware the quota-reset lag.** Cloudflare's free allocation nominally resets at 00:00 UTC, but on
+   2026-08-21 a FLUX call was still rejected with 4006 at **05:05 UTC with zero neurons billed that
+   day**, then succeeded at 06:05. A 4006 shortly after midnight UTC may mean "not reset yet" rather
+   than "spent".
+5. **Do not trust a 4006 at face value** — Cloudflare has a widely-reported false-4006 bug.
    Confirm real consumption:
    ```bash
    TOKEN=$(grep -m1 'oauth_token' ~/Library/Preferences/.wrangler/config/default.toml | sed 's/.*= *"//; s/"//')
@@ -322,9 +333,9 @@ incident.
      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      --data '{"query":"query { viewer { accounts(filter: {accountTag: \"f22a506dedde3bb3837157cd47d5fe5c\"}) { aiInferenceAdaptiveGroups(limit: 10000, filter: {datetimeHour_geq: \"2026-08-20T00:00:00Z\"}, orderBy: [datetimeHour_ASC]) { count sum { totalNeurons } dimensions { datetimeHour modelId } } } } }"}'
    ```
-4. **Read the hourly buckets, not just the daily total.** They reveal *who* generated:
+6. **Read the hourly buckets, not just the daily total.** They reveal *who* generated:
    the hour containing Chicago midnight = devices on the request path; the cron hour = the cron.
-5. **Compare against baseline.** A healthy day is 4–5 FLUX.2 calls / ~5,555 neurons. Diverging
+7. **Compare against baseline.** A healthy day is 4–5 FLUX.2 calls / ~5,555 neurons. Diverging
    *call count* points at duplicate generation; diverging *cost per call* points at a pricing or
    model change.
 
