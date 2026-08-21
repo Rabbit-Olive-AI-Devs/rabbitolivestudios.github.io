@@ -21,6 +21,7 @@ import { convert1Bit } from "./convert-1bit";
 import { pick1BitStyle, findStyleByName, ANTI_TEXT_SUFFIX } from "./styles-1bit";
 import { isNeuronBudgetError } from "./cache-guard";
 import type { Env, MomentBeforeData } from "./types";
+import { bytesToImageStream } from "./images-input";
 
 export const WIDTH = 800;
 export const HEIGHT = 480;
@@ -402,7 +403,7 @@ async function generateAndDecodeGray(
   const jpegBytes = await generateAIImage(env, prompt, steps, guidance);
 
   // 2. Convert JPEG → PNG via Cloudflare Images, then decode to grayscale
-  const pngResponse = (await env.IMAGES.input(jpegBytes).output({ format: "image/png" })).response();
+  const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
   const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
   const decoded = await decodePNG(pngBytes);
 
@@ -421,7 +422,7 @@ async function generateAndDecodeGrayFlux(
 ): Promise<Uint8Array> {
   const jpegBytes = await generateFluxImage(env, prompt);
 
-  const pngResponse = (await env.IMAGES.input(jpegBytes).output({ format: "image/png" })).response();
+  const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
   const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
   const decoded = await decodePNG(pngBytes);
 

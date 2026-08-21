@@ -39,6 +39,8 @@ Every session must begin with these steps:
 | Changing any pipeline or cache behavior | Bump the relevant cache key version |
 | Bumping a cache key version | Safe for the stale-image fallback — it resolves keys by KV prefix, not by rebuilding them (DECISIONS #58). Never reintroduce a fallback that rebuilds keys from `*_CACHE_VERSION` |
 | Adding an HTML page whose body is an `<img>` | Give it a text fallback so a failed image never renders as a broken-image glyph on the panel (DECISIONS #58) |
+| Any image pipeline change | Never pass raw bytes to `env.IMAGES.input()` — it throws `undefined (reading 'font')` and burns the AI call before failing (DECISIONS #59) |
+| An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list`) before assuming reads are racing (DECISIONS #59) |
 | Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying |
 
 ---
@@ -182,6 +184,7 @@ Do not commit documentation updates until you have verified every file.
 - Chunk large arrays for `String.fromCharCode` (8192-byte slices) to avoid stack overflow
 - SDXL does NOT support `negative_prompt` — embed negatives in positive prompt
 - FLUX.2 requires multipart FormData, not JSON
+- `env.IMAGES.input()` requires a **ReadableStream** — pass `bytesToImageStream()` from `src/images-input.ts`, never a `Uint8Array`/`ArrayBuffer`/`Blob` (DECISIONS.md #59)
 - KV cache dates use America/Chicago timezone
 - All external fetches must use `fetchWithTimeout()` from `src/fetch-timeout.ts`
 - All KV `.put()` calls must include `expirationTtl` (86400 for ephemeral, 604800 for daily) — see DECISIONS.md #24 for why ephemeral must be >>soft TTL
@@ -278,6 +281,7 @@ eink-dashboard/
     styles-1bit.ts        — Pipeline B style table, picker, hash
     birthday.ts           — Birthday data + detection
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
+    images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)
     escape.ts             — HTML escaping utility (escapeHTML)
     fetch-timeout.ts      — fetchWithTimeout() utility (AbortController-based)
     validate.ts           — Input validation (parseMonth, parseDay, parseStyleIdx)

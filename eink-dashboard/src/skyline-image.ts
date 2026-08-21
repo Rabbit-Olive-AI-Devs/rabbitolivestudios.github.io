@@ -32,6 +32,7 @@ import { ditherFloydSteinberg } from "./dither-spectra6";
 import { SPECTRA6_PALETTE } from "./spectra6";
 import { getPhotoFromR2 } from "./birthday-image";
 import { isNeuronBudgetError } from "./cache-guard";
+import { bytesToImageStream } from "./images-input";
 
 // SDXL params (same as Pipeline B — stable for architectural subjects)
 const SDXL_STEPS = 20;
@@ -170,7 +171,7 @@ function computeCaptionLayout(left: string, center: string, right: string): Capt
 // --- BW path: grayscale 4-level ---
 
 async function jpegToGray(env: Env, jpegBytes: Uint8Array): Promise<Uint8Array> {
-  const pngResponse = (await env.IMAGES.input(jpegBytes).output({ format: "image/png" })).response();
+  const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
   const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
   const decoded = await decodePNG(pngBytes);
 
@@ -182,7 +183,7 @@ async function jpegToGray(env: Env, jpegBytes: Uint8Array): Promise<Uint8Array> 
 
 async function jpegToRGB(env: Env, jpegBytes: Uint8Array): Promise<Uint8Array> {
   const pngResponse = (await env.IMAGES
-    .input(jpegBytes)
+    .input(bytesToImageStream(jpegBytes))
     .transform({ width: WIDTH, height: HEIGHT, fit: "cover" })
     .output({ format: "image/png" })
   ).response();

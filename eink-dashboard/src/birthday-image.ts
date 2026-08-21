@@ -18,6 +18,7 @@ import { getArtStyle } from "./birthday";
 import { isNeuronBudgetError } from "./cache-guard";
 import type { BirthdayPerson } from "./birthday";
 import type { Env } from "./types";
+import { bytesToImageStream } from "./images-input";
 
 const FLUX_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
 const FLUX_WIDTH = 1024;
@@ -72,7 +73,7 @@ export async function generateBirthdayImage(
   }
 
   // JPEG → PNG via Cloudflare Images
-  const pngResponse = (await env.IMAGES.input(jpegBytes).output({ format: "image/png" })).response();
+  const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
   const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
   const decoded = await decodePNG(pngBytes);
 

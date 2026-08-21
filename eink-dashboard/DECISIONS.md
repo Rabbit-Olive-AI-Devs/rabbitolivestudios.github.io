@@ -1722,6 +1722,11 @@ Works on both displays: on the E1002 the fills are true pigment colors; on the E
 > v3.15.23, because rebuilding embeds the current cache-key version and so broke on every bump.
 > The reasoning recorded here still stands; only the implementation changed.
 
+> **Root cause corrected by #59.** The diagnosis below — a DST cron hole letting the devices
+> generate on the request path — was not what blanked the panels. `IMAGES.input()` had stopped
+> accepting byte input, so *no* image could be cached by anything, and every poll regenerated.
+> The DST hole was real and the fixes below still stand, but they were not the cure.
+
 ### Symptom
 
 Both AI pages on the E1002 died on the same day: `/skyline` rendered a broken `<img>` and
@@ -1865,3 +1870,91 @@ degrades to a legible sentence rather than a bare icon.
 Both problems applied equally to the colour and mono displays. The two panels share one
 account-wide neuron pool, so neither is ever independently safe: whichever display exhausts the
 quota blanks the other.
+
+## 59. The Real Cause of the August Blowout: `IMAGES.input()` Needs a Stream (v3.15.24, 2026-08-21)
+
+### Symptom: a second blowout the morning after #57/#58 shipped
+
+On 2026-08-21 the E1002 was still showing the `/skyline` text fallback and both moment pages were
+still serving **August 19** images. `/health-detailed` reported `ai_budget.blocked: true` again,
+armed at 05:05:49 UTC by `cron Pipeline A` with Cloudflare's genuine 4006 text.
+
+The neuron data said something was badly wrong with the #57 story:
+
+| Date (UTC) | Neurons | Daily images cached |
+|---|---|---|
+| 2026-08-19 | 5,559 | ✅ all five |
+| 2026-08-20 | **12,465** | **none** |
+| 2026-08-21 | 4,136 by 06:05 | **none** |
+
+KV confirmed it: the newest `fact4:` / `fact1:` / `color-moment:` keys were all `2026-08-19`, and
+`skyline:` held **zero keys**. Two days had burned ~16,600 neurons and produced *nothing*.
+`workersInvocationsAdaptive` showed no `scriptThrew` and no `exceededCpu` — every exception was
+being caught and logged by the per-pipeline `try/catch`.
+
+### Root cause: the Images binding stopped accepting byte input
+
+Every pipeline decodes the AI model's JPEG through `env.IMAGES`. On the real edge that call throws:
+
+```
+TypeError: Cannot read properties of undefined (reading 'font')
+    at serializeTextSource (cloudflare-internal:images-api:14:30)
+```
+
+Reproduced with no AI, no KV and no project code — `env.IMAGES.input(bytes).output({format})` alone
+is enough. The input type is the entire bug:
+
+| `.input(...)` argument | Result |
+|---|---|
+| `Uint8Array` | ❌ `undefined (reading 'font')` |
+| `ArrayBuffer` | ❌ same |
+| `Blob` | ❌ same |
+| `Blob.stream()` | ✅ |
+| `Response.body` (ReadableStream) | ✅ |
+| stream + `.transform()` + output | ✅ |
+
+`env.IMAGES.info(bytes)` still works and returns correct dimensions, so Images is provisioned and
+healthy — only `.output()` is affected. It is independent of `compatibility_date` (checked
+2024-09-23 through 2026-08-01), of input validity, and of transform options. Every documented
+Cloudflare example passes a **stream** (`img.body`, `file.stream()`); byte input worked
+incidentally and stopped when the binding gained its `text()` / font source-type dispatch. Nothing
+in this repo changed — the last deploy before the breakage was v3.15.21 on 2026-07-29.
+
+**Decision: never hand `IMAGES.input()` raw bytes.** `src/images-input.ts` exports
+`bytesToImageStream()`, used at all eight call sites (`image.ts` ×2, `image-color.ts` ×2,
+`skyline-image.ts` ×2, `birthday-image.ts`, `pages/color-moment.ts`).
+
+### Why this drained the neuron budget
+
+The AI call is billed *before* post-processing runs. Every generation therefore paid full price,
+threw at the decode step, and cached nothing — so the next device poll and the next cron run
+regenerated from scratch, forever. With two panels polling every 15 minutes, that is a loop that
+cannot converge, and it emptied a 10,000-neuron allocation in a few hours.
+
+It also explains a detail #57 never accounted for: the SDXL fallbacks fired on days when the FLUX
+calls had *succeeded and been billed*. The exception came from the decode after the model call, not
+from the model.
+
+### Correction to #57
+
+**#57's root cause is wrong, not merely incomplete.** The DST cron hole was real and worth fixing —
+a UTC-scheduled cron filling Chicago-dated keys is only correct half the year — but it was not what
+blanked the panels. A 65-minute hole costs one or two duplicate generations; it cannot cost 12,465
+neurons. The cache was never being filled *at all*, by anything, which is why the devices
+regenerated on every single poll. The evidence was already visible on 2026-08-20 and was misread:
+zero cached images that day was treated as a consequence of the budget block rather than as its
+cause.
+
+The #57 and #58 changes are all still correct and stay in place. #58 in particular is why the panels
+degraded to stale images and a text page instead of broken-image glyphs across two full days.
+
+### Lesson
+
+**When a cache is empty, ask whether writes are failing before concluding that reads are racing.**
+Duplicate work and never-completing work look identical from the neuron bill; they are told apart by
+the cache, not by the meter. One `wrangler kv key list` on 2026-08-20 would have shown that no image
+had been written since the 19th and pointed straight at the write path.
+
+Corollary: **an API that is billed before it can fail is a budget hazard.** Any post-processing step
+downstream of a paid call should be treated as part of that call's cost, and a pipeline that fails
+after paying deserves a louder signal than a caught-and-logged exception.

@@ -1,5 +1,17 @@
 # Incident Report — Workers AI Neuron Budget Blowout
 
+> ## ⚠️ Root cause superseded — see DECISIONS.md #59 (2026-08-21)
+>
+> The diagnosis in this report is **wrong**. The DST cron hole was real and worth fixing, but it did
+> not blank the panels. `env.IMAGES.input()` had stopped accepting byte input and threw
+> `TypeError: Cannot read properties of undefined (reading 'font')` after every AI call was already
+> billed — so **no image could be cached by anything**, and every device poll regenerated from
+> scratch. That loop, not a race, drained the allocation.
+>
+> The tell was in this report's own data and was misread: 2026-08-20 cached **zero** images. That was
+> treated as a consequence of the budget block rather than as its cause. The evidence tables,
+> timeline and runbook below remain accurate and useful; the conclusion does not.
+
 **Date:** 2026-08-20
 **Version at fault:** v3.15.21 · **Fixed in:** v3.15.22, hardened in v3.15.23
 **Decision record:** [DECISIONS.md #57](DECISIONS.md)

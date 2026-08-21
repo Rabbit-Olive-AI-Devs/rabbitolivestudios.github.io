@@ -8,6 +8,7 @@
 import { decodePNG } from "./png-decode";
 import { generateAIImage, generateFluxImage, WIDTH, HEIGHT } from "./image";
 import type { Env } from "./types";
+import { bytesToImageStream } from "./images-input";
 
 // --- AI model → RGB 800×480 (SDXL) ---
 
@@ -21,7 +22,7 @@ export async function generateAndDecodeColor(
 
   // Resize + center-crop to 800×480 via Cloudflare Images — avoids JS decode of full 1024×768
   const pngResponse = (await env.IMAGES
-    .input(jpegBytes)
+    .input(bytesToImageStream(jpegBytes))
     .transform({ width: WIDTH, height: HEIGHT, fit: "cover" })
     .output({ format: "image/png" })
   ).response();
@@ -45,7 +46,7 @@ export async function generateAndDecodeColorFlux(
 
   // Resize + center-crop to 800×480 via Cloudflare Images — avoids JS decode of full 1024×768
   const pngResponse = (await env.IMAGES
-    .input(jpegBytes)
+    .input(bytesToImageStream(jpegBytes))
     .transform({ width: WIDTH, height: HEIGHT, fit: "cover" })
     .output({ format: "image/png" })
   ).response();

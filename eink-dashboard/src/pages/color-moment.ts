@@ -28,6 +28,7 @@ import { escapeHTML } from "../escape";
 import { htmlResponse } from "../response";
 import { parseMonth, parseDay, parseStyleIdx } from "../validate";
 import { colorBirthdayCacheKey, colorMomentCacheKey } from "../cache-keys";
+import { bytesToImageStream } from "../images-input";
 import {
   assertAiBudgetAvailable,
   isNeuronBudgetError,
@@ -114,7 +115,7 @@ export async function generateColorMoment(
 /** Decode JPEG bytes to 800×480 RGB via Cloudflare Images (center-crop + resize). */
 async function jpegToRGB(env: Env, jpegBytes: Uint8Array): Promise<Uint8Array> {
   const pngResponse = (await env.IMAGES
-    .input(jpegBytes)
+    .input(bytesToImageStream(jpegBytes))
     .transform({ width: WIDTH, height: HEIGHT, fit: "cover" })
     .output({ format: "image/png" })
   ).response();
