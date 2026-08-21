@@ -56,6 +56,8 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /clean` | 800x480 solid-color screen cleaner for clearing e-ink ghosting/retention. Auto-rotates through all 6 Spectra-6 pigments + black/white flushes across fetches (point the device at it with a short refresh interval). Works on both E1001 and E1002. | none (`no-store`) |
 | `GET /clean?c=black\|white\|red\|yellow\|green\|blue` | Hold one solid color (also accepts index `0`-`5`) | none |
 | `GET /clean?s=N` | Seconds each color is held before rotating (default 1) | none |
+| `GET /alert-test?key=KEY` | Run the failure check on demand and report what it found (requires `TEST_AUTH_KEY`) | none |
+| `GET /alert-test?force=1&key=KEY` | Send a test alert email immediately, bypassing the hour guard and de-duplication | none |
 | `GET /health` | Status check | none |
 | `GET /health-detailed` | Cache health, daily image cache status, telemetry age, and AI budget pause status | none |
 
@@ -420,7 +422,31 @@ v3.11.2 adds guardrails around expensive AI generation:
 - **Never pass raw bytes to `env.IMAGES.input()` (v3.15.24)**: it requires a **ReadableStream**. A `Uint8Array`/`ArrayBuffer`/`Blob` routes into the binding's text-source path and throws `TypeError: Cannot read properties of undefined (reading 'font')`. Because the AI call is billed *before* post-processing runs, every generation paid full price, threw at the decode step and cached nothing — so every device poll regenerated from scratch and drained the daily allocation. All eight call sites go through `bytesToImageStream()` in `src/images-input.ts` (DECISIONS.md #59).
 - **Neuron budget**: the Workers AI free tier is 10,000 neurons/day (resets 00:00 UTC). FLUX.2 klein-9b costs ~1,364 neurons/image and is effectively the entire bill; a healthy day is ~5,555 neurons. See [INCIDENT-2026-08-20-neuron-budget-blowout.md](INCIDENT-2026-08-20-neuron-budget-blowout.md) for the diagnosis runbook (including how to query real usage, since Cloudflare has a known false-4006 bug).
 - **AI budget pause** ends at the next 00:00 UTC — when Workers AI actually resets the free neuron allocation — instead of a fixed 6 hours. A block that lifted early just burned neurons on generations that were never going to be granted (DECISIONS.md #57).
+- **Failure alerting (v3.16.0)**: both August outages were found by looking at a physical panel — the Worker degraded as designed and said nothing. The every-6h cron now checks whether the day's five images are actually in KV and whether the AI budget guard is armed, and emails on a change of state via **Cloudflare Email Routing's `send_email` binding** (no third-party service, API key or account). A KV fingerprint keeps it to one email per distinct problem, at most one reminder per 24h, plus a single recovery notice. The check skips Chicago hours below 3 so it can't race the daily image warm. See DECISIONS.md #60 and **Alert setup** below.
 - `/color/headlines` is back on without Workers AI; it ranks RSS/scraped sources deterministically and caches results as `headlines:v3:YYYY-MM-DD:PERIOD`.
+
+### Alert Setup
+
+Alerting needs Cloudflare Email Routing enabled once, plus two secrets. There is no third-party
+account or API key involved.
+
+1. **Cloudflare dashboard → `mac-tbo.com` → Email Routing → Enable.** This adds MX + SPF records to
+   the zone. (It was parked with no A/MX/TXT records, so nothing was displaced.)
+2. **Email Routing → Destination addresses → add your inbox** and click Cloudflare's verification
+   link. `send_email` can only deliver to a verified address.
+3. Set the two secrets:
+   ```bash
+   npx wrangler secret put ALERT_TO      # the verified inbox
+   npx wrangler secret put ALERT_FROM    # e.g. alerts@mac-tbo.com
+   ```
+4. Confirm: `/health-detailed` → `config.alerting` should read `configured`, then
+   `curl "https://URL/alert-test?force=1&key=YOUR_KEY"` to prove delivery.
+
+The `[[send_email]]` binding in `wrangler.toml` intentionally has **no** `destination_address` — the
+address lives in `ALERT_TO` because this repo is public. Sending is still restricted to addresses
+verified on the account.
+
+If the secrets are absent the check still runs and logs; it simply cannot send.
 
 ### Rollback
 

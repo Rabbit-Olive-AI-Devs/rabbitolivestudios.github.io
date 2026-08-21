@@ -1958,3 +1958,80 @@ had been written since the 19th and pointed straight at the write path.
 Corollary: **an API that is billed before it can fail is a budget hazard.** Any post-processing step
 downstream of a paid call should be treated as part of that call's cost, and a pipeline that fails
 after paying deserves a louder signal than a caught-and-logged exception.
+
+## 60. Failure Alerting by Email, via Cloudflare Email Routing (v3.16.0, 2026-08-21)
+
+### Problem: two multi-day outages, both found by looking at a panel
+
+The August 20 and August 21 failures were detected the same way — the user glanced at a physical
+display and noticed it was wrong. In between, the Worker degraded exactly as designed: stale images
+served, a text fallback rendered, every exception caught and logged. Nothing was broken enough to
+trip Cloudflare's built-in Workers error notifications, because **nothing threw**. Graceful
+degradation without alerting is indistinguishable from working.
+
+### Decision: watch the cache, not the code
+
+The signal that would have caught either outage on day one is not an exception count or a latency
+graph — it is that **the day's images are not in KV**. Every failure mode this project has had ends
+there: a broken decode, a spent neuron budget, a cron that never ran, an API that changed shape.
+The check is two conditions:
+
+1. any of the five daily images missing for the current Chicago date, and
+2. the AI budget guard being armed.
+
+### Delivery: Email Routing's `send_email` binding
+
+The constraint was no new account and no new API key. Cloudflare Email Routing satisfies it
+exactly: `mac-tbo.com` was already on the account (parked — no A, MX or TXT records, so enabling
+mail on it breaks nothing), and the `send_email` binding sends to any address verified on the
+account with no third-party service in the path.
+
+The binding is declared **without** `destination_address`. The address lives in the `ALERT_TO`
+secret instead, because this repo is public and the destination is a personal mailbox; sending is
+still restricted to verified addresses, so the looser binding costs nothing. `ALERT_FROM` is a
+secret for the same reason.
+
+`send_email` also offers a builder overload — `send({from, to, subject, text})` — which avoids
+hand-rolling an RFC 5322 message and the header-injection risk that comes with it. That is worth
+preferring over the older raw-`EmailMessage` path.
+
+### Noise control
+
+An alert channel that cries wolf gets muted, and a muted channel is worse than none. A KV record
+(`alert:v1:last`) holds a **fingerprint** of the current problem state. Mail goes out when the
+fingerprint changes, or once every 24h while it is unchanged, plus a single **recovery** notice when
+it returns to healthy. The August 20 incident would have produced one email, not eight.
+
+The fingerprint deliberately excludes the date, so a fault that persists past Chicago midnight is
+recognised as the same fault rather than a new one. The record is written **only after a successful
+send**, so a delivery failure retries next run instead of being silently marked as handled.
+
+### Scheduling: no trigger to spare
+
+Workers Free allows **5 cron triggers per account** and six Workers share this account, so there was
+no room for a dedicated alert cron (this is the same cap that produced the `code: 10072` failure in
+#57). The check folds into the existing `5 0,6,12,18 * * *` trigger.
+
+That trigger also fires at 06:05 UTC, which lands at 01:05 Chicago in CDT — on top of the daily
+image warm — so the check skips any Chicago hour below 3. The remaining firings land at 07:05 and
+13:05 Chicago (CDT), long after the warm should have finished. In CST the 05:05 UTC daily firing
+lands at 23:05 on the *previous* Chicago day, whose images exist, so the guard holds in both offsets.
+
+### Keeping the check honest
+
+`dailyImageKeys()` was extracted so `/health-detailed` and the alert compute the day's keys from one
+place. Had they drifted — on birthdays, or if the skyline mode changed — the alert would either cry
+wolf on healthy days or stay silent on broken ones, and a monitor that is wrong about what it
+watches is worse than no monitor.
+
+`runAlertCheck` never throws and its call site is wrapped again: nothing about alerting may prevent
+the cron from generating the images it is watching.
+
+### Rejected
+
+- **ntfy.sh / Pushover / Discord / Resend.** All work, but each adds an account, an API key or a
+  third-party relay in the path of the thing that tells you the system is down.
+- **Deliberately throwing so Cloudflare's error notifications fire.** This would mean removing the
+  graceful degradation of #58 to get observability — trading a working panel for an email.
+- **Alerting on weather/device staleness.** Those already degrade visibly on the panel and recover
+  on their own. YAGNI until one actually causes a problem.

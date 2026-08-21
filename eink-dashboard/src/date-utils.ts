@@ -21,6 +21,17 @@ export function getChicagoDateParts(): { year: string; month: string; day: strin
   return { year, month, day, dateStr };
 }
 
+/** Current hour (0-23) in America/Chicago. Used to keep the alert check clear of the daily warm. */
+export function getChicagoHour(): number {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date()).find((p) => p.type === "hour")!.value;
+  // Intl can render midnight as "24" in some ICU versions.
+  return parseInt(hour, 10) % 24;
+}
+
 export function getChicagoDateISO(): string {
   return getChicagoDateParts().dateStr;
 }

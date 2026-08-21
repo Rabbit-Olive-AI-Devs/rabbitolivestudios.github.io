@@ -17,7 +17,7 @@ import { getBirthdayToday, getBirthdayByKey } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
 import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID } from "./device";
 import { fetchWithTimeout } from "./fetch-timeout";
-import { getChicagoDateParts, shiftDateStr } from "./date-utils";
+import { getChicagoDateParts, shiftDateStr, getChicagoHour } from "./date-utils";
 import { findMostRecentCached, hasRecentCached } from "./stale-cache";
 import { parseMonth, parseDay, parseStyleIdx } from "./validate";
 import {
@@ -36,6 +36,7 @@ import {
   markAiBudgetExhausted,
   withGenerationLock,
 } from "./cache-guard";
+import { runAlertCheck, alertingConfigured, buildAlertEmail, sendAlertEmail } from "./alert";
 import { getHeadlines, getCurrentPeriod } from "./headlines";
 import { pngToBase64 } from "./png";
 import { pickCleanColorIndex, parseCleanColor, renderCleanPNG } from "./clean";
@@ -56,7 +57,10 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.15.24";
+const VERSION = "3.16.0";
+
+/** Public origin, used for links in alert emails (a cron has no request URL). */
+const WORKER_BASE_URL = "https://eink-dashboard.thiago-oliveira77.workers.dev";
 
 /** Check test endpoint auth. Returns null if allowed, or a 404 Response if denied. */
 function checkTestAuth(url: URL, env: Env): Response | null {
@@ -580,6 +584,36 @@ function handleHealth(): Response {
   );
 }
 
+/**
+ * KV keys that should hold the day's five images (plus the shared moment event),
+ * accounting for birthdays and the configured skyline mode.
+ *
+ * Shared by /health-detailed and the alert check so the two can never disagree
+ * about what "today's images" means — a mismatch would either alert on healthy
+ * days or stay silent on broken ones (DECISIONS #60).
+ */
+function dailyImageKeys(dateStr: string, monthNum: number, dayNum: number) {
+  const birthday = getBirthdayToday(monthNum, dayNum);
+  const colorStyle = getColorMomentStyle(dateStr);
+  const bucket = computeBucket(DEFAULT_ROTATE_MIN);
+  const skylineMode = DEFAULT_MODE === "daily" ? "daily" : "rotate";
+  return {
+    birthday,
+    colorStyle,
+    keys: {
+      fact4_gray: birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr),
+      fact1_1bit: fact1CacheKey(dateStr),
+      color_moment: birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id),
+      skyline: skylineCacheKey(dateStr, skylineMode, DEFAULT_ROTATE_MIN, bucket),
+      skyline_bw: skylineCacheKey(dateStr, skylineMode, DEFAULT_ROTATE_MIN, bucket, true),
+      moment_event: momentCacheKey(dateStr),
+    },
+  };
+}
+
+/** The five generated images the alert watches (moment_event is metadata, not a panel image). */
+const ALERT_WATCHED_IMAGES = ["fact4_gray", "fact1_1bit", "color_moment", "skyline", "skyline_bw"] as const;
+
 async function handleHealthDetailed(env: Env): Promise<Response> {
   const { month, day, dateStr } = getChicagoDateParts();
   const monthNum = parseInt(month);
@@ -608,18 +642,9 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
   }
 
   // Determine daily image keys (birthday-aware)
-  const birthday = getBirthdayToday(monthNum, dayNum);
-  const colorStyle = getColorMomentStyle(dateStr);
-  const fact4Key = birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr);
-  const fact1Key = fact1CacheKey(dateStr);
-  const colorMomentKey = birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id);
-  const skylineKey = DEFAULT_MODE === "daily"
-    ? skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, computeBucket(DEFAULT_ROTATE_MIN))
-    : skylineCacheKey(dateStr, "rotate", DEFAULT_ROTATE_MIN, computeBucket(DEFAULT_ROTATE_MIN));
-  const skylineBwKey = DEFAULT_MODE === "daily"
-    ? skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, computeBucket(DEFAULT_ROTATE_MIN), true)
-    : skylineCacheKey(dateStr, "rotate", DEFAULT_ROTATE_MIN, computeBucket(DEFAULT_ROTATE_MIN), true);
-  const momentKey = momentCacheKey(dateStr);
+  const { keys: dailyKeys, colorStyle } = dailyImageKeys(dateStr, monthNum, dayNum);
+  const { fact4_gray: fact4Key, fact1_1bit: fact1Key, color_moment: colorMomentKey,
+          skyline: skylineKey, skyline_bw: skylineBwKey, moment_event: momentKey } = dailyKeys;
   const aiBudgetBlock = await getAiBudgetBlock(env);
 
   // Fetch all keys in parallel
@@ -667,6 +692,7 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
       },
       config: {
         test_auth_key: env.TEST_AUTH_KEY ? "configured" : "missing",
+        alerting: alertingConfigured(env) ? "configured" : "missing",
         ai_budget: aiBudgetBlock
           ? {
               blocked: true,
@@ -759,6 +785,25 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       }
     }
     console.log("Cron: warmed 6h data (headlines, weather, devices)");
+
+    // Failure alerting — both August outages were found by looking at a panel,
+    // not by the system saying anything (DECISIONS #60). runAlertCheck never
+    // throws, but the await is guarded anyway: nothing here may prevent the
+    // daily image warm below from running.
+    try {
+      const watched = dailyImageKeys(dateStr, monthNum, dayNum).keys;
+      const alertResult = await runAlertCheck(env, {
+        dateStr,
+        chicagoHour: getChicagoHour(),
+        imageKeys: Object.fromEntries(ALERT_WATCHED_IMAGES.map((l) => [l, watched[l]])),
+        baseUrl: WORKER_BASE_URL,
+      });
+      if (alertResult.checked) {
+        console.log(`Alert check: ${alertResult.sent ? "SENT" : "quiet"} (${alertResult.reason ?? alertResult.fingerprint})`);
+      }
+    } catch (err) {
+      console.error("Cron: alert check failed:", err);
+    }
 
     // --- Daily only: images + skyline ---
     if (!isDaily) return;
@@ -1079,6 +1124,36 @@ export default {
           },
         });
       }
+      case "/alert-test": {
+        const authBlockAlert = checkTestAuth(url, env);
+        if (authBlockAlert) return authBlockAlert;
+        // Runs the real check against real cache state. ?force=1 ignores both the
+        // hour guard and the de-duplication, so delivery can be proven on demand.
+        const force = url.searchParams.get("force") === "1";
+        const { month: aMonth, day: aDay, dateStr: aDate } = getChicagoDateParts();
+        const aKeys = dailyImageKeys(aDate, parseInt(aMonth), parseInt(aDay)).keys;
+        if (force) {
+          const { subject, text } = buildAlertEmail(
+            "problem",
+            ["This is a test alert — nothing is actually wrong."],
+            { dateStr: aDate, baseUrl: WORKER_BASE_URL },
+          );
+          try {
+            await sendAlertEmail(env, subject, text);
+            return jsonResponse({ sent: true, subject }, 200, 0);
+          } catch (err) {
+            return jsonResponse({ sent: false, error: String((err as Error)?.message ?? err) }, 500, 0);
+          }
+        }
+        const result = await runAlertCheck(env, {
+          dateStr: aDate,
+          chicagoHour: getChicagoHour(),
+          imageKeys: Object.fromEntries(ALERT_WATCHED_IMAGES.map((l) => [l, aKeys[l]])),
+          baseUrl: WORKER_BASE_URL,
+        });
+        return jsonResponse(result as unknown as Record<string, unknown>, 200, 0);
+      }
+
       case "/test-birthday.png": {
         const authBlockBday = checkTestAuth(url, env);
         if (authBlockBday) return authBlockBday;

@@ -6,6 +6,11 @@ export interface Env {
   BROWSER?: Fetcher; // Cloudflare Browser Rendering binding (headless Chromium)
   TEST_AUTH_KEY?: string;
   FOOTBALL_DATA_KEY?: string;
+  // Alerting (DECISIONS #60). SEND_EMAIL is the Cloudflare Email Routing binding;
+  // the addresses are secrets, not vars, because this repo is public.
+  SEND_EMAIL?: SendEmail;
+  ALERT_TO?: string;
+  ALERT_FROM?: string;
 }
 
 // --- Moment Before types ---

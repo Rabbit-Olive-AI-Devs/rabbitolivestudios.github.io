@@ -41,6 +41,7 @@ Every session must begin with these steps:
 | Adding an HTML page whose body is an `<img>` | Give it a text fallback so a failed image never renders as a broken-image glyph on the panel (DECISIONS #58) |
 | Any image pipeline change | Never pass raw bytes to `env.IMAGES.input()` — it throws `undefined (reading 'font')` and burns the AI call before failing (DECISIONS #59) |
 | An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list`) before assuming reads are racing (DECISIONS #59) |
+| Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
 | Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying |
 
 ---
@@ -85,6 +86,8 @@ curl http://localhost:8790/color/weather?test-device&test-alert=tornado
 curl http://localhost:8790/color/headlines?test-headlines
 curl "http://localhost:8790/color/test-moment?m=7&d=20"
 curl http://localhost:8790/skyline
+curl "http://localhost:8790/alert-test"          # run the failure check
+curl "http://localhost:8790/alert-test?force=1"  # send a test alert email
 curl "http://localhost:8790/skyline-test?date=2026-06-01"
 ```
 
@@ -286,6 +289,7 @@ eink-dashboard/
     fetch-timeout.ts      — fetchWithTimeout() utility (AbortController-based)
     validate.ts           — Input validation (parseMonth, parseDay, parseStyleIdx)
     response.ts           — htmlResponse() with security headers
+    alert.ts              — failure alerting: cache-state check + Email Routing sender (DECISIONS #60)
     stale-cache.ts        — prefix-based lookup of the most recent cached entry; survives cache-key version bumps (DECISIONS #58)
     weather-ui.ts         — Shared weather page helpers (formatDate, formatTime, icon, etc.)
     headlines.ts          — Steel/trade RSS/HTML fetch + deterministic ranking (no LLM)
