@@ -6,10 +6,6 @@ import { generateMomentBefore, getOrGenerateMoment } from "./moment";
 import { handleWeatherPageV2 } from "./pages/weather2";
 import { handleFactPage } from "./pages/fact";
 import { handleColorWeatherPage } from "./pages/color-weather";
-import { handleWorldCupPage, warmWorldCupImage, IMG_KEY as WC_IMAGE_KEY } from "./pages/worldcup";
-import { handleColorWorldCupPage } from "./pages/color-worldcup";
-import { getWorldCupData } from "./worldcup";
-import { worldCupSignature } from "./worldcup-ui";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
@@ -57,7 +53,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.16.0";
+const VERSION = "3.16.1";
 
 /** Public origin, used for links in alert emails (a cron has no request URL). */
 const WORKER_BASE_URL = "https://eink-dashboard.thiago-oliveira77.workers.dev";
@@ -709,47 +705,14 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 
 // --- Scheduled handler (Cron) ---
 
-const WC_SIG_KEY = "wc:image:sig";
-const WC_LAST_DATE = "2026-07-19"; // tournament final; after this, stop the 15-min WC refresh
-
-/**
- * World Cup refresh for the every-15-min cron: pull fresh data (synchronous — no ctx — so KV is
- * updated in place), then re-render the bracket image ONLY when a result actually changed (or the
- * image cache is gone). The change check (worldCupSignature) keeps Browser-Rendering cost
- * proportional to real results instead of ~96 renders/day. No-ops once the tournament is over. (#54)
- */
-async function refreshWorldCup(env: Env): Promise<void> {
-  try {
-    const { dateStr } = getChicagoDateParts();
-    if (dateStr > WC_LAST_DATE) return; // tournament finished — nothing to refresh
-    const data = await getWorldCupData(env);
-    const sig = worldCupSignature(data);
-    const prevSig = await env.CACHE.get(WC_SIG_KEY);
-    const haveImage = (await env.CACHE.get(WC_IMAGE_KEY)) !== null;
-    if (sig !== prevSig || !haveImage) {
-      await warmWorldCupImage(env);
-      await env.CACHE.put(WC_SIG_KEY, sig, { expirationTtl: 86400 });
-      console.log(`Cron: WC image re-rendered (${sig === prevSig ? "cold image" : "result changed"})`);
-    } else {
-      console.log("Cron: WC unchanged, skipped image render");
-    }
-  } catch (e) {
-    console.error("Cron: WC 15-min refresh failed:", e);
-  }
-}
+// The World Cup dashboard was retired after the 2026 final (DECISIONS #61). Its source,
+// tests and docs are all still in the repo for the 2030 tournament — only the wiring
+// (routes, the */15 cron trigger and the [browser] binding) has been removed.
 
 /** Cron expressions that trigger the daily image warm (see the isDaily note below). */
 const DAILY_CRONS = new Set(["5 5,6 * * *", "5 5 * * *", "5 6 * * *"]);
 
 async function handleScheduled(env: Env, cronExpression: string): Promise<void> {
-  // Every 15 min: World Cup only — keep its data + bracket image current so the device's
-  // ~15-min poll always shows recent results, with no manual nudging. Cheap: re-renders the
-  // image only when a result actually changed (see refreshWorldCup). (#54)
-  if (cronExpression === "*/15 * * * *") {
-    await refreshWorldCup(env);
-    return;
-  }
-
   // The daily warm fires twice, once for each Chicago UTC offset: 05:05 UTC lands just
   // after midnight in CDT, 06:05 UTC just after midnight in CST. Both run year-round —
   // the one that fires before the date rolls finds yesterday's images already cached and
@@ -770,7 +733,6 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     const dayNum = parseInt(day);
 
     // --- Every-6h: headlines + weather + device (parallel, independent) ---
-    // (World Cup is refreshed by its own every-15-min cron — see refreshWorldCup / #54.)
     const sixHourResults = await Promise.allSettled([
       getHeadlines(env, dateStr, getCurrentPeriod()),
       getWeather(env),
@@ -1185,10 +1147,6 @@ export default {
         return handleFactPage(env);
       case "/color/weather":
         return handleColorWeatherPage(env, url, ctx);
-      case "/worldcup":
-        return handleWorldCupPage(env, url, ctx);
-      case "/color/worldcup":
-        return handleColorWorldCupPage(env, url, ctx);
       case "/color/moment":
         return handleColorMomentPage(env, url);
       case "/color/test-moment": {
@@ -1235,7 +1193,6 @@ export default {
             endpoints: [
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
-              "/worldcup", "/color/worldcup",
               "/skyline", "/skyline-bw", "/skyline.png",
               "/test-birthday.png", "/health", "/health-detailed",
             ],

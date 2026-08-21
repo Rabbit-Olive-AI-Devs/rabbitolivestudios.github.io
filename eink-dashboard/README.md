@@ -40,11 +40,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/test-moment?m=MM&d=DD&style=ID&key=KEY` | Generate color moment for any date + optional style override (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
-| **World Cup 2026** (seasonal) | | |
-| `GET /worldcup` | 800x480 adaptive World Cup page for E1001 mono — served as a **server-pre-dithered 1-bit PNG** (Browser Rendering screenshot of the Inter HTML; DECISIONS #48). SWR-cached + cron-warmed | ~14 min |
-| `GET /worldcup?variant=src` | The Inter-styled HTML screenshot source (also a raw-HTML debug view) | none |
-| `GET /color/worldcup` | Same adaptive page for E1002 Spectra 6 — live HTML with color flags | 15 min |
-| `GET /worldcup?test-phase=group\|r32\|knockout\|champion` | Preview any phase layout with canned data (also on `/color/worldcup`) | none |
+| **World Cup 2026** | *Retired 2026-08-21 — routes now 404. Source and tests are preserved for 2030; see DECISIONS.md #61.* | — |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for E1002 (`<img src="/skyline.png">`, always no-store). Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
 | `GET /skyline-bw` | 800x480 HTML skyline page for E1001 mono (`<img src="/skyline.png?bw=1">`, BW styles only). Same text fallback as `/skyline` (DECISIONS #58) | none |
@@ -298,7 +294,14 @@ KV cache (24h)
 
 ---
 
-## World Cup 2026 Dashboard (seasonal)
+## World Cup 2026 Dashboard (retired)
+
+> **Retired on 2026-08-21 (DECISIONS.md #61).** The tournament ended 2026-07-19. The routes, the
+> `*/15` cron trigger and the `[browser]` binding have been removed — the Worker went from 1115 KiB
+> to 243 KiB — but **every source file, all 34 tests and all decision records are still in the repo**
+> for the 2030 tournament. The tests still run, so the code stays compiling and correct. DECISIONS.md
+> #61 carries the step-by-step revival checklist. The description below documents how it worked.
+
 
 `/worldcup` (E1001 mono) and `/color/worldcup` (E1002 Spectra 6) are a **single adaptive page per display** that transitions itself by tournament phase:
 
@@ -319,7 +322,7 @@ The page advances through phases by the **current round being played**, not by w
 
 The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `COLOR_STYLE`, `MONO_STYLE_BASE`), passed via `WcTheme.styleCSS`, so a change to one display's CSS can't affect the other. Structure and logic (`worldcup-ui.ts`) stay shared.
 
-> **Setup:** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive; without it the page runs on the openfootball fallback). The B&W image needs **Cloudflare Browser Rendering** enabled on the account (the `[browser]` binding + `nodejs_compat` are in `wrangler.toml`; `npm i` installs `@cloudflare/puppeteer`). Add the two routes to the device pagelists for the tournament; remove after 2026-07-19. See DECISIONS.md #44/#47/#48.
+> **Setup (for a future tournament):** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive; without it the page runs on the openfootball fallback). The B&W image needs **Cloudflare Browser Rendering** enabled on the account. The `[browser]` binding was **removed** at retirement and must be restored in `wrangler.toml`, and `@cloudflare/puppeteer` moved back to `dependencies` (it is currently a devDependency so the preserved source still typechecks without shipping). `nodejs_compat` was deliberately left in place. Then add the two routes to the device pagelists. Full checklist: DECISIONS.md #61; background: #44/#47/#48.
 
 ## Architecture
 
@@ -352,8 +355,10 @@ The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `
 | `env.IMAGES` | Cloudflare Images | Format conversion + center-crop/resize to 800×480 via `.transform()` |
 | `env.CACHE` | KV Namespace | Response caching (24h/6h) |
 | `env.PHOTOS` | R2 Bucket | Birthday portraits (`portraits/`) + skyline reference photos (`skylines/`) |
-| `env.BROWSER` | Browser Rendering | Headless Chromium to screenshot the B&W `/worldcup` HTML → pre-dithered 1-bit image (needs `nodejs_compat`; DECISIONS #48) |
+| ~~`env.BROWSER`~~ | Browser Rendering | *Removed with the World Cup retirement (DECISIONS #61). Restore the `[browser]` binding to revive the B&W `/worldcup` image.* |
+| `env.SEND_EMAIL` | Email Routing | Sends failure-alert email via Cloudflare Email Routing (DECISIONS #60) |
 | `env.TEST_AUTH_KEY` | Secret | Auth key for expensive test endpoints (optional, open in dev) |
+| `env.ALERT_TO` / `env.ALERT_FROM` | Secrets | Alert destination + sending identity (secrets, not vars — this repo is public) |
 | `env.FOOTBALL_DATA_KEY` | Secret | football-data.org API key for the World Cup dashboard (optional; falls back to openfootball JSON when absent) |
 
 > **Note**: The `APOD_API_KEY` secret was removed in v3.10.1. NASA APOD has been replaced by the World Skyline Series. The Cloudflare secret can be deleted: `npx wrangler secret delete APOD_API_KEY`.

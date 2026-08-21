@@ -18,10 +18,6 @@ binding = "AI"
 [images]
 binding = "IMAGES"
 
-# Browser Rendering (headless Chromium) for server-side page screenshots
-[browser]
-binding = "BROWSER"
-
 # Cloudflare Email Routing — lets the Worker email failure alerts with no
 # third-party service, API key or account (DECISIONS #60). No destination_address
 # here on purpose: the address lives in the ALERT_TO secret because this repo is
@@ -43,8 +39,10 @@ bucket_name = "eink-birthday-photos"
 #                       duplicated work and blew the neuron budget (DECISIONS #57). Kept as ONE
 #                       expression with two fire times: Workers Free allows only 5 cron
 #                       triggers per account and the slots are already full.
-#   "5 0,6,12,18 * * *" — headlines + weather every 6h
-#   "*/15 * * * *"    — World Cup only: refresh data + re-render bracket image on a result change
-#                       (keeps the device's ~15-min poll current without manual nudging; #54)
+#   "5 0,6,12,18 * * *" — headlines + weather + the failure-alert check (#60)
+#
+# The World Cup "*/15 * * * *" trigger was removed when the tournament dashboard was
+# retired (DECISIONS #61) — it was 96 no-op invocations a day, and cron triggers are a
+# scarce per-account resource on the free plan (5 across all Workers; see #57).
 [triggers]
-crons = ["5 5,6 * * *", "5 0,6,12,18 * * *", "*/15 * * * *"]
+crons = ["5 5,6 * * *", "5 0,6,12,18 * * *"]

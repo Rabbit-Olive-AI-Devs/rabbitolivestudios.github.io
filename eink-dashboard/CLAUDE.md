@@ -41,6 +41,7 @@ Every session must begin with these steps:
 | Adding an HTML page whose body is an `<img>` | Give it a text fallback so a failed image never renders as a broken-image glyph on the panel (DECISIONS #58) |
 | Any image pipeline change | Never pass raw bytes to `env.IMAGES.input()` — it throws `undefined (reading 'font')` and burns the AI call before failing (DECISIONS #59) |
 | An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list`) before assuming reads are racing (DECISIONS #59) |
+| Touching World Cup code | It is **retired but preserved** for 2030 — unwired, not deleted. Keep the files and their tests green; see DECISIONS #61 before removing anything |
 | Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
 | Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying |
 
@@ -301,6 +302,8 @@ eink-dashboard/
     png.ts                — Pure JS PNG encoder (8-bit, 1-bit, indexed) + pngToBase64()
     png-decode.ts         — PNG decoder (RGB, RGBA, Gray, GrayAlpha)
     font.ts               — 8x8 bitmap font (CP437)
+    # --- World Cup: RETIRED 2026-08-21, preserved for 2030 (DECISIONS #61). Unwired from
+    # --- the router/cron; files and tests intentionally kept. Do not delete.
     worldcup.ts           — WC data layer (SWR/withBudget/KV) + finalize (phase, qualifying flags)
     worldcup-football-data.ts — football-data.org adapter (primary source)
     worldcup-openfootball.ts  — openfootball/worldcup.json adapter (no-key fallback)

@@ -2035,3 +2035,68 @@ the cron from generating the images it is watching.
   graceful degradation of #58 to get observability — trading a working panel for an email.
 - **Alerting on weather/device staleness.** Those already degrade visibly on the panel and recover
   on their own. YAGNI until one actually causes a problem.
+
+## 61. Retiring the World Cup Dashboard Without Deleting It (v3.16.1, 2026-08-21)
+
+The 2026 tournament ended on 2026-07-19. The dashboard kept running: `*/15 * * * *` fired 96 times
+a day into a function that returned immediately on its `dateStr > WC_LAST_DATE` guard, and ~160 KB
+of tournament code shipped in every deploy to serve two routes that are in neither device's
+pagelist.
+
+### Decision: unwire it, keep every line
+
+There will be another World Cup in 2030, and this code encodes a lot of hard-won detail — the
+official bracket tree, fixture-aware qualification maths, the Spectra-6 flag renderer, the
+Browser-Rendering path that defeats mono-panel fog (#44–#55). Deleting it to satisfy a "no dead
+code" rule would throw away the expensive part and keep only the cheap part.
+
+So **only the wiring was removed**. All 12 source files, the 34 unit tests and every decision record
+stay exactly where they are. The tests still run in CI, which matters more than it sounds: they keep
+the preserved code compiling and correct against four years of dependency drift, so 2030 starts from
+something known-good rather than something last verified in 2026.
+
+Removed: the two route cases, the `*/15` trigger, `refreshWorldCup`, the `[browser]` binding, and
+the endpoint-list entries. `@cloudflare/puppeteer` moved to `devDependencies` — the same pattern
+`flag-icons` and `@resvg/resvg-js` already use for the offline flag generator — so `worldcup-browser-image.ts`
+still typechecks without the module shipping.
+
+The routes now 404. Nothing pointed at them, so nothing broke.
+
+### Effect
+
+| | Before | After |
+|---|---|---|
+| Worker upload | 1115 KiB (270 KiB gzip) | **243 KiB (59 KiB gzip)** |
+| Cron triggers used | 3 | **2** |
+| No-op invocations/day | 96 | **0** |
+| Runtime dependencies | 1 | **0** |
+
+The freed trigger matters beyond tidiness: Workers Free allows **5 cron triggers per account** across
+all six Workers on this account, and that cap is what blocked a dedicated alert cron in #60 and
+produced the `code: 10072` deploy failure in #57.
+
+### Revival checklist for 2030
+
+The code is intact; only these need redoing. `git log --oneline -- src/worldcup.ts` finds the
+retirement commit, and `git show` on it is the exact diff to invert.
+
+1. **`wrangler.toml`** — restore the `[browser]` binding and add `*/15 * * * *` to `crons`. Check the
+   account-wide 5-trigger cap *before* deploying; a rejected schedule update still uploads the
+   Worker (#57).
+2. **`package.json`** — move `@cloudflare/puppeteer` back to `dependencies`.
+3. **`src/index.ts`** — restore the four imports, `WC_SIG_KEY`/`WC_LAST_DATE`, `refreshWorldCup`, the
+   `*/15` dispatch branch, both route cases, and the two endpoint-list entries.
+4. **`src/worldcup-bracket.ts`** — `BRACKET_R32` and `FINAL_DATES` are hardcoded from the official
+   2026 bracket and must be re-pinned from the 2030 one (#52). Update `WC_LAST_DATE` to the new final.
+5. **Cache keys** — bump `wc:data:` and `wc:image:` versions; the old shapes are four years stale.
+6. **`nodejs_compat`** was left in `wrangler.toml` on purpose. Nothing outside the World Cup code
+   needs it now, but removing a compatibility flag changes runtime semantics for zero benefit, and
+   Browser Rendering needs it back anyway.
+7. **`npm run flags`** — regenerate `worldcup-flags.ts` if the qualified team set changed. Confirm
+   the `FOOTBALL_DATA_KEY` secret still exists and that football-data.org's API hasn't moved.
+
+### Note
+
+This is the counter-case to CLAUDE.md's "no dead code" rule, and the rule stays as written. The
+distinction is that this code is **dormant, not dead**: it has a known future use, a known revival
+date, and tests that keep it honest until then. Code with none of those should still be deleted.
