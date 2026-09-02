@@ -44,7 +44,8 @@ Every session must begin with these steps:
 | Touching World Cup code | It is **retired but preserved** for 2030 — unwired, not deleted. Keep the files and their tests green; see DECISIONS #61 before removing anything |
 | Adding any per-request KV write or `list` | Cost it against the free tier's **1,000 writes/day** — a normal day already uses ~590 (DECISIONS #62). Reads are effectively free; writes and lists are not |
 | Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
-| Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying |
+| Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying, **including with an alert banner** (`?test-alert=tornado`) — that state has ~34px less room (DECISIONS #63) |
+| Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
 
 ---
 
