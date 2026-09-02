@@ -264,9 +264,21 @@ function renderHTML(w: WeatherResponse, device: DeviceData | null = null, moonOv
   .hour-icon { margin: 2px 0; line-height: 0; }
   .hour-temp { font-size: 18px; font-weight: 700; }
   .hour-precip { font-size: 14px; font-weight: 500; }
+
+  /* An alert or rain banner adds ~39px to a column with a fixed 480px budget.
+     .hourly is the only flexible item, so it absorbs the whole deficit and its
+     cards get sliced through the temperature. Reclaim the banner's cost from
+     whitespace instead, so the cards keep the height they have on a quiet day
+     (DECISIONS.md #63). */
+  body.has-banner { padding-top: 10px; padding-bottom: 10px; }
+  body.has-banner .header { margin-bottom: 4px; }
+  body.has-banner .current { margin-bottom: 0; }
+  body.has-banner .divider { margin: 4px 0; }
+  body.has-banner .daily { margin-bottom: 6px; }
+  body.has-banner .section-label { margin-bottom: 2px; }
 </style>
 </head>
-<body>
+<body${bannerHTML ? ' class="has-banner"' : ""}>
   <div class="header">
     <div class="location">${escapeHTML(w.location.name.toUpperCase())}</div>
     ${device ? `<div class="header-center">${ic("house", 18)}<span>${device.indoor_temp_c}°C</span>${ic("droplet", 14)}<span>${device.indoor_humidity_pct}%</span></div>` : ""}

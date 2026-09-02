@@ -2184,3 +2184,101 @@ kvOperationsAdaptiveGroups(limit: 10000, filter: {date_geq: "YYYY-MM-DD"}, order
 ```
 
 Counts come back sampled and rounded to the nearest ten; treat them as close estimates, not exact.
+
+---
+
+## 63. An Alert Banner Must Cost Whitespace, Not Card Content (v3.16.3, 2026-09-01)
+
+A live **Heat Advisory** on 2026-09-01 sliced the bottom row of cards on *both* panels: the
+"Next Hours" temperatures were cut through the middle of the glyphs and the precipitation line under
+them disappeared entirely. The 5-day cards above were untouched, which is what made it look like a
+rendering fault rather than a layout one.
+
+### Root cause
+
+Both weather pages are a fixed `800x480` flex column with `overflow: hidden`, and `.hourly` is the
+**only** flexible item:
+
+```css
+body   { height: 480px; overflow: hidden; display: flex; flex-direction: column; padding: 16px 28px; }
+.hourly { display: flex; gap: 10px; flex: 1; min-height: 0; overflow: hidden; }
+```
+
+`flex: 1` plus `min-height: 0` makes `.hourly` the sole absorber of *all* layout slack — including
+**negative** slack. The column had no reserve for the optional banner, so when one appeared the flex
+algorithm took the entire deficit out of the hourly row and `overflow: hidden` silently clipped the
+result. Measured at 800x480:
+
+| State | `.hourly` gets | cards need | verdict |
+|---|---|---|---|
+| no banner | 108–109px | 102–103px | fits, 5–7px slack |
+| **alert banner** (+39px) | **69–70px** | 102–103px | **34px short — clipped** |
+| **rain warning** (+27px) | **82px** | 102–103px | **20px short — clipped** |
+
+The alert banner costs ~39px (31px banner + 8px margin); the rain warning ~27px. **Both** overflowed —
+the rain-warning case had simply never been seen with populated precipitation lines, since
+`.hour-precip` collapses to 0px when a row has no rain to report.
+
+Two details explain why this went unnoticed for so long:
+
+- **The healthy layout already had only 5–7px of slack.** There was never room to absorb anything.
+- **`body.scrollHeight` reports 480 regardless.** The overflow is inside `.hourly`, so the usual
+  "does the page overflow?" check says no. The bug is only visible by measuring the deepest rendered
+  element: real ink extended to **492px (mono) / 494px (color)** against a 480px viewport.
+
+### Decision
+
+The banner is optional content on a hard-capped canvas, so its cost has to come out of **whitespace,
+not information**. The server already knows whether a banner is rendered, so it tags the body and the
+stylesheet reclaims exactly what the banner spends:
+
+```html
+<body${bannerHTML ? ' class="has-banner"' : ""}>
+```
+
+```css
+body.has-banner { padding-top: 10px; padding-bottom: 10px; }  /* 12px */
+body.has-banner .header        { margin-bottom: 4px; }        /*  4px */
+body.has-banner .current       { margin-bottom: 0; }          /*  4px */
+body.has-banner .divider       { margin: 4px 0; }             /* 12px */
+body.has-banner .daily         { margin-bottom: 6px; }        /*  4px */
+body.has-banner .section-label { margin-bottom: 2px; }        /*  4px x2 labels */
+```
+
+40px reclaimed against the banner's 39px, so **the hourly cards end up the same height they have on a
+quiet day** (110px vs 109px mono, 109px vs 108px color). The tightening is scoped to `body.has-banner`,
+so a day with no alert renders byte-for-byte as before. No JavaScript, no media queries — the class is
+decided server-side, which is the only option on a panel that screenshots static HTML.
+
+### Rejected alternatives
+
+- **A `min-height` floor on `.hourly`.** Stops the crush but not the clipping: the overflow just moves
+  to the body edge and cuts the same cards. It treats the symptom.
+- **Shrinking the banner** (smaller font/padding). Recovers ~7px of the 39px needed, and the alert is
+  the one element on the page that must stay maximally legible.
+- **Hiding the `NEXT HOURS` label when a banner shows.** Recovers 21px cheaply, but pays for the
+  banner by deleting information — the same mistake in a politer form.
+- **Tightening the spacing unconditionally.** Would make every quiet day — the overwhelming majority —
+  pay for a rare alert, and changes a layout nobody complained about.
+
+### Verified
+
+All ten states measured in-browser at exactly 800x480 (both pages x no-banner / tornado / winter /
+flood / rain-warning), with every `.hour-precip` forced to carry text to hold the worst case. Every
+state: deepest rendered ink `<= 480px`, and `.hourly` height `>=` the card's intrinsic need.
+
+### The constraint worth remembering
+
+**These pages have almost no vertical slack — 5–7px on a good day.** Anything that adds a row, a line
+of text, or a few px of margin to `/weather` or `/color/weather` will come out of the hourly cards
+first, and `overflow: hidden` will hide the evidence. Measure the deepest rendered element, not
+`scrollHeight`:
+
+```js
+let max = 0;
+document.querySelectorAll('*').forEach(el => {
+  const r = el.getBoundingClientRect();
+  if (r.height > 0 && r.bottom > max) max = r.bottom;
+});
+// max must be <= 480
+```
