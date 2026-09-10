@@ -1224,6 +1224,10 @@ No black tier remains. Green is a legible foreground on white (#40's rule lists 
 
 ## 42. Weather Resilience + NWS Fallback (v3.12.0, 2026-05-26)
 
+> **Scope note (2026-09-10, #65):** the ~8–10s renderer timeout measured here applies to the page
+> *document*. Sub-resources such as an `<img src>` get about one second before SenseCraft
+> screenshots and cancels them. Panel pages must be a single request.
+
 ### Incident: E1002 `/color/weather` blank ("Failed to load remote image")
 
 The color weather panel went blank-gray with a faint text ghost; SenseCraft HMI reported "Failed to load remote image" and it persisted across forced refreshes, while the other three E1002 pages rendered fine.
@@ -2284,6 +2288,11 @@ document.querySelectorAll('*').forEach(el => {
 ```
 
 ## 64. A Panel Request Must Never Wait on AI Generation (v3.16.4, 2026-09-10)
+
+> **Partly superseded by #65.** The stale-while-generating routes, the pre-midnight warm and the
+> caption-safe dither all stand. But the "~8–10s renderer budget" this entry relies on was the
+> *document* timeout; the renderer gives a sub-resource about one second. Inlining the PNG —
+> rejected below — is what actually restored the panel, and `/skyline` no longer uses an `<img src>`.
 
 ### Symptom
 

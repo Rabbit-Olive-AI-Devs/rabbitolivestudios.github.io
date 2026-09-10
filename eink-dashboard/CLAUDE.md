@@ -40,7 +40,8 @@ Every session must begin with these steps:
 | Bumping a cache key version | Safe for the stale-image fallback — it resolves keys by KV prefix, not by rebuilding them (DECISIONS #58). Never reintroduce a fallback that rebuilds keys from `*_CACHE_VERSION` |
 | Adding an HTML page whose body is an `<img>` | Give it a text fallback so a failed image never renders as a broken-image glyph on the panel (DECISIONS #58) |
 | Any image pipeline change | Never pass raw bytes to `env.IMAGES.input()` — it throws `undefined (reading 'font')` and burns the AI call before failing (DECISIONS #59) |
-| An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list`) before assuming reads are racing (DECISIONS #59) |
+| An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list --remote …`) before assuming reads are racing (DECISIONS #59). Without `--remote`, wrangler 4 reports the empty local store |
+| Diagnosing what a panel actually received | `wrangler tail --format json` shows the renderer's requests (UA `HeadlessChrome`, from Azure US West via Cloudflare SJC). An `outcome: canceled` with no log line is the client hanging up — on SenseCraft that is a white frame. The tail can go silent while alive; `/health-detailed` cache ages are ground truth (DECISIONS #65) |
 | Touching World Cup code | It is **retired but preserved** for 2030 — unwired, not deleted. Keep the files and their tests green; see DECISIONS #61 before removing anything |
 | Adding any per-request KV write or `list` | Cost it against the free tier's **1,000 writes/day** — a normal day already uses ~590 (DECISIONS #62). Reads are effectively free; writes and lists are not |
 | Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
@@ -57,7 +58,7 @@ Every session must begin with these steps:
 
 - **Project**: E-Ink "Moment Before" Dashboard
 - **Tech**: Cloudflare Workers (TypeScript)
-- **Repo**: `rabbitolivestudios/rabbitolivestudios.github.io`
+- **Repo**: `Rabbit-Olive-AI-Devs/rabbitolivestudios.github.io` (moved from `rabbitolivestudios/…` on 2026-09-10; the old URL redirects)
 - **Subdirectory**: `eink-dashboard/`
 - **Live URL**: `https://eink-dashboard.thiago-oliveira77.workers.dev`
 - **Displays**: reTerminal E1001 (mono, 7.5" ePaper, 800x480) + reTerminal E1002 (Spectra 6 color, 7.3", 800x480)
@@ -85,6 +86,13 @@ npx wrangler dev --port 8790
 
 # Deploy to production
 npx wrangler deploy
+
+# Production KV and logs. wrangler 4 kv commands read the LOCAL store unless --remote
+# is given; `wrangler tail` can stop delivering a few minutes after attaching while the
+# process stays alive — re-attach in rounds and kill the node child directly (DECISIONS #65).
+npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "skyline:v3:"
+npx wrangler tail eink-dashboard --format json
+pkill -f "bin/wrangler tail"
 
 # Test endpoints (E1001) — no key needed in local dev
 curl http://localhost:8790/weather?test-device
@@ -228,7 +236,7 @@ For API/cache changes:
 
 ## Git Practices
 
-- **Commit messages**: Short summary line, blank line, body explaining why (not what). End with `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
+- **Commit messages**: Short summary line, blank line, body explaining why (not what). End with the `Co-Authored-By:` and `Claude-Session:` attribution lines the current session provides (the model name changes between sessions; do not hardcode one)
 - **Commit often**: One logical change per commit. Don't batch unrelated changes.
 - **Never force push** to main.
 - **Push after committing** unless told otherwise.
