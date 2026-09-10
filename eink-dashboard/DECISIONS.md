@@ -2440,11 +2440,14 @@ that a page whose picture arrives by a second request was always one slow second
 frame, and on 2026-09-10 it lost that race on every cycle. The fix removes the race rather than
 betting on the cause.
 
-Also observed, and worth knowing: SenseCraft does not fetch a page once. In the first burst after
-this fix (20:19:55–20:20:48 UTC) it requested `/skyline` six times, `/skyline-bw` three times,
-`/color/moment` and `/fact.png` twice, `/color/weather` once — all 200 — and re-rendered *both*
-pagelists outside their 15-minute schedule. Repeated fetches of the same page within a burst are
-normal renderer behaviour, not a Worker fault.
+Also observed, and worth knowing: a **pagelist re-deploy in SenseCraft HMI** shows up in the tail
+as an immediate, off-schedule render of *both* pagelists with repeated fetches of each page — at
+20:19:55–20:20:48 UTC the renderer requested `/skyline` six times, `/skyline-bw` three times,
+`/color/moment` and `/fact.png` twice, `/color/weather` once, all 200. That burst was the user
+re-deploying the pages, nine minutes after the fix went live; it rendered the new one-request page
+and the panel recovered on it. The next scheduled cycle (20:35:45 UTC) rendered every page exactly
+once. A re-deploy is the way to force a re-render when a panel is stuck on a bad frame; the
+device itself never fetches anything.
 
 #64 was still right about the midnight window (a 10–20s generation on the request path can never
 render), but it left the second request on the renderer's clock even with a warm key, and it
