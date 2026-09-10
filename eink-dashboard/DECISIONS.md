@@ -2282,3 +2282,102 @@ document.querySelectorAll('*').forEach(el => {
 });
 // max must be <= 480
 ```
+
+## 64. A Panel Request Must Never Wait on AI Generation (v3.16.4, 2026-09-10)
+
+### Symptom
+
+The E1002 colour skyline page was **fully white** — no picture, no caption bar, no alt text — from
+first thing in the morning, while the other three E1002 pages rendered normally. By the time it was
+looked at (~10:00 CDT) the server was healthy: every daily key warm, AI budget unblocked, both
+`/skyline.png` variants serving valid 800x480 PNGs in 0.3–1.5s, no alert e-mail sent, and no
+skyline-related code change since the v3.16.3 deploy eight days earlier.
+
+### Root cause
+
+Two facts about the render path, both already on record, combined:
+
+1. **SenseCraft's renderer gives up after ~8–10s and the device then keeps a blank frame** (#42).
+   A failed image *request* would have drawn the styled alt text; a fully white frame means the
+   screenshot was taken while the `<img>` was still loading.
+2. **A request-path generation takes 10–20s** (FLUX.2 + Images + dither + KV write).
+
+The Chicago date rolls at 05:00 UTC in CDT. #57 moved the daily warm to 05:05 UTC, which closed the
+65-minute hole but left a ~5-minute one — and the skyline is 4th in the sequential warm, so its key
+stayed cold until ~00:08 CDT. A device poll of `/skyline` in that window became the generator, the
+renderer timed out before FLUX finished, and the panel got a white frame it kept all morning. Whether
+a given day hits depends on the phase of the page cycle, which is why it looked random.
+
+`/skyline` is the **only E1002 page that needs a second HTTP request** for its content (weather and
+headlines are pure HTML, the colour moment inlines its PNG as base64) — that is why it was the one
+page affected, and why `/fact`, `/skyline-bw` on the E1001 carry the same exposure.
+
+A second, independent defect was visible on the same image: the colour caption bar was red/blue
+speckle instead of black with white text. Floyd–Steinberg carries quantisation error downward, and a
+bright sky above the bar dumped enough residual into the pure-black rows to flip them. The mono
+skyline (no diffusion) had a clean bar.
+
+### Decision
+
+Three changes, each closing a different layer:
+
+**1. Stale-while-generating on every AI image route** (`serveStaleWhileGenerating` in
+`src/cache-guard.ts`; `/fact.png`, `/fact1.png`, `/skyline.png`, `/color/moment`). On a cold key with
+a healthy budget, the route serves the most recent cached image immediately (`no-store`,
+`X-Stale-While-Generating: 1`) and runs the generation under `ctx.waitUntil`. The blocking path is
+taken only when nothing older exists. A blocked budget short-circuits to the existing stale fallback
+as before, so nothing runs in the background that cannot succeed. Background generations wait up to
+60s on a held lock (`BACKGROUND_LOCK_WAIT_MS`) instead of overwriting it at 18s, so a poll racing the
+cron no longer duplicates the FLUX call. The neuron cost of a cold miss is unchanged — the same one
+generation happens, it just no longer holds the panel hostage. Same principle as #42's weather SWR:
+**the panel screenshots whatever arrives inside the renderer's budget; a day-old image inside it
+beats today's image outside it.**
+
+**2. Warm the next day's images before Chicago midnight.** The daily cron moved from
+`5 5,6 * * *` to `35 4,5 * * *`, and `dailyWarmTargetDate()` picks the date the panels are *about to
+ask for*: tomorrow when it fires after noon Chicago (23:35 CDT / 22:35 CST), today when it fires
+after midnight (00:35 CDT — the safety net; 23:35 CST is a no-op on the warm cache). The keys are
+therefore filled while the panels are still on the previous day, and there is **no window at all** in
+which a poll can be the generator. Still one set of images per UTC day; still one cron expression
+(the free plan's 5-trigger cap is full, #57). `getTodayEvents()`/`getFact()` take an optional date;
+the daily block of `handleScheduled` moved verbatim into `warmDailyImages(env, dateStr)`.
+`/health-detailed` reports `next_day_images` so the pre-warm can be checked after ~23:40 Chicago.
+
+**3. Dither the picture, not the caption** (`ditherPictureKeepCaption` in `src/skyline-image.ts`).
+Only the top 456 rows go through Floyd–Steinberg; the 24 caption rows are mapped by nearest colour,
+which is lossless for exact black and white. The test drives both paths with a bright synthetic sky
+and asserts the bar is exact under the new function *and corrupted under plain FS*, so it proves the
+failure it guards against.
+
+### Rejected alternatives
+
+- **Moving the cron a few minutes earlier / adding a third fire time.** Shrinks the hole, never
+  closes it, and the trigger cap is full. Warming the *next* date is what makes the hole zero.
+- **Generating in the background without serving a stale image first (fire-and-forget + 503).**
+  The renderer would draw the alt text — better than white, worse than yesterday's picture.
+- **Inlining the skyline PNG in the HTML like `/color/moment`.** Removes the second request but
+  not the blocking generation; and the BW/colour cross-fallback logic lives on the `.png` route.
+- **Dithering the caption with the error buffer reset at the bar boundary.** Works, but nearest
+  colour on rows that are already exact palette colours is simpler and has no edge case.
+
+### Verified
+
+- `npm run typecheck`, `npm run test:utils` (99 → 107 tests), `npm run dry-run` all pass.
+- New tests: SWR returns the stale bytes before generation resolves, marks them `no-store`, hands
+  generation to `waitUntil`, returns null with nothing stale or no `ctx`, and contains a throwing
+  generator; `dailyWarmTargetDate` across CDT/CST fire times, the noon boundary, month and year
+  roll; `getTodayEvents` fetches the requested date; caption rows exact vs. plain FS corrupting
+  >1000 bar pixels.
+- Live check after deploy: `/health-detailed` → `next_day_images` all `true` after the 04:35 UTC
+  fire; a cold-key request carries `X-Stale-While-Generating: 1` and returns in well under 8s.
+
+### What to remember
+
+- **If a page needs a second request for its content, that request is on the renderer's clock.**
+  Anything that can take >8s must be behind a cache that is already warm, or must answer with
+  something stale.
+- **"Warm before the roll", not "warm right after the roll".** The gap between a key going cold and
+  the job filling it is the exposure (#57's own lesson); the only zero-width version is filling the
+  next key before the current one expires.
+- **Never diffuse error into pixels you drew in palette colours.** Draw them after dithering, or
+  map them directly.
