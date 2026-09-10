@@ -45,7 +45,8 @@ Every session must begin with these steps:
 | Adding any per-request KV write or `list` | Cost it against the free tier's **1,000 writes/day** — a normal day already uses ~590 (DECISIONS #62). Reads are effectively free; writes and lists are not |
 | Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
 | Adding visual changes to weather/fact pages | Test in browser at 800x480 before deploying, **including with an alert banner** (`?test-alert=tornado`) — that state has ~34px less room (DECISIONS #63) |
-| Adding an AI image route, or anything slow, to a page the panel loads | It must answer inside SenseCraft's ~8–10s renderer budget or the panel goes white. Serve a stale image and generate under `ctx.waitUntil` (`serveStaleWhileGenerating`, DECISIONS #64); never generate on the request path when something older exists |
+| Adding an AI image route, or anything slow, to a page the panel loads | Never generate on the request path when something older exists: serve a stale image and generate under `ctx.waitUntil` (`serveStaleWhileGenerating`, DECISIONS #64) |
+| Adding or changing any page a panel loads | It must be **one request**: inline images as `data:` URIs (`renderSkylineInlineHTML`, `/color/moment`). SenseCraft screenshots ~1s after the document arrives and cancels sub-resources still in flight — a separate `<img src="/skyline.png">` went white on the E1002 even with a warm cache (DECISIONS #65). The document itself is waited for; a sub-resource is not |
 | Touching the daily cron or `dailyWarmTargetDate` | The warm must fill the **next** Chicago date before it rolls (`35 4,5 * * *`). Warming "right after midnight" reopens the hole that blanked the skyline (DECISIONS #64) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
@@ -338,7 +339,7 @@ eink-dashboard/
       color-weather.ts    — /color/weather HTML page (E1002 Spectra 6)
       color-moment.ts     — /color/moment + color birthday + test endpoints
       color-headlines.ts  — /color/headlines HTML page
-      skyline.ts          — /skyline + /skyline-test HTML pages
+      skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
   photos/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)

@@ -54,7 +54,7 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 
-const VERSION = "3.16.4";
+const VERSION = "3.16.5";
 
 /** Public origin, used for links in alert emails (a cron has no request URL). */
 const WORKER_BASE_URL = "https://eink-dashboard.thiago-oliveira77.workers.dev";
@@ -569,8 +569,17 @@ async function handleSkylinePng(env: Env, url: URL, ctx?: ExecutionContext): Pro
   return generateFresh(false);
 }
 
-function handleSkylinePage(env: Env, url: URL): Promise<Response> {
-  return skylinePageResponse(env, url.search.replace(/^\?/, ""));
+/**
+ * The panel pages inline the PNG (DECISIONS #65), so they run the png handler
+ * themselves instead of pointing an <img> at it. The page's own query string is
+ * what /skyline.png used to receive via the forwarded <img src>.
+ */
+function handleSkylinePage(env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
+  return skylinePageResponse(env, () => handleSkylinePng(env, url, ctx));
+}
+
+function handleSkylineBwPage(env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
+  return skylineBwPageResponse(env, () => handleSkylinePng(env, new URL("/skyline.png?bw=1", url), ctx));
 }
 
 async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
@@ -1248,9 +1257,9 @@ export default {
       case "/skyline.png":
         return handleSkylinePng(env, url, ctx);
       case "/skyline":
-        return handleSkylinePage(env, url);
+        return handleSkylinePage(env, url, ctx);
       case "/skyline-bw":
-        return skylineBwPageResponse(env);
+        return handleSkylineBwPage(env, url, ctx);
       case "/skyline-test.png": {
         const authBlockST = checkTestAuth(url, env);
         if (authBlockST) return authBlockST;

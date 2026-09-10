@@ -2381,3 +2381,115 @@ failure it guards against.
   next key before the current one expires.
 - **Never diffuse error into pixels you drew in palette colours.** Draw them after dithering, or
   map them directly.
+
+---
+
+## 65. A Panel Page Must Carry Its Own Image (v3.16.5, 2026-09-10)
+
+### Symptom
+
+#64 (v3.16.4) deployed at 18:21 UTC and the E1002 skyline stayed **fully white** all afternoon.
+Every daily key was warm, the AI budget was open, `/skyline` and `/skyline.png` answered in
+~0.2s from Chicago, and a Chromium render at 800x480 showed the picture. The server was not the
+problem, so the question became what the *renderer* was doing.
+
+### Evidence
+
+`wrangler tail` while the panels cycled (renderer UA `HeadlessChrome/151`, X11 Linux):
+
+| Time (UTC) | Request | Outcome |
+|------------|---------|---------|
+| 20:06:27 | `GET /skyline` | 200 |
+| 20:06:28 | `GET /skyline.png` | **canceled** — no status, no "cache hit" log |
+| 20:06:29 | `GET /color/weather` | 200 |
+| 20:06:31 | `GET /color/moment` | 200, cache hit (its PNG is inlined) |
+
+The E1001 bursts at 19:08, 19:23 and 20:09 fetched `/skyline-bw` and `/skyline.png?bw=1` in the
+same second, both 200. SenseCraft renders every page of a pagelist in one burst, about two seconds
+per page, and the whole pagelist about every 15 minutes.
+
+### Root cause
+
+SenseCraft waits for the **document**, screenshots roughly **one second** later, and closes the page,
+cancelling any sub-resource still in flight. A cancelled `<img>` paints nothing — not even the alt
+text, which only appears when a request *fails*. The frame is white.
+
+The ~8–10s "renderer budget" that #42 and #64 relied on was the document-navigation timeout seen
+when `/color/weather` itself was slow. It never applied to a sub-resource. The colour `/skyline.png`
+— one KV read of a ~70KB value plus a 52KB transfer — did not finish inside the second; the mono
+one happened to. The renderer is a single HeadlessChrome instance on Microsoft Azure (US West,
+`13.91.141.56`) reaching the Worker through Cloudflare **SJC**, so the distance is modest and the
+margin is simply thin: the whole image round-trip has to fit in what is left of the renderer's
+one second after the document has arrived.
+
+### What is *not* established: why today
+
+Nothing on our side changed between the v3.16.3 deploy (2026-09-02) and the first white frame on
+the morning of 2026-09-10 — the #64 deploy came after it. The two-request design had been the same
+since the skyline page was written. Two candidate explanations were checked:
+
+- **Image size.** No. Today's colour PNG is 52KB; the seven cached days run 12–75KB and four of
+  them were larger than today (Sep 4: 75KB, Sep 5: 69KB, Sep 7: 71KB, Sep 8: 57KB) with no
+  reported blank. Mono PNGs are 24–42KB.
+- **A cold key / request-path generation.** No. The key was warm all day and every `/skyline.png`
+  in the tail was a cache hit or a cancel; no generation ran on a panel request.
+
+What remains is a change on SenseCraft's side (their renderer's timing or placement) or in the
+latency between it and the Worker, neither of which is observable from here. The honest summary is
+that a page whose picture arrives by a second request was always one slow second away from a white
+frame, and on 2026-09-10 it lost that race on every cycle. The fix removes the race rather than
+betting on the cause.
+
+Also observed, and worth knowing: SenseCraft does not fetch a page once. In the first burst after
+this fix (20:19:55–20:20:48 UTC) it requested `/skyline` six times, `/skyline-bw` three times,
+`/color/moment` and `/fact.png` twice, `/color/weather` once — all 200 — and re-rendered *both*
+pagelists outside their 15-minute schedule. Repeated fetches of the same page within a burst are
+normal renderer behaviour, not a Worker fault.
+
+#64 was still right about the midnight window (a 10–20s generation on the request path can never
+render), but it left the second request on the renderer's clock even with a warm key, and it
+rejected inlining for the wrong reason. `/color/moment` has inlined its PNG since it was written
+and is the one AI page on the E1002 that has never blanked.
+
+### Decision
+
+`/skyline` and `/skyline-bw` inline the PNG as a `data:` URI, like `/color/moment`. The page
+handlers run `handleSkylinePng` themselves (a `SkylinePngFetcher` callback, so the page module does
+not import the router), which keeps every #64 behaviour — stale-while-generating, stale and BW
+cross-fallbacks, the budget short-circuit — and turns a non-PNG result (503) into the text page of
+#58. The png handler's `X-Skyline-*` and `X-Stale-While-Generating` headers are forwarded onto the
+HTML response so `curl -I /skyline` still diagnoses. `/skyline-test` keeps its `<img src>` form: it
+is a browser test page that forwards the auth key, never a panel page.
+
+No cache key bump: the PNG pipelines are untouched, and the wrapper was already `no-store`.
+
+### Rejected
+
+- **Making `/skyline.png` faster** (Cache API at the edge, smaller PNG). Still a second request
+  on a ~1s budget from wherever SenseCraft's renderer happens to run; and the KV read is needed
+  for the document anyway, where the renderer *does* wait for it.
+- **A longer screenshot delay in SenseCraft HMI.** Not something the Web Function exposes.
+- **Inlining `/fact` as well.** The E1001 pagelist fetches `/fact.png` directly — no HTML wrapper
+  appears in the tail — so there is no second request to remove. Left alone.
+
+### Verified
+
+- `npm run typecheck`, `npm run test:utils` (107 → 112), `npm run dry-run` pass. New tests: the
+  inline HTML carries the data URI and no image route; `/skyline` and `/skyline-bw` inline what the
+  fetcher returns and forward its diagnostic headers; a 503 from the fetcher becomes the text page.
+- Live after deploy: `/skyline` → `text/html`, 56KB, 0.2–0.26s, `X-Skyline-*` present; Chromium
+  800x480 renders identically to the PNG with exactly **one** network request per page.
+- Renderer: the first E1002 burst after the deploy (20:19:55 UTC) fetched `/skyline` with a 200 and
+  the cache-hit log on the page request itself, and made **no** `/skyline.png` request; every
+  request in the burst completed (`outcome: ok`), none was cancelled.
+
+### What to remember
+
+- **A panel page is one request.** Inline the image. The renderer waits for the document and for
+  nothing else.
+- `outcome: canceled` with no log line in `wrangler tail` means the client hung up before the
+  Worker finished. On SenseCraft that is a white frame, and it is invisible to every server-side
+  health check.
+- `wrangler tail` (4.92) silently stops delivering a few minutes after it attaches while the
+  process stays alive. Re-attach in rounds and cross-check against the cache ages in
+  `/health-detailed`, which record every render whether or not the tail saw it.
