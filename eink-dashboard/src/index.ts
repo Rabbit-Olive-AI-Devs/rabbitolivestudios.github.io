@@ -13,7 +13,7 @@ import { getBirthdayToday, getBirthdayByKey } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
 import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID } from "./device";
 import { fetchWithTimeout } from "./fetch-timeout";
-import { getChicagoDateParts, shiftDateStr, getChicagoHour } from "./date-utils";
+import { getChicagoDateParts, shiftDateStr, getChicagoHour, dailyWarmTargetDate } from "./date-utils";
 import { findMostRecentCached, hasRecentCached } from "./stale-cache";
 import { parseMonth, parseDay, parseStyleIdx } from "./validate";
 import {
@@ -696,6 +696,15 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
           skyline: skylineKey, skyline_bw: skylineBwKey, moment_event: momentKey } = dailyKeys;
   const aiBudgetBlock = await getAiBudgetBlock(env);
 
+  // Tomorrow's keys: the evening warm fills these before the date rolls (DECISIONS #64),
+  // so after ~23:40 Chicago they should all read cached.
+  const nextDate = shiftDateStr(dateStr, 1);
+  const [, nextMonth, nextDay] = nextDate.split("-").map(Number);
+  const nextKeys = dailyImageKeys(nextDate, nextMonth, nextDay).keys;
+  const nextCached = Object.fromEntries(
+    await Promise.all(ALERT_WATCHED_IMAGES.map(async (l) => [l, (await env.CACHE.get(nextKeys[l], "stream")) !== null])),
+  );
+
   // Fetch all keys in parallel
   const [
     fact4Raw, fact1Raw, colorMomentRaw, skylineRaw, skylineBwRaw, momentRaw,
@@ -731,6 +740,7 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         skyline_bw:   { cached: skylineBwRaw !== null,   key: skylineBwKey },
         moment_event: { cached: momentRaw !== null,      key: momentKey },
       },
+      next_day_images: { date_chicago: nextDate, ...nextCached },
       ephemeral: {
         weather_home:   weatherStatus(weatherHomeRaw),
         weather_office: weatherStatus(weatherOfficeRaw),
@@ -763,16 +773,18 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 // (routes, the */15 cron trigger and the [browser] binding) has been removed.
 
 /** Cron expressions that trigger the daily image warm (see the isDaily note below). */
-const DAILY_CRONS = new Set(["5 5,6 * * *", "5 5 * * *", "5 6 * * *"]);
+const DAILY_CRONS = new Set(["35 4,5 * * *", "35 4 * * *", "35 5 * * *"]);
 
 async function handleScheduled(env: Env, cronExpression: string): Promise<void> {
-  // The daily warm fires twice, once for each Chicago UTC offset: 05:05 UTC lands just
-  // after midnight in CDT, 06:05 UTC just after midnight in CST. Both run year-round —
-  // the one that fires before the date rolls finds yesterday's images already cached and
-  // no-ops, so the cost is a few KV reads. The point is that the cache is warm before
-  // the devices start polling the new day's keys (DECISIONS #57).
+  // The daily warm fires twice, before midnight Chicago in either UTC offset: 04:35 UTC
+  // is 23:35 CDT / 22:35 CST, 05:35 UTC is 00:35 CDT / 23:35 CST. Each fire warms the
+  // date the panels are about to ask for (tomorrow in the evening, today after
+  // midnight — see dailyWarmTargetDate), so the keys are filled before the date rolls
+  // and no device poll can ever be the generator. The earlier 05:05/06:05 schedule
+  // fired *after* the roll and left a 5-8 minute hole at 00:00 CDT in which a poll
+  // generated on the request path and the renderer timed out (DECISIONS #57, #64).
   //
-  // Matched as a set rather than one literal: the schedule is a single "5 5,6 * * *"
+  // Matched as a set rather than one literal: the schedule is a single "35 4,5 * * *"
   // expression (cron triggers are a scarce per-account resource on the free plan), but
   // the individual forms are accepted too so a schedule split can't silently turn the
   // daily warm into a no-op.
@@ -823,180 +835,196 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     // --- Daily only: images + skyline ---
     if (!isDaily) return;
 
-    // Shared dependencies: events + moment (needed by all image pipelines)
-    const { events, displayDate } = await getTodayEvents(env);
-    console.log(`Cron: fetched ${events.length} events for ${dateStr}`);
-
-    const sharedMoment = await getOrGenerateMoment(env, events, dateStr);
-    console.log(`Cron: shared moment — ${sharedMoment.year}, ${sharedMoment.location}`);
-
-    const birthday = getBirthdayToday(monthNum, dayNum);
-
-    // fact.json first (no AI cost)
-    try {
-      await getFact(env);
-      console.log(`Cron: cached fact.json for ${dateStr}`);
-    } catch (err) {
-      console.error("Cron: fact.json failed:", err);
-    }
-
-    // --- Sequential image generation with neuron budget awareness ---
-    // Workers AI free tier = 10,000 neurons/day. Running in parallel would
-    // exhaust the budget before any single pipeline finishes its SDXL fallback.
-    // Sequential execution + early abort ensures core images are prioritized.
-    let budgetExhausted = false;
-    function isNeuronError(err: unknown): boolean {
-      return isNeuronBudgetError(err);
-    }
-
-    // 1. Pipeline A (or birthday) — HIGHEST PRIORITY
-    if (!budgetExhausted) {
-      try {
-        // Skip if already cached: the day's other daily trigger, or a device that
-        // beat the cron to the new date, may have filled this already. Regenerating
-        // it burned ~1,364 neurons for an identical image (DECISIONS #57).
-        const keyA = birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr);
-        if (await env.CACHE.get(keyA)) {
-          console.log(`Cron: Pipeline A already cached for ${dateStr}`);
-        } else if (birthday) {
-          console.log(`Cron: birthday detected — ${birthday.name}`);
-          const bdayPng = await generateBirthdayImage(env, birthday, yearNum);
-          await env.CACHE.put(birthdayCacheKey(dateStr), pngToBase64(bdayPng), { expirationTtl: 604800 });
-          console.log(`Cron: cached birthday image for ${birthday.name}`);
-        } else {
-          const png4 = await generateMomentImage(env, sharedMoment, displayDate, dateStr);
-          await env.CACHE.put(fact4CacheKey(dateStr), pngToBase64(png4), { expirationTtl: 604800 });
-          console.log(`Cron: cached 4-level image for ${dateStr}`);
-        }
-      } catch (err) {
-        if (isNeuronError(err)) {
-          budgetExhausted = true;
-          await markAiBudgetExhausted(env, "cron Pipeline A", err);
-          console.error("Cron: neuron budget exhausted at Pipeline A");
-        } else {
-          console.error("Cron: Pipeline A failed:", err);
-        }
-      }
-    }
-
-    // 2. Pipeline B
-    if (!budgetExhausted) {
-      try {
-        const keyB = fact1CacheKey(dateStr);
-        if (await env.CACHE.get(keyB)) {
-          console.log(`Cron: Pipeline B already cached for ${dateStr}`);
-        } else {
-          const png1 = await generateMomentImage1Bit(env, sharedMoment, displayDate, dateStr);
-          await env.CACHE.put(keyB, pngToBase64(png1), { expirationTtl: 604800 });
-          console.log(`Cron: cached 1-bit image for ${dateStr}`);
-        }
-      } catch (err) {
-        if (isNeuronError(err)) {
-          budgetExhausted = true;
-          await markAiBudgetExhausted(env, "cron Pipeline B", err);
-          console.error("Cron: neuron budget exhausted at Pipeline B");
-        } else {
-          console.error("Cron: Pipeline B failed:", err);
-        }
-      }
-    }
-
-    // 3. Color moment
-    if (!budgetExhausted && !birthday) {
-      try {
-        const colorStyle = getColorMomentStyle(dateStr);
-        const colorCacheKey = colorMomentCacheKey(dateStr, colorStyle.id);
-        const existing = await env.CACHE.get(colorCacheKey);
-        if (!existing) {
-          const colorResult = await generateColorMoment(env, sharedMoment, dateStr);
-          const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-          const colorDisplayDate = `${months[monthNum - 1]} ${dayNum}`;
-          const cacheData = JSON.stringify({ imageB64: colorResult.base64, moment: sharedMoment, displayDate: colorDisplayDate });
-          await env.CACHE.put(colorCacheKey, cacheData, { expirationTtl: 604800 });
-          console.log(`Cron: cached color moment (${colorStyle.name}) for ${dateStr}`);
-        } else {
-          console.log(`Cron: color moment already cached for ${dateStr}`);
-        }
-      } catch (err) {
-        if (isNeuronError(err)) {
-          budgetExhausted = true;
-          await markAiBudgetExhausted(env, "cron color moment", err);
-          console.error("Cron: neuron budget exhausted at color moment");
-        } else {
-          console.error("Cron: color moment warm failed:", err);
-        }
-      }
-    }
-
-    // 4. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
-    if (!budgetExhausted) {
-      try {
-        const skylineDailyKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0);
-        const existingSkyline = await env.CACHE.get(skylineDailyKey);
-        if (!existingSkyline) {
-          const skylineParts = parseDateParts(dateStr);
-          const skylineOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 };
-          const skylineCity = pickSkylineCity(skylineParts, skylineOpts);
-          const skylineStyle = pickSkylineStyle(skylineParts, skylineOpts);
-          const skylineRefPrompt = buildSkylineRefPrompt(skylineCity, skylineStyle);
-          const skylineSdxlPrompt = buildSkylinePrompt(skylineCity, skylineStyle);
-          const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate);
-          const skylinePhotoSeed = djb2(`${dateStr}|photo|daily`);
-          const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineSdxlPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
-          await env.CACHE.put(skylineDailyKey, skylineResult.base64, { expirationTtl: 604800 });
-          console.log(`Cron: cached skyline daily (${skylineCity.name}, ${skylineStyle.label}, ref=${skylineResult.usedRef})`);
-        } else {
-          console.log(`Cron: skyline already cached for today`);
-        }
-      } catch (err) {
-        if (isNeuronError(err)) {
-          budgetExhausted = true;
-          await markAiBudgetExhausted(env, "cron skyline", err);
-          console.error("Cron: neuron budget exhausted at skyline");
-        } else {
-          console.error("Cron: skyline warm failed:", err);
-        }
-      }
-    }
-
-    // 5. Skyline BW — daily mode
-    if (!budgetExhausted) {
-      try {
-        const bwCacheKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0, true);
-        const existingBw = await env.CACHE.get(bwCacheKey);
-        if (!existingBw) {
-          const bwParts = parseDateParts(dateStr);
-          const bwOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0, colorModeFilter: "bw" };
-          const bwCity = pickSkylineCity(bwParts, bwOpts);
-          const bwStyle = pickSkylineStyle(bwParts, bwOpts);
-          const bwRefPrompt = buildSkylineRefPrompt(bwCity, bwStyle);
-          const bwSdxlPrompt = buildSkylinePrompt(bwCity, bwStyle);
-          const bwCaption = formatSkylineCaption(bwCity, bwParts.displayDate);
-          const bwPhotoSeed = djb2(`${dateStr}|photo|daily-bw`);
-          const bwResult = await generateSkylineImage(env, bwRefPrompt, bwSdxlPrompt, bwCaption, bwStyle.colorMode, bwCity.key, bwPhotoSeed, true);
-          await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: 604800 });
-          console.log(`Cron: cached skyline BW daily (${bwCity.name}, ${bwStyle.label}, sdxlOnly)`);
-        } else {
-          console.log(`Cron: skyline BW already cached for today`);
-        }
-      } catch (err) {
-        if (isNeuronError(err)) {
-          budgetExhausted = true;
-          await markAiBudgetExhausted(env, "cron skyline BW", err);
-          console.error("Cron: neuron budget exhausted at skyline BW");
-        } else {
-          console.error("Cron: skyline BW warm failed:", err);
-        }
-      }
-    }
-
-    if (budgetExhausted) {
-      console.error("Cron: WARNING — neuron budget exhausted before all images generated. Consider upgrading to Workers Paid plan ($5/mo).");
-    }
-    console.log("Cron: daily image warm complete");
+    // Warm the date the panels are about to ask for, not the one they are on.
+    // In the evening that is tomorrow, so the keys are already filled when the
+    // Chicago date rolls; the post-midnight fire targets today and acts as the
+    // safety net (DECISIONS #64).
+    const target = dailyWarmTargetDate(dateStr, getChicagoHour());
+    await warmDailyImages(env, target);
   } catch (err) {
     console.error("Cron error:", err);
   }
+}
+
+/**
+ * Generate the day's five images (plus fact.json and the shared moment) for
+ * `dateStr`, skipping anything already cached. Sequential, budget-aware.
+ */
+async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
+  const [yearNum, monthNum, dayNum] = dateStr.split("-").map(Number);
+  console.log(`Cron: warming daily images for ${dateStr}`);
+
+  // Shared dependencies: events + moment (needed by all image pipelines)
+  const { events, displayDate } = await getTodayEvents(env, dateStr);
+  console.log(`Cron: fetched ${events.length} events for ${dateStr}`);
+
+  const sharedMoment = await getOrGenerateMoment(env, events, dateStr);
+  console.log(`Cron: shared moment — ${sharedMoment.year}, ${sharedMoment.location}`);
+
+  const birthday = getBirthdayToday(monthNum, dayNum);
+
+  // fact.json first (no AI cost)
+  try {
+    await getFact(env, dateStr);
+    console.log(`Cron: cached fact.json for ${dateStr}`);
+  } catch (err) {
+    console.error("Cron: fact.json failed:", err);
+  }
+
+  // --- Sequential image generation with neuron budget awareness ---
+  // Workers AI free tier = 10,000 neurons/day. Running in parallel would
+  // exhaust the budget before any single pipeline finishes its SDXL fallback.
+  // Sequential execution + early abort ensures core images are prioritized.
+  let budgetExhausted = false;
+  function isNeuronError(err: unknown): boolean {
+    return isNeuronBudgetError(err);
+  }
+
+  // 1. Pipeline A (or birthday) — HIGHEST PRIORITY
+  if (!budgetExhausted) {
+    try {
+      // Skip if already cached: the day's other daily trigger, or a device that
+      // beat the cron to the new date, may have filled this already. Regenerating
+      // it burned ~1,364 neurons for an identical image (DECISIONS #57).
+      const keyA = birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr);
+      if (await env.CACHE.get(keyA)) {
+        console.log(`Cron: Pipeline A already cached for ${dateStr}`);
+      } else if (birthday) {
+        console.log(`Cron: birthday detected — ${birthday.name}`);
+        const bdayPng = await generateBirthdayImage(env, birthday, yearNum);
+        await env.CACHE.put(birthdayCacheKey(dateStr), pngToBase64(bdayPng), { expirationTtl: 604800 });
+        console.log(`Cron: cached birthday image for ${birthday.name}`);
+      } else {
+        const png4 = await generateMomentImage(env, sharedMoment, displayDate, dateStr);
+        await env.CACHE.put(fact4CacheKey(dateStr), pngToBase64(png4), { expirationTtl: 604800 });
+        console.log(`Cron: cached 4-level image for ${dateStr}`);
+      }
+    } catch (err) {
+      if (isNeuronError(err)) {
+        budgetExhausted = true;
+        await markAiBudgetExhausted(env, "cron Pipeline A", err);
+        console.error("Cron: neuron budget exhausted at Pipeline A");
+      } else {
+        console.error("Cron: Pipeline A failed:", err);
+      }
+    }
+  }
+
+  // 2. Pipeline B
+  if (!budgetExhausted) {
+    try {
+      const keyB = fact1CacheKey(dateStr);
+      if (await env.CACHE.get(keyB)) {
+        console.log(`Cron: Pipeline B already cached for ${dateStr}`);
+      } else {
+        const png1 = await generateMomentImage1Bit(env, sharedMoment, displayDate, dateStr);
+        await env.CACHE.put(keyB, pngToBase64(png1), { expirationTtl: 604800 });
+        console.log(`Cron: cached 1-bit image for ${dateStr}`);
+      }
+    } catch (err) {
+      if (isNeuronError(err)) {
+        budgetExhausted = true;
+        await markAiBudgetExhausted(env, "cron Pipeline B", err);
+        console.error("Cron: neuron budget exhausted at Pipeline B");
+      } else {
+        console.error("Cron: Pipeline B failed:", err);
+      }
+    }
+  }
+
+  // 3. Color moment
+  if (!budgetExhausted && !birthday) {
+    try {
+      const colorStyle = getColorMomentStyle(dateStr);
+      const colorCacheKey = colorMomentCacheKey(dateStr, colorStyle.id);
+      const existing = await env.CACHE.get(colorCacheKey);
+      if (!existing) {
+        const colorResult = await generateColorMoment(env, sharedMoment, dateStr);
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const colorDisplayDate = `${months[monthNum - 1]} ${dayNum}`;
+        const cacheData = JSON.stringify({ imageB64: colorResult.base64, moment: sharedMoment, displayDate: colorDisplayDate });
+        await env.CACHE.put(colorCacheKey, cacheData, { expirationTtl: 604800 });
+        console.log(`Cron: cached color moment (${colorStyle.name}) for ${dateStr}`);
+      } else {
+        console.log(`Cron: color moment already cached for ${dateStr}`);
+      }
+    } catch (err) {
+      if (isNeuronError(err)) {
+        budgetExhausted = true;
+        await markAiBudgetExhausted(env, "cron color moment", err);
+        console.error("Cron: neuron budget exhausted at color moment");
+      } else {
+        console.error("Cron: color moment warm failed:", err);
+      }
+    }
+  }
+
+  // 4. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
+  if (!budgetExhausted) {
+    try {
+      const skylineDailyKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0);
+      const existingSkyline = await env.CACHE.get(skylineDailyKey);
+      if (!existingSkyline) {
+        const skylineParts = parseDateParts(dateStr);
+        const skylineOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 };
+        const skylineCity = pickSkylineCity(skylineParts, skylineOpts);
+        const skylineStyle = pickSkylineStyle(skylineParts, skylineOpts);
+        const skylineRefPrompt = buildSkylineRefPrompt(skylineCity, skylineStyle);
+        const skylineSdxlPrompt = buildSkylinePrompt(skylineCity, skylineStyle);
+        const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate);
+        const skylinePhotoSeed = djb2(`${dateStr}|photo|daily`);
+        const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineSdxlPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
+        await env.CACHE.put(skylineDailyKey, skylineResult.base64, { expirationTtl: 604800 });
+        console.log(`Cron: cached skyline daily (${skylineCity.name}, ${skylineStyle.label}, ref=${skylineResult.usedRef})`);
+      } else {
+        console.log(`Cron: skyline already cached for today`);
+      }
+    } catch (err) {
+      if (isNeuronError(err)) {
+        budgetExhausted = true;
+        await markAiBudgetExhausted(env, "cron skyline", err);
+        console.error("Cron: neuron budget exhausted at skyline");
+      } else {
+        console.error("Cron: skyline warm failed:", err);
+      }
+    }
+  }
+
+  // 5. Skyline BW — daily mode
+  if (!budgetExhausted) {
+    try {
+      const bwCacheKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0, true);
+      const existingBw = await env.CACHE.get(bwCacheKey);
+      if (!existingBw) {
+        const bwParts = parseDateParts(dateStr);
+        const bwOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0, colorModeFilter: "bw" };
+        const bwCity = pickSkylineCity(bwParts, bwOpts);
+        const bwStyle = pickSkylineStyle(bwParts, bwOpts);
+        const bwRefPrompt = buildSkylineRefPrompt(bwCity, bwStyle);
+        const bwSdxlPrompt = buildSkylinePrompt(bwCity, bwStyle);
+        const bwCaption = formatSkylineCaption(bwCity, bwParts.displayDate);
+        const bwPhotoSeed = djb2(`${dateStr}|photo|daily-bw`);
+        const bwResult = await generateSkylineImage(env, bwRefPrompt, bwSdxlPrompt, bwCaption, bwStyle.colorMode, bwCity.key, bwPhotoSeed, true);
+        await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: 604800 });
+        console.log(`Cron: cached skyline BW daily (${bwCity.name}, ${bwStyle.label}, sdxlOnly)`);
+      } else {
+        console.log(`Cron: skyline BW already cached for today`);
+      }
+    } catch (err) {
+      if (isNeuronError(err)) {
+        budgetExhausted = true;
+        await markAiBudgetExhausted(env, "cron skyline BW", err);
+        console.error("Cron: neuron budget exhausted at skyline BW");
+      } else {
+        console.error("Cron: skyline BW warm failed:", err);
+      }
+    }
+  }
+
+  if (budgetExhausted) {
+    console.error("Cron: WARNING — neuron budget exhausted before all images generated. Consider upgrading to Workers Paid plan ($5/mo).");
+  }
+  console.log("Cron: daily image warm complete");
 }
 
 // --- Main export ---

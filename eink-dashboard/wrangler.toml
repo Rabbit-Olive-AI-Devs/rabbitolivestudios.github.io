@@ -31,18 +31,20 @@ binding = "PHOTOS"
 bucket_name = "eink-birthday-photos"
 
 # Cron schedules:
-#   "5 5,6 * * *"     — daily image warm, at BOTH 05:05 and 06:05 UTC. Chicago midnight is
-#                       05:00 UTC in CDT and 06:00 UTC in CST, so whichever fires first after
-#                       the date rolls generates, and the other no-ops on the now-warm cache.
-#                       A single 06:05 UTC trigger left a 65-minute hole every summer day where
-#                       the devices themselves generated the images on the request path — which
-#                       duplicated work and blew the neuron budget (DECISIONS #57). Kept as ONE
-#                       expression with two fire times: Workers Free allows only 5 cron
-#                       triggers per account and the slots are already full.
+#   "35 4,5 * * *"    — daily image warm, BEFORE midnight Chicago: 04:35 UTC is 23:35 CDT /
+#                       22:35 CST and 05:35 UTC is 00:35 CDT / 23:35 CST. Each fire warms the
+#                       date the panels are about to ask for (tomorrow in the evening, today
+#                       after midnight), so the keys are already filled when the date rolls
+#                       and a device poll can never be the generator. The previous 05:05/06:05
+#                       schedule fired AFTER the roll and left a 5-8 minute hole at 00:00 CDT;
+#                       a poll in that hole generated on the request path (10-20s), SenseCraft's
+#                       renderer timed out, and the E1002 skyline went white (DECISIONS #57,
+#                       #64). Kept as ONE expression with two fire times: Workers Free allows
+#                       only 5 cron triggers per account and the slots are already full.
 #   "5 0,6,12,18 * * *" — headlines + weather + the failure-alert check (#60)
 #
 # The World Cup "*/15 * * * *" trigger was removed when the tournament dashboard was
 # retired (DECISIONS #61) — it was 96 no-op invocations a day, and cron triggers are a
 # scarce per-account resource on the free plan (5 across all Workers; see #57).
 [triggers]
-crons = ["5 5,6 * * *", "5 0,6,12,18 * * *"]
+crons = ["35 4,5 * * *", "5 0,6,12,18 * * *"]

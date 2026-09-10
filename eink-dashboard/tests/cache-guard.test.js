@@ -72,3 +72,21 @@ test("a failing background generation is contained — waitUntil promise resolve
   assert.ok(res);
   await assert.doesNotReject(ctx.pending[0]);
 });
+
+// --- getTodayEvents / getFact accept an explicit date (DECISIONS #64) ---
+
+test("getTodayEvents fetches the requested date, not today's", async () => {
+  const { getTodayEvents } = fromBuild("src/fact.js");
+  const realFetch = globalThis.fetch;
+  let url = "";
+  globalThis.fetch = async (u) => { url = String(u); return new Response(JSON.stringify({ events: [{ year: 1969, text: "Moon" }] })); };
+  try {
+    const r = await getTodayEvents({}, "2026-12-25");
+    assert.match(url, /onthisday\/events\/12\/25$/);
+    assert.equal(r.dateStr, "2026-12-25");
+    assert.equal(r.displayDate, "Dec 25");
+    assert.deepEqual(r.events, [{ year: 1969, text: "Moon" }]);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

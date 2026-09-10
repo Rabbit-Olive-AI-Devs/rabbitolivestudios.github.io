@@ -15,29 +15,32 @@ const FALLBACK_FACT: FactResponse = {
   source: "Fallback",
 };
 
-function getTodayChicago(): { dateStr: string; displayDate: string; month: string; day: string } {
-  const { month, day, dateStr } = getChicagoDateParts();
-
-  const displayFmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
+/**
+ * Date parts for a Chicago calendar date. Defaults to today; the daily warm
+ * passes tomorrow's date so the images exist before the date rolls (DECISIONS #64).
+ */
+function getChicagoDay(dateStr?: string): { dateStr: string; displayDate: string; month: string; day: string } {
+  const target = dateStr ?? getChicagoDateParts().dateStr;
+  const [year, month, day] = target.split("-");
+  const displayDate = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
     month: "short",
     day: "numeric",
-  });
-  const displayDate = displayFmt.format(new Date());
+  }).format(new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))));
 
-  return { dateStr, displayDate, month, day };
+  return { dateStr: target, displayDate, month, day };
 }
 
 /**
  * Fetch all raw "on this day" events from Wikipedia.
  * Used by the Moment Before engine to pick the most visual event via LLM.
  */
-export async function getTodayEvents(env: Env): Promise<{
+export async function getTodayEvents(env: Env, forDate?: string): Promise<{
   events: Array<{ year: number; text: string }>;
   dateStr: string;
   displayDate: string;
 }> {
-  const { dateStr, displayDate, month, day } = getTodayChicago();
+  const { dateStr, displayDate, month, day } = getChicagoDay(forDate);
 
   try {
     const url = `https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`;
@@ -60,8 +63,8 @@ export async function getTodayEvents(env: Env): Promise<{
   }
 }
 
-export async function getFact(env: Env): Promise<FactResponse> {
-  const { dateStr, displayDate, month, day } = getTodayChicago();
+export async function getFact(env: Env, forDate?: string): Promise<FactResponse> {
+  const { dateStr, displayDate, month, day } = getChicagoDay(forDate);
   const cacheKey = `fact:${dateStr}`;
 
   // Check cache

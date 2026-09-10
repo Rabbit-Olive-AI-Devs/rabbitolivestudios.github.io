@@ -25,7 +25,7 @@ const { tempColor, batteryIcon } = fromBuild("src/pages/color-weather.js");
 const { withBudget } = fromBuild("src/with-budget.js");
 const { pickCleanColorIndex, parseCleanColor, CLEAN_SEQUENCE } = fromBuild("src/clean.js");
 const { nextUtcMidnight } = fromBuild("src/cache-guard.js");
-const { shiftDateStr } = fromBuild("src/date-utils.js");
+const { shiftDateStr, dailyWarmTargetDate } = fromBuild("src/date-utils.js");
 const { pickMostRecentDated } = fromBuild("src/stale-cache.js");
 
 test("query param validators clamp to safe defaults", () => {
@@ -262,4 +262,19 @@ test("pickMostRecentDated tolerates undated and unrelated keys", () => {
     pickMostRecentDated(keys, "2026-08-19", { accept: (n) => !n.startsWith("gen-lock:") }),
     "fact4:v4:2026-08-18",
   );
+});
+
+// --- dailyWarmTargetDate (DECISIONS #64) ---
+
+test("dailyWarmTargetDate warms tomorrow in the evening and today after midnight", () => {
+  // 04:35 UTC = 23:35 CDT → tomorrow; 05:35 UTC = 00:35 CDT → today (safety net)
+  assert.equal(dailyWarmTargetDate("2026-09-10", 23), "2026-09-11");
+  assert.equal(dailyWarmTargetDate("2026-09-11", 0), "2026-09-11");
+  // 04:35 UTC = 22:35 CST and 05:35 UTC = 23:35 CST → both tomorrow (second is a no-op)
+  assert.equal(dailyWarmTargetDate("2026-12-10", 22), "2026-12-11");
+  assert.equal(dailyWarmTargetDate("2026-12-10", 23), "2026-12-11");
+  // Noon is the boundary; month and year roll correctly
+  assert.equal(dailyWarmTargetDate("2026-09-30", 12), "2026-10-01");
+  assert.equal(dailyWarmTargetDate("2026-12-31", 23), "2027-01-01");
+  assert.equal(dailyWarmTargetDate("2026-09-10", 11), "2026-09-10");
 });

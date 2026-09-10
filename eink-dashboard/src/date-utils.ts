@@ -37,6 +37,19 @@ export function getChicagoDateISO(): string {
 }
 
 /**
+ * Which Chicago date the daily image warm should fill.
+ *
+ * The warm runs before midnight Chicago (04:35 and 05:35 UTC), so in the
+ * evening it targets *tomorrow* and the keys are already warm when the date
+ * rolls — there is no window in which a device poll can be the generator
+ * (DECISIONS #64). Before noon it targets today, which makes the second fire
+ * (00:35 CDT) a safety net that fills anything the evening run missed.
+ */
+export function dailyWarmTargetDate(chicagoDateStr: string, chicagoHour: number): string {
+  return chicagoHour >= 12 ? shiftDateStr(chicagoDateStr, 1) : chicagoDateStr;
+}
+
+/**
  * Shift a `YYYY-MM-DD` string by whole calendar days.
  *
  * Used to walk backwards through daily cache keys when looking for the most
