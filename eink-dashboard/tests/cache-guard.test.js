@@ -90,3 +90,39 @@ test("getTodayEvents fetches the requested date, not today's", async () => {
     globalThis.fetch = realFetch;
   }
 });
+
+// --- Colour skyline caption survives dithering (DECISIONS #64) ---
+
+test("caption rows stay solid black/white while the picture is dithered", () => {
+  const { ditherPictureKeepCaption } = fromBuild("src/skyline-image.js");
+  const { ditherFloydSteinberg } = fromBuild("src/dither-spectra6.js");
+  const { SPECTRA6_PALETTE } = fromBuild("src/spectra6.js");
+  const W = 800, H = 480, BAR = 24;
+
+  // Bright, slightly off-palette "sky" (this is what dumps error into the bar), then a
+  // black bar with a white text block in it.
+  const rgb = new Uint8Array(W * H * 3);
+  for (let i = 0; i < (H - BAR) * W; i++) { rgb[i * 3] = 250; rgb[i * 3 + 1] = 235; rgb[i * 3 + 2] = 120; }
+  for (let y = H - BAR; y < H; y++) for (let x = 0; x < W; x++) {
+    const white = y >= H - 16 && y < H - 8 && x >= 8 && x < 40;
+    const o = (y * W + x) * 3; rgb[o] = rgb[o + 1] = rgb[o + 2] = white ? 255 : 0;
+  }
+
+  const fixed = ditherPictureKeepCaption(rgb);
+  const naive = ditherFloydSteinberg(rgb, W, H, SPECTRA6_PALETTE);
+
+  let fixedBad = 0, naiveBad = 0, whiteOk = 0;
+  for (let y = H - BAR; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    const expect = (y >= H - 16 && y < H - 8 && x >= 8 && x < 40) ? 1 : 0;
+    if (fixed[i] !== expect) fixedBad++;
+    if (naive[i] !== expect) naiveBad++;
+    if (expect === 1 && fixed[i] === 1) whiteOk++;
+  }
+  assert.equal(fixedBad, 0, "caption rows must map exactly to black/white");
+  assert.equal(whiteOk, 8 * 32);
+  assert.ok(naiveBad > 1000, `plain FS should corrupt the bar (got ${naiveBad}) — otherwise this test proves nothing`);
+  // Picture rows still dithered (not a single flat colour).
+  const pic = new Set(fixed.subarray(0, (H - BAR) * W));
+  assert.ok(pic.size >= 2);
+});

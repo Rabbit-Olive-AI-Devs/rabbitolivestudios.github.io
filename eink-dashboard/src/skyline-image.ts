@@ -5,10 +5,11 @@
  * Fallback:   SDXL text-only (when no reference photo, or FLUX.2 fails)
  *
  * BW path:    → grayscale → crop/resize → caption → tone curve → 4-level quantize → 8-bit PNG
- * Color path: → RGB crop/resize → caption bar in RGB → Floyd-Steinberg dither → Spectra 6 indexed PNG
+ * Color path: → RGB crop/resize → caption bar in RGB → Floyd-Steinberg dither (picture rows only) → Spectra 6 indexed PNG
  *
  * Caption is ALWAYS baked into the PNG (both BW and color) so HTML wrappers are pure <img> tags.
- * For color: caption drawn BEFORE dithering — black bar + white text stay crisp through Floyd-Steinberg.
+ * For color: the caption rows are mapped to the palette directly, never diffused — error from a bright
+ * sky above the bar turned it into red/blue speckle (DECISIONS #64).
  */
 
 import type { Env } from "./types";
@@ -28,7 +29,7 @@ import { encodePNGGray8, encodePNGIndexed, pngToBase64 } from "./png";
 import { decodePNG } from "./png-decode";
 import { FONT_8X8 as FONT_DATA, measureText } from "./font";
 import { generateAndDecodeColor } from "./image-color";
-import { ditherFloydSteinberg } from "./dither-spectra6";
+import { ditherFloydSteinberg, findNearestColor } from "./dither-spectra6";
 import { SPECTRA6_PALETTE } from "./spectra6";
 import { getPhotoFromR2 } from "./birthday-image";
 import { isNeuronBudgetError } from "./cache-guard";
@@ -379,10 +380,33 @@ export async function generateSkylineImage(
     return { png, base64: pngToBase64(png), colorMode, usedRef };
   }
 
-  // Color path: → RGB → caption in RGB → dither → indexed PNG
+  // Color path: → RGB → caption in RGB → dither picture → map caption → indexed PNG
   const rgb = await jpegToRGB(env, jpeg);
   drawSkylineCaptionRGB(rgb, caption.left, caption.center, caption.right);
-  const indices = ditherFloydSteinberg(rgb, WIDTH, HEIGHT, SPECTRA6_PALETTE);
+  const indices = ditherPictureKeepCaption(rgb);
   const png = await encodePNGIndexed(indices, WIDTH, HEIGHT, SPECTRA6_PALETTE);
   return { png, base64: pngToBase64(png), colorMode, usedRef };
+}
+
+/**
+ * Dither the picture rows only; map the caption rows to the palette directly.
+ *
+ * Floyd-Steinberg carries quantisation error downward, so a bright sky above
+ * the bar dumped enough residual into the pure-black rows that they came out
+ * as red/blue speckle and the white text vanished into it (Havana,
+ * 2026-09-10). The bar is drawn in exact palette colours, so it needs no
+ * diffusion at all — nearest-colour on those rows is lossless and keeps the
+ * bar solid (DECISIONS #64).
+ */
+export function ditherPictureKeepCaption(rgb: Uint8Array): Uint8Array {
+  const pictureH = HEIGHT - BAR_H;
+  const picture = ditherFloydSteinberg(rgb.subarray(0, pictureH * WIDTH * 3), WIDTH, pictureH, SPECTRA6_PALETTE);
+
+  const indices = new Uint8Array(WIDTH * HEIGHT);
+  indices.set(picture, 0);
+  for (let i = pictureH * WIDTH; i < WIDTH * HEIGHT; i++) {
+    const off = i * 3;
+    indices[i] = findNearestColor(rgb[off], rgb[off + 1], rgb[off + 2], SPECTRA6_PALETTE);
+  }
+  return indices;
 }
