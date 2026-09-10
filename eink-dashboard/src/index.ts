@@ -30,6 +30,7 @@ import {
   getAiBudgetBlock,
   isNeuronBudgetError,
   markAiBudgetExhausted,
+  serveStaleWhileGenerating,
   withGenerationLock,
 } from "./cache-guard";
 import { runAlertCheck, alertingConfigured, buildAlertEmail, sendAlertEmail } from "./alert";
@@ -180,114 +181,150 @@ async function findRecentDailyPNG(
 }
 
 /**
+ * A background generation is nobody's critical path, so it can wait out a
+ * lock held by the cron or another poll instead of overwriting it after the
+ * default 18s and duplicating the work (DECISIONS #64).
+ */
+const BACKGROUND_LOCK_WAIT_MS = 60_000;
+
+/** Read a cached base64 PNG and wrap it as an image response, or null on a miss. */
+async function readCachedPNG(env: Env, cacheKey: string, label: string): Promise<Response | null> {
+  const cachedB64 = await env.CACHE.get(cacheKey);
+  if (!cachedB64) return null;
+  console.log(`${label}: cache hit`);
+  const binary = Uint8Array.from(atob(cachedB64), (c) => c.charCodeAt(0));
+  return new Response(binary, { headers: PNG_HEADERS });
+}
+
+/**
  * Generate the "Moment Before" 4-level grayscale image.
  * On family birthdays, generates a portrait instead.
  * Cached in KV for 24 hours per date.
+ *
+ * On a cold key the most recent cached image is served immediately and the
+ * generation runs in the background (DECISIONS #64); the blocking path is only
+ * taken when there is nothing older to show.
  */
-async function handleFactImage(env: Env): Promise<Response> {
+async function handleFactImage(env: Env, ctx?: ExecutionContext): Promise<Response> {
   const { year, month, day, dateStr } = getChicagoDateParts();
   const yearNum = parseInt(year);
   const monthNum = parseInt(month);
   const dayNum = parseInt(day);
 
-  // Check for birthday
   const birthday = getBirthdayToday(monthNum, dayNum);
+  const bdayCacheKey = birthdayCacheKey(dateStr);
+  const cacheKey = fact4CacheKey(dateStr);
+  const readBirthdayCache = () => readCachedPNG(env, bdayCacheKey, "birthday");
+  const readFactCache = () => readCachedPNG(env, cacheKey, "fact.png");
 
-  if (birthday) {
-    const bdayCacheKey = birthdayCacheKey(dateStr);
-    const readBirthdayCache = async (): Promise<Response | null> => {
-      const cachedB64 = await env.CACHE.get(bdayCacheKey);
-      if (!cachedB64) return null;
-      console.log("birthday: cache hit");
-      const binary = Uint8Array.from(atob(cachedB64), (c) => c.charCodeAt(0));
-      return new Response(binary, { headers: PNG_HEADERS });
-    };
+  const cached = birthday ? await readBirthdayCache() : await readFactCache();
+  if (cached) return cached;
 
-    const cachedBirthday = await readBirthdayCache();
-    if (cachedBirthday) return cachedBirthday;
+  // Same work whether it runs on the request path or in the background:
+  // birthday portrait first (falling through to the regular pipeline on
+  // failure), then the regular Moment Before image, then the stale fallback.
+  const generateFresh = async (background: boolean): Promise<Response> => {
+    const lockOpts = background ? { waitMs: BACKGROUND_LOCK_WAIT_MS } : {};
+
+    if (birthday) {
+      try {
+        await assertAiBudgetAvailable(env);
+        return await withGenerationLock(env, bdayCacheKey, readBirthdayCache, async () => {
+          console.log(`Birthday detected: ${birthday.name} (${birthday.key})`);
+          const png = await generateBirthdayImage(env, birthday, yearNum);
+          await env.CACHE.put(bdayCacheKey, pngToBase64(png), { expirationTtl: 604800 });
+          return new Response(png, { headers: PNG_HEADERS });
+        }, lockOpts);
+      } catch (err) {
+        await markAiBudgetExhausted(env, "fact.png birthday", err);
+        console.error("Birthday image failed, falling back to Moment Before:", err);
+        // Fall through to regular pipeline
+      }
+    }
+
+    const cachedFact = await readFactCache();
+    if (cachedFact) return cachedFact;
 
     try {
       await assertAiBudgetAvailable(env);
-      return await withGenerationLock(env, bdayCacheKey, readBirthdayCache, async () => {
-        console.log(`Birthday detected: ${birthday.name} (${birthday.key})`);
-        const png = await generateBirthdayImage(env, birthday, yearNum);
-        await env.CACHE.put(bdayCacheKey, pngToBase64(png), { expirationTtl: 604800 });
+      return await withGenerationLock(env, cacheKey, readFactCache, async () => {
+        const { events, displayDate } = await getTodayEvents(env);
+        const moment = await getOrGenerateMoment(env, events, dateStr);
+        const png = await generateMomentImage(env, moment, displayDate, dateStr);
+        await env.CACHE.put(cacheKey, pngToBase64(png), { expirationTtl: 604800 });
         return new Response(png, { headers: PNG_HEADERS });
-      });
+      }, lockOpts);
     } catch (err) {
-      await markAiBudgetExhausted(env, "fact.png birthday", err);
-      console.error("Birthday image failed, falling back to Moment Before:", err);
-      // Fall through to regular pipeline
+      await markAiBudgetExhausted(env, "fact.png", err);
+      console.error("Moment Before image error:", err);
+      const stale = await findRecentDailyPNG(env, dateStr, "fact4:", "fact.png");
+      if (stale) return stale;
+      return new Response("Failed to generate image", { status: 503 });
     }
-  }
-
-  // Regular Moment Before pipeline
-  const cacheKey = fact4CacheKey(dateStr);
-  const readFactCache = async (): Promise<Response | null> => {
-    const cachedB64 = await env.CACHE.get(cacheKey);
-    if (!cachedB64) return null;
-    console.log("fact.png: cache hit");
-    const binary = Uint8Array.from(atob(cachedB64), (c) => c.charCodeAt(0));
-    return new Response(binary, { headers: PNG_HEADERS });
   };
 
-  const cachedFact = await readFactCache();
-  if (cachedFact) return cachedFact;
-
-  try {
-    await assertAiBudgetAvailable(env);
-    return await withGenerationLock(env, cacheKey, readFactCache, async () => {
-      const { events, displayDate } = await getTodayEvents(env);
-      const moment = await getOrGenerateMoment(env, events, dateStr);
-      const png = await generateMomentImage(env, moment, displayDate, dateStr);
-      await env.CACHE.put(cacheKey, pngToBase64(png), { expirationTtl: 604800 });
-      return new Response(png, { headers: PNG_HEADERS });
-    });
-  } catch (err) {
-    await markAiBudgetExhausted(env, "fact.png", err);
-    console.error("Moment Before image error:", err);
-    const stale = await findRecentDailyPNG(env, dateStr, "fact4:", "fact.png");
-    if (stale) return stale;
-    return new Response("Failed to generate image", { status: 503 });
+  // Blocked budget: generateFresh() short-circuits to the stale fallback, so
+  // there is nothing to run in the background.
+  if (!(await getAiBudgetBlock(env))) {
+    const swr = await serveStaleWhileGenerating(
+      ctx,
+      "fact.png",
+      // On a birthday today's regular image may already exist (an earlier
+      // portrait failure fell through to it) — that beats yesterday's.
+      async () => (birthday ? await readFactCache() : null)
+        ?? findRecentDailyPNG(env, dateStr, "fact4:", "fact.png"),
+      () => generateFresh(true),
+    );
+    if (swr) return swr;
   }
+  return generateFresh(false);
 }
 
 /**
  * Generate the 1-bit dithered "Moment Before" image for mono e-ink displays.
  * Always shows regular Moment Before content, even on birthdays.
  * Cached separately from the grayscale version.
+ *
+ * Cold key: serve the most recent cached image, generate in the background
+ * (DECISIONS #64).
  */
-async function handleFact1BitImage(env: Env): Promise<Response> {
+async function handleFact1BitImage(env: Env, ctx?: ExecutionContext): Promise<Response> {
   const { dateStr } = getChicagoDateParts();
   const cacheKey = fact1CacheKey(dateStr);
-
-  const readCache = async (): Promise<Response | null> => {
-    const cachedB641 = await env.CACHE.get(cacheKey);
-    if (!cachedB641) return null;
-    console.log("fact1.png: cache hit");
-    const binary = Uint8Array.from(atob(cachedB641), (c) => c.charCodeAt(0));
-    return new Response(binary, { headers: PNG_HEADERS });
-  };
+  const readCache = () => readCachedPNG(env, cacheKey, "fact1.png");
 
   const cached = await readCache();
   if (cached) return cached;
 
-  try {
-    await assertAiBudgetAvailable(env);
-    return await withGenerationLock(env, cacheKey, readCache, async () => {
-      const { events, displayDate } = await getTodayEvents(env);
-      const moment = await getOrGenerateMoment(env, events, dateStr);
-      const png = await generateMomentImage1Bit(env, moment, displayDate, dateStr);
-      await env.CACHE.put(cacheKey, pngToBase64(png), { expirationTtl: 604800 });
-      return new Response(png, { headers: PNG_HEADERS });
-    });
-  } catch (err) {
-    await markAiBudgetExhausted(env, "fact1.png", err);
-    console.error("1-bit Moment Before image error:", err);
-    const stale = await findRecentDailyPNG(env, dateStr, "fact1:", "fact1.png");
-    if (stale) return stale;
-    return new Response("Failed to generate image", { status: 503 });
+  const generateFresh = async (background: boolean): Promise<Response> => {
+    try {
+      await assertAiBudgetAvailable(env);
+      return await withGenerationLock(env, cacheKey, readCache, async () => {
+        const { events, displayDate } = await getTodayEvents(env);
+        const moment = await getOrGenerateMoment(env, events, dateStr);
+        const png = await generateMomentImage1Bit(env, moment, displayDate, dateStr);
+        await env.CACHE.put(cacheKey, pngToBase64(png), { expirationTtl: 604800 });
+        return new Response(png, { headers: PNG_HEADERS });
+      }, background ? { waitMs: BACKGROUND_LOCK_WAIT_MS } : {});
+    } catch (err) {
+      await markAiBudgetExhausted(env, "fact1.png", err);
+      console.error("1-bit Moment Before image error:", err);
+      const stale = await findRecentDailyPNG(env, dateStr, "fact1:", "fact1.png");
+      if (stale) return stale;
+      return new Response("Failed to generate image", { status: 503 });
+    }
+  };
+
+  if (!(await getAiBudgetBlock(env))) {
+    const swr = await serveStaleWhileGenerating(
+      ctx,
+      "fact1.png",
+      () => findRecentDailyPNG(env, dateStr, "fact1:", "fact1.png"),
+      () => generateFresh(true),
+    );
+    if (swr) return swr;
   }
+  return generateFresh(false);
 }
 
 // --- Skyline helpers ---
@@ -383,7 +420,7 @@ async function findBwFallback(
   return findStaleSkylineCache(env, dateStr, rotateMin, bucket, ":bw");
 }
 
-async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
+async function handleSkylinePng(env: Env, url: URL, ctx?: ExecutionContext): Promise<Response> {
   const { dateStr } = getChicagoDateParts();
   const mode = parseSkylineMode(url.searchParams.get("mode"));
   const rotateMin = parseSkylineRotateMin(url.searchParams.get("rotateMin"));
@@ -470,23 +507,9 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
   const cached = await readSkylineCache();
   if (cached) return cached;
 
-  try {
-    await assertAiBudgetAvailable(env);
-    return await withGenerationLock(env, cacheKey, readSkylineCache, async () => {
-      console.log(`Skyline ${mode}: ${city.name} | ${style.label} (${style.colorMode}) | bucket=${bucket}${bwOnly ? " sdxlOnly" : ""}`);
-
-      const result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, style.colorMode, city.key, photoSeed, bwOnly);
-      await env.CACHE.put(cacheKey, result.base64, { expirationTtl: Math.max(ttl, 900) });
-
-      return new Response(result.png, {
-        headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*", ...debug, "X-Skyline-UsedRef": String(result.usedRef) },
-      });
-    });
-  } catch (err) {
-    await markAiBudgetExhausted(env, "skyline.png", err);
-    console.error("Skyline image error:", err);
-
-    // Stale fallback: try recent previous buckets, then yesterday's cache
+  // Fallback chain shared by the request-path failure case and the
+  // stale-while-generating case: stale colour/BW entry → BW cross-fallback.
+  const findFallback = async (): Promise<Response | null> => {
     const stale = await findStaleSkylineCache(env, dateStr, rotateMin, bucket, bwSuffix);
     if (stale) {
       console.log("Skyline: serving stale cached image as fallback");
@@ -511,9 +534,39 @@ async function handleSkylinePng(env: Env, url: URL): Promise<Response> {
         } catch { /* fall through */ }
       }
     }
+    return null;
+  };
 
-    return new Response("Failed to generate skyline image", { status: 503 });
+  const generateFresh = async (background: boolean): Promise<Response> => {
+    try {
+      await assertAiBudgetAvailable(env);
+      return await withGenerationLock(env, cacheKey, readSkylineCache, async () => {
+        console.log(`Skyline ${mode}: ${city.name} | ${style.label} (${style.colorMode}) | bucket=${bucket}${bwOnly ? " sdxlOnly" : ""}`);
+
+        const result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, style.colorMode, city.key, photoSeed, bwOnly);
+        await env.CACHE.put(cacheKey, result.base64, { expirationTtl: Math.max(ttl, 900) });
+
+        return new Response(result.png, {
+          headers: { "Content-Type": "image/png", "Cache-Control": `public, max-age=${maxAge}`, "Access-Control-Allow-Origin": "*", ...debug, "X-Skyline-UsedRef": String(result.usedRef) },
+        });
+      }, background ? { waitMs: BACKGROUND_LOCK_WAIT_MS } : {});
+    } catch (err) {
+      await markAiBudgetExhausted(env, "skyline.png", err);
+      console.error("Skyline image error:", err);
+      const fallback = await findFallback();
+      if (fallback) return fallback;
+      return new Response("Failed to generate skyline image", { status: 503 });
+    }
+  };
+
+  // Cold key: show the panel something now and generate behind it. A blocking
+  // generation here is what blanked the E1002 skyline on 2026-09-10 — the
+  // renderer timed out before FLUX finished (DECISIONS #64).
+  if (!(await getAiBudgetBlock(env))) {
+    const swr = await serveStaleWhileGenerating(ctx, "skyline.png", findFallback, () => generateFresh(true));
+    if (swr) return swr;
   }
+  return generateFresh(false);
 }
 
 function handleSkylinePage(env: Env, url: URL): Promise<Response> {
@@ -978,9 +1031,9 @@ export default {
       case "/fact.json":
         return handleFact(env);
       case "/fact.png":
-        return handleFactImage(env);
+        return handleFactImage(env, ctx);
       case "/fact1.png":
-        return handleFact1BitImage(env);
+        return handleFact1BitImage(env, ctx);
       case "/clean": {
         // Screen-cleaner: solid full-screen fills to clear e-ink ghosting/retention.
         // Point the device (E1001 or E1002) at this URL with a short refresh
@@ -1148,7 +1201,7 @@ export default {
       case "/color/weather":
         return handleColorWeatherPage(env, url, ctx);
       case "/color/moment":
-        return handleColorMomentPage(env, url);
+        return handleColorMomentPage(env, url, ctx);
       case "/color/test-moment": {
         const authBlockCM = checkTestAuth(url, env);
         if (authBlockCM) return authBlockCM;
@@ -1165,7 +1218,7 @@ export default {
       case "/color/headlines":
         return handleColorHeadlinesPage(env, url);
       case "/skyline.png":
-        return handleSkylinePng(env, url);
+        return handleSkylinePng(env, url, ctx);
       case "/skyline":
         return handleSkylinePage(env, url);
       case "/skyline-bw":

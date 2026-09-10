@@ -31,8 +31,10 @@ import { colorBirthdayCacheKey, colorMomentCacheKey } from "../cache-keys";
 import { bytesToImageStream } from "../images-input";
 import {
   assertAiBudgetAvailable,
+  getAiBudgetBlock,
   isNeuronBudgetError,
   markAiBudgetExhausted,
+  serveStaleWhileGenerating,
   withGenerationLock,
 } from "../cache-guard";
 
@@ -237,7 +239,20 @@ function renderHTML(
 </html>`;
 }
 
-export async function handleColorMomentPage(env: Env, url: URL): Promise<Response> {
+/**
+ * A background generation is nobody's critical path, so it can wait out a lock
+ * held by the cron or another poll instead of overwriting it after the default
+ * 18s and duplicating the work (DECISIONS #64).
+ */
+const BACKGROUND_LOCK_WAIT_MS = 60_000;
+
+/**
+ * /color/moment page. On a cold key the most recent cached moment is served
+ * immediately and today's is generated in the background, so the panel never
+ * waits on FLUX (DECISIONS #64). The blocking path only runs when nothing
+ * older exists.
+ */
+export async function handleColorMomentPage(env: Env, url: URL, ctx?: ExecutionContext): Promise<Response> {
   const { year, month, day, dateStr } = getChicagoDateParts();
   const monthNum = parseInt(month);
   const dayNum = parseInt(day);
@@ -267,58 +282,71 @@ export async function handleColorMomentPage(env: Env, url: URL): Promise<Respons
   const displayDate = `${months[monthNum - 1]} ${dayNum}`;
   const currentYear = parseInt(year);
 
-  try {
-    await assertAiBudgetAvailable(env);
-    return await withGenerationLock(env, cacheKey, readCache, async () => {
-      let imageB64: string;
-      let moment: MomentBeforeData;
-      let birthdayInfo: BirthdayCaptionInfo | undefined;
+  const generateFresh = async (background: boolean): Promise<Response> => {
+    try {
+      await assertAiBudgetAvailable(env);
+      return await withGenerationLock(env, cacheKey, readCache, async () => {
+        let imageB64: string;
+        let moment: MomentBeforeData;
+        let birthdayInfo: BirthdayCaptionInfo | undefined;
 
-      if (birthday) {
-        const age = currentYear - birthday.birthYear;
-        const style = getArtStyle(currentYear);
-        moment = { year: currentYear, location: "", title: birthday.name, scene: "", imagePrompt: "" };
-        try {
-          imageB64 = await generateColorBirthday(env, birthday, currentYear);
-          birthdayInfo = { name: birthday.name, age, styleName: style.name };
-        } catch (err) {
-          if (isNeuronBudgetError(err)) throw err;
-          console.error("Color birthday failed, falling back to moment:", err);
+        if (birthday) {
+          const age = currentYear - birthday.birthYear;
+          const style = getArtStyle(currentYear);
+          moment = { year: currentYear, location: "", title: birthday.name, scene: "", imagePrompt: "" };
+          try {
+            imageB64 = await generateColorBirthday(env, birthday, currentYear);
+            birthdayInfo = { name: birthday.name, age, styleName: style.name };
+          } catch (err) {
+            if (isNeuronBudgetError(err)) throw err;
+            console.error("Color birthday failed, falling back to moment:", err);
+            const { events } = await getTodayEvents(env);
+            moment = await getOrGenerateMoment(env, events, dateStr);
+            const result = await generateColorMoment(env, moment, dateStr);
+            imageB64 = result.base64;
+          }
+        } else {
           const { events } = await getTodayEvents(env);
           moment = await getOrGenerateMoment(env, events, dateStr);
           const result = await generateColorMoment(env, moment, dateStr);
           imageB64 = result.base64;
         }
-      } else {
-        const { events } = await getTodayEvents(env);
-        moment = await getOrGenerateMoment(env, events, dateStr);
-        const result = await generateColorMoment(env, moment, dateStr);
-        imageB64 = result.base64;
-      }
 
-      // Cache the result
-      const cacheData = JSON.stringify({ imageB64, moment, displayDate, birthdayInfo });
-      await env.CACHE.put(cacheKey, cacheData, { expirationTtl: 604800 });
+        // Cache the result
+        const cacheData = JSON.stringify({ imageB64, moment, displayDate, birthdayInfo });
+        await env.CACHE.put(cacheKey, cacheData, { expirationTtl: 604800 });
 
-      const html = renderHTML(imageB64, moment, displayDate, birthdayInfo);
-      return htmlResponse(html, "public, max-age=86400");
-    });
-  } catch (err) {
-    await markAiBudgetExhausted(env, "color/moment", err);
-    console.error("Color moment page error:", err);
+        const html = renderHTML(imageB64, moment, displayDate, birthdayInfo);
+        return htmlResponse(html, "public, max-age=86400");
+      }, background ? { waitMs: BACKGROUND_LOCK_WAIT_MS } : {});
+    } catch (err) {
+      await markAiBudgetExhausted(env, "color/moment", err);
+      console.error("Color moment page error:", err);
 
-    // Serve the most recent cached moment rather than a 503. The device renders a
-    // failed fetch as an error page, so a day-old illustration is strictly better
-    // than a broken panel — and entries live 7 days, so one is usually there
-    // (DECISIONS #57).
-    const stale = await findRecentColorMoment(env, dateStr);
-    if (stale) return stale;
+      // Serve the most recent cached moment rather than a 503. The device renders a
+      // failed fetch as an error page, so a day-old illustration is strictly better
+      // than a broken panel — and entries live 7 days, so one is usually there
+      // (DECISIONS #57).
+      const stale = await findRecentColorMoment(env, dateStr);
+      if (stale) return stale;
 
-    return new Response("Color moment temporarily unavailable", {
-      status: 503,
-      headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "300" },
-    });
+      return new Response("Color moment temporarily unavailable", {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "300" },
+      });
+    }
+  };
+
+  if (!(await getAiBudgetBlock(env))) {
+    const swr = await serveStaleWhileGenerating(
+      ctx,
+      "color/moment",
+      () => findRecentColorMoment(env, dateStr),
+      () => generateFresh(true),
+    );
+    if (swr) return swr;
   }
+  return generateFresh(false);
 }
 
 /**

@@ -72,6 +72,44 @@ export async function assertAiBudgetAvailable(env: Env): Promise<void> {
   throw new Error(`AI budget temporarily paused after ${block.source}; retry in ~${mins} min`);
 }
 
+/**
+ * Serve a previously cached image now and generate the current one in the
+ * background, so a panel request never waits on AI generation.
+ *
+ * SenseCraft's screenshot renderer gives up after ~8-10s and leaves a blank
+ * frame the device keeps until a later render succeeds (DECISIONS #42). A
+ * request-path generation takes 10-20s, so any device poll that lands on a
+ * cold daily key before the cron has filled it blanks that page — which is
+ * what the 2026-09-10 skyline blank was. The stale image is served with
+ * `no-store` and an `X-Stale-While-Generating` header; the next poll finds the
+ * fresh key (DECISIONS #64).
+ *
+ * Returns null when there is nothing stale to serve (or no ExecutionContext,
+ * i.e. a cron caller), in which case the caller falls back to blocking
+ * generation exactly as before.
+ */
+export async function serveStaleWhileGenerating(
+  ctx: ExecutionContext | undefined,
+  label: string,
+  findStale: () => Promise<Response | null>,
+  generate: () => Promise<unknown>,
+): Promise<Response | null> {
+  if (!ctx) return null;
+  const stale = await findStale();
+  if (!stale) return null;
+  console.log(`${label}: cold key — serving stale image, generating in background`);
+  ctx.waitUntil(
+    generate().then(
+      () => console.log(`${label}: background generation finished`),
+      (err) => console.error(`${label}: background generation failed:`, err),
+    ),
+  );
+  const headers = new Headers(stale.headers);
+  headers.set("Cache-Control", "no-store");
+  headers.set("X-Stale-While-Generating", "1");
+  return new Response(stale.body, { status: stale.status, headers });
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
