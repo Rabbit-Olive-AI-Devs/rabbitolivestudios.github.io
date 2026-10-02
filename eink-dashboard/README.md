@@ -120,7 +120,7 @@ npx wrangler secret put TEST_AUTH_KEY
 
 - **TEST_AUTH_KEY**: Protects expensive test endpoints (`/test.png`, `/test1.png`, `/test-birthday.png`, `/color/test-moment`, `/color/test-birthday`, `/skyline-test.png`, `/skyline-test`) from public abuse. When set, these routes require `?key=YOUR_KEY`. When not set (local dev), test routes work without auth.
 
-### Step 5: Test
+### Step 6: Test
 
 ```bash
 curl -o fact.png https://YOUR-URL.workers.dev/fact.png
@@ -459,19 +459,19 @@ If the secrets are absent the check still runs and logs; it simply cannot send.
 
 ### Rollback
 
-These changes are isolated on the `codex/reliability-hardening-six-pack` branch. If something breaks before merge, switch back to `main`:
+Everything ships from `main` (the v3.11.2 hardening branch this section was written for was merged
+long ago). To back a change out, revert its commit, verify, and redeploy — never force-push:
 
 ```bash
-git checkout main
-```
-
-If this branch is merged and then needs to be backed out, revert the v3.11.2 commit:
-
-```bash
-git revert <v3.11.2-commit-sha>
+git revert <commit-sha>
 npm run typecheck
+npm run test:utils
 npm run dry-run
+npx wrangler deploy
 ```
+
+If the reverted commit changed image output, bump the affected cache-key version as well, or the
+panels keep serving what the reverted code cached.
 
 ### Firmware Update
 
@@ -493,7 +493,7 @@ npm run dry-run
 | Stale image in browser | Browser caches for 24h. Hard refresh with Cmd+Shift+R |
 | Weather not updating on device | Check the Interval setting in SenseCraft HMI and that the device is online |
 | Image too large for KV | KV values max 25MB. Current images are ~20-230KB (well within limits) |
-| Hourly cards clipped on weather page | If alert banner is present, hourly cards should shrink to fit. Both pages use flex column layout since 2026-02-19. If still clipped, check for extra padding or new sections pushing content past 480px. |
+| Hourly cards clipped on weather page | The page is a fixed 480px flex column with only 5–7px of slack, and `.hourly` absorbs every deficit while `overflow: hidden` hides it. A banner is paid for by `body.has-banner` reclaiming 40px of margins/padding (v3.16.3); anything else added to the page comes out of the hourly cards. `body.scrollHeight` reports 480 even when cards are cut — measure the deepest rendered element at 800x480 instead (DECISIONS.md #63). |
 | Wrong location weather | Edit `src/weather.ts` — coordinates are hardcoded for Naperville, IL (60540) |
 | No weather alerts showing | NWS alerts only cover active US warnings. Check `api.weather.gov` for your area. Alerts cache for 5 min in KV. |
 | Emoji not showing on display | ESP32-S3 renderer doesn't support emoji. Use inline SVG or text labels. |

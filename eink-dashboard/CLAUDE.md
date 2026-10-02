@@ -123,7 +123,7 @@ This project has independent image pipelines. They share the LLM event selection
 | | Pipeline A (`/fact.png`) | Pipeline B (`/fact1.png`) | Pipeline D (`/color/moment`) | Pipeline E (`/skyline`) |
 |---|---|---|---|---|
 | Model | FLUX.2 klein-9b | SDXL | FLUX.2 (fallback SDXL) | FLUX.2 + ref photo (fallback SDXL) |
-| Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | 5-style rotation (gouache/oil/graphic/ink/woodblock) | 15-style rotation (6 BW + 9 color) |
+| Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | 5-style rotation (gouache/oil/graphic/ink/woodblock) | 14-style rotation (6 BW + 8 color) |
 | Output | 4-level grayscale | 1-bit (Bayer or threshold) | 6-color Spectra (Floyd-Steinberg) | BW: 4-level gray / Color: Spectra 6 |
 | Cache key | `fact4:v4:YYYY-MM-DD` | `fact1:v7:YYYY-MM-DD` | `color-moment:v2:YYYY-MM-DD:STYLE_ID` | default `skyline:v3:DATE:daily[:bw]`; rotate `skyline:v3:DATE:rN:bBUCKET[:bw]` |
 | Display | E1001 (mono) | E1001 (mono) | E1002 (Spectra 6) | E1002 (Spectra 6) |
@@ -168,6 +168,8 @@ Change logging is mandatory. Every meaningful change must update documentation *
 | `MEMORY.md` | Claude Code auto-memory when available; may be external to this checkout | Architecture changes, new patterns, critical bugs |
 | `DECISIONS.md` | Why things are the way they are, failed approaches | Any tradeoff, threshold change, or pipeline change |
 | `README.md` | User-facing: endpoints, pipelines, architecture, setup | New endpoints, changed behavior, version bumps |
+| `HANDOVER.md` | One-file briefing for an agent starting cold: mental model, rules, budgets, process, runbook | Anything it states changes — routes, crons, cache keys, budgets, rules, open items. Update its "Describes" line to the new commit/version |
+| `AGENTS.md` | Short entry point for agents that auto-load it; points at `HANDOVER.md` and `CLAUDE.md` | Only if the pointers or the handful of hard rules it repeats change |
 | `package.json` | Version number | Feature releases |
 | `src/index.ts` | `VERSION` constant | Feature releases |
 
@@ -180,7 +182,8 @@ Every time you update documentation, sweep ALL files:
 | 1 | `MEMORY.md` | If present, key architecture, cache keys, learnings — all accurate? |
 | 2 | `DECISIONS.md` | Any new or changed decisions documented? |
 | 3 | `README.md` | Endpoints table, architecture diagram, version — all accurate? |
-| 4 | `package.json` + `src/index.ts` | Version numbers match? |
+| 4 | `HANDOVER.md` | "Describes" line, routes, crons, cache keys, budgets, test count, drift/open-items list — all still true? |
+| 5 | `package.json` + `src/index.ts` | Version numbers match? |
 
 Do not commit documentation updates until you have verified every file.
 
@@ -358,6 +361,8 @@ eink-dashboard/
   CLAUDE.md               — This file
   DECISIONS.md            — Architecture & design decisions
   README.md               — Project documentation
+  HANDOVER.md             — One-file agent briefing; part of the documentation sweep
+  AGENTS.md               — Entry point for agents that auto-load it; points at HANDOVER.md
   wrangler.toml           — Cloudflare Worker config + bindings
   package.json            — Dependencies + version
   tsconfig.json           — TypeScript config
