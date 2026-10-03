@@ -299,6 +299,8 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 - Decision records #31 and #33 give older skyline style counts (15 and 18). They are history and are left as written; `src/skyline.ts` defines 14 (6 BW + 8 colour).
 - Decision record #38 describes `/color/headlines` as disabled with a redirect to `/skyline`. That was reversed in #39: it is a live page with deterministic, non-LLM ranking, warmed by the 6-hourly cron. Whether it is on a panel's pagelist is a question for the owner.
 
+**Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.
+
 **Open items the owner has not chosen to act on:**
 
 - The E1002 pagelist may effectively show the skyline twice if it still includes the legacy `/color/apod` entry.
