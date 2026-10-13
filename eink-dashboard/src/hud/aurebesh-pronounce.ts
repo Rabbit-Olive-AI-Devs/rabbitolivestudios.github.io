@@ -6,6 +6,12 @@
  * English respelling, dictionary style, with the stressed syllable in capitals.
  * Written by hand; the unusual names follow how they are said in the films and
  * series as best known, and are the entries most worth a second look.
+ *
+ * Checked against Wookieepedia (starwars.fandom.com) on 2026-10-12. Few of its
+ * articles give a pronunciation; the ones that do agree with this table for
+ * Kamino, Tauntaun, Felucia, Jawa, Naboo and Utapau, and corrected Tatooine
+ * (stress on the last syllable). For Kashyyyk its Legends article gives
+ * "kuh-ZOOK" or "KASH-ik"; this table keeps "kah-SHEEK", as said on screen.
  */
 
 const SAY: Readonly<Record<string, string>> = {
@@ -24,7 +30,7 @@ const SAY: Readonly<Record<string, string>> = {
   TAUNTAUN: "TAWN-tawn", RANCOR: "RANG-kor", SARLACC: "SAR-lak", KRAYT: "KRATE", PORG: "PORG",
   LOTHCAT: "LOTH-kat",
   // Planets
-  ENDOR: "EN-dor", HOTH: "HAWTH", DAGOBAH: "DAY-guh-bah", TATOOINE: "TAT-oo-een", NABOO: "nuh-BOO",
+  ENDOR: "EN-dor", HOTH: "HAWTH", DAGOBAH: "DAY-guh-bah", TATOOINE: "tat-oo-EEN", NABOO: "nuh-BOO",
   BESPIN: "BESS-pin", JAKKU: "JAH-koo", ALDERAAN: "AWL-der-ahn", KASHYYYK: "kah-SHEEK",
   MUSTAFAR: "MOOS-tuh-far", SCARIF: "SKAR-if", CRAIT: "KRATE", YAVIN: "YAH-vin", KESSEL: "KESS-ul",
   CORELLIA: "kor-EL-ee-uh", MANDALORE: "MAN-duh-lor", KAMINO: "kuh-MEE-no", GEONOSIS: "jee-oh-NO-sis",
