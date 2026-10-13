@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-12 · **Describes:** v3.18.0 (code as of `8480db2` plus the no-repeat planet pick that follows it), which is what production runs.
+**Last verified:** 2026-10-12 · **Describes:** v3.18.0 (code as of `c4fc0a3`), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -21,7 +21,7 @@ When documents disagree about **current behaviour**, the source code and the liv
 
 ## 1. What this project is
 
-A single Cloudflare Worker (TypeScript, no framework, zero runtime dependencies) that renders content for two e-ink panels owned by one person. It is a personal project on Cloudflare's **free tier**, and staying on the free tier is a deliberate choice that shapes most of the engineering.
+A single Cloudflare Worker (TypeScript, no framework, zero runtime dependencies) that renders content for three e-ink panels owned by one person. It is a personal project on Cloudflare's **free tier**, and staying on the free tier is a deliberate choice that shapes most of the engineering.
 
 The headline feature is **"Moment Before"**: every day the Worker picks a famous historical event that happened on this date, has an image model illustrate it in a rotating art style, and converts the result to something an e-ink panel can show well. Alongside it the panels show a weather dashboard, a daily AI city skyline, and steel/trade headlines.
 
@@ -41,7 +41,7 @@ The headline feature is **"Moment Before"**: every day the Worker picks a famous
 
 The exact pagelists live in the SenseCraft HMI web app, not in this repo. (Since SenseCraft HMI v1.3.2, February 2026, there is no separate "Web Function" page type: a URL is shown through the **HTML widget** in the Canvas Editor, sized 800x480 at position 0,0. Older notes in this repo still say "Web Function"; they mean the same mechanism.) The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel.
 
-A **third panel** is being set up: a second E1001 (mono) on the home-office desk, for the `/desk/*` pages. It was not yet paired when this was written, so it has no device ID here and no telemetry is fetched for it.
+A **third panel**, a second E1001 (mono), sits on the owner's home-office desk and shows the `/desk/*` pages. It was paired in SenseCraft HMI on 2026-10-12; its device ID is not recorded here and no telemetry is fetched for it.
 
 **The mental model that explains most of this project's rules:** the panel never fetches anything itself. SenseCraft HMI's "Web Function" loads each URL in a **headless Chromium in Seeed's cloud**, screenshots it, quantises the screenshot to the panel's palette, and pushes a finished image to the device. Every page of a pagelist is rendered in one burst about every 15 minutes. Consequences:
 
@@ -185,6 +185,7 @@ Supporting mechanisms:
 - Font weight at most 700, body 500. Size rows to content with fixed spacing so baselines land on whole pixels. Never put text rows in a shrinkable flex container with `overflow: hidden` (#46, #48).
 - `/weather` and `/color/weather` have only **5–7px of vertical slack**, and `.hourly` absorbs every deficit while `overflow: hidden` hides the clipping. `body.scrollHeight` reports 480 even when cards are cut. Measure the deepest rendered element instead, and test with a banner (`?test-alert=tornado`) (#63).
 - An HTML page whose body is an image needs a text fallback.
+- **Desk panel pages (`/desk/*`)** are drawn by the Worker as 1-bit images with `src/hud/`, never as live HTML text. Type is real fonts only, from the generated glyph faces, and never smaller than `plex11m` (11px medium), the owner's minimum on the panel. Show the owner a mockup before building a new page (#66, #67).
 
 **For code:**
 
@@ -309,7 +310,16 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 **Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.
 
-**Third panel, in progress (2026-10-12):** the owner has a second, brand-new E1001 for the home-office desk. Four pages were chosen, all in one targeting-HUD style and drawn by the Worker as 1-bit images (#66) and set in real fonts pre-rendered to 1-bit glyphs (#67; the first version's drawn lettering was rejected by the owner on sight, so **never propose the 8x8 font or hand-drawn letters, and show a mockup before building a look**). **Built:** the drawing kit in `src/hud/`, the calibration card `/desk/test` and the Aurebesh word of the day `/desk/aurebesh`. **Seen on the panel and approved by the owner** ("looks excellent"); the smallest text size is settled at 11px medium (`plex11m`), enforced by a test. The Aurebesh page also shows a pronunciation line, a family member's name on their birthday, and a themed word on a few fixed dates; the owner asked for those dates to stay a surprise, so do not list them back to them. **Planet of the day is built (#68).** **Still to build, each with a mockup for the owner first:** a TARS dashboard for two Macs and AI subscription quotas, a Flamengo board. Data sources already checked for those are listed in section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`. This is separate from the Muse firmware experiment above, which concerns the first E1001.
+**Third panel: two of four pages live (state at the end of 2026-10-12, v3.18.0).** A second E1001 sits on the owner's home-office desk, paired in SenseCraft HMI and showing `/desk/aurebesh`, which the owner called "excellent" on the panel.
+
+- **Built and deployed:** the drawing kit in `src/hud/` (#66), real fonts pre-rendered to 1-bit glyphs (#67), the Aurebesh word of the day with pronunciation, numerals, birthdays and special days (#67 and its follow-ups), and the planet of the day from NASA's Exoplanet Archive (#68).
+- **To check first next session:** (1) that the six-hourly cron warmed the next day's planet in production: `npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "planet:v1:"` should list today and tomorrow (Chicago dates); (2) whether the owner added `/desk/planet` to the panel's pagelist, and how it looks there.
+- **Still to build, in this order, each with a mockup shown to the owner before any code:** a TARS dashboard for the owner's two Macs and AI subscription quotas, then a Flamengo board. What is already known about their data sources is in section 4 and section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`.
+- **How this work went, so it is not repeated:** the first version used drawn lettering and was rejected on sight; a written spec and plan had not caught it, and three rounds of pictures did. For this owner, on this panel: **show a mockup first, use real fonts, never go below 11px medium.**
+- **Surprises:** the Aurebesh page and the planet page each carry a few date-based and data-based easter eggs the owner asked to be kept as surprises. They are in the code (`SPECIAL_DAYS` in `src/hud/aurebesh-words.ts`; `NICKNAMES` and `DATE_PLANETS` in `src/planet.ts`). Do not list them back to the owner.
+- **Not done:** the planet page and the real-font rebuild had no independent code review (the first version did). The pronunciations are hand-written; only seven were confirmed against Wookieepedia. The panel's SenseCraft device ID is not in the repo, and no telemetry is fetched for it.
+
+This is separate from the Muse firmware experiment above, which concerns the first E1001.
 
 **Open items the owner has not chosen to act on:**
 

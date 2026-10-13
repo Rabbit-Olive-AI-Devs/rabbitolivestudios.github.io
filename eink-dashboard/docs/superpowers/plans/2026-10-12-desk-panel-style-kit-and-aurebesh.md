@@ -1,5 +1,7 @@
 # Desk Panel: Style Kit + Aurebesh Page Implementation Plan
 
+> **Status (2026-10-12): executed, then partly superseded the same day.** Tasks 1–4 and 6–9 were carried out and shipped as v3.17.0. The owner rejected the lettering and layout this plan describes (the 8x8 bitmap font, hand-drawn stroke letters, the framed layout); they were replaced with real fonts and a new layout in DECISIONS #67. `stroke.ts`, `style.ts` and the traced Aurebesh glyphs no longer exist. Keep this file as the record of what was tried; do not build from it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the new desk E1001 a Worker-drawn, pure 1-bit "targeting HUD" style kit, a calibration card at `/desk/test`, and the Aurebesh word-of-the-day page at `/desk/aurebesh`.
