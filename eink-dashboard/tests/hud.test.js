@@ -133,3 +133,68 @@ test("a space advances without drawing", () => {
   assert.ok([...cols].some((x) => x < 50));
   assert.ok([...cols].some((x) => x >= 120), "second I sits two advances to the right");
 });
+const parts = fromBuild("src/hud/parts.js");
+const style = fromBuild("src/hud/style.js");
+
+test("frame draws a border inset by the margin and leaves the centre white", () => {
+  const c = cv.createCanvas();
+  parts.frame(c);
+  const m = style.MARGIN;
+  assert.equal(at(c, m, m), 0);
+  assert.equal(at(c, 800 - m - 1, 480 - m - 1), 0);
+  assert.equal(at(c, 400, m), 0);
+  assert.equal(at(c, 0, 0), 1, "outside the margin stays white");
+  assert.equal(at(c, 400, 240), 1);
+});
+
+test("brackets mark only the corners", () => {
+  const c = cv.createCanvas(200, 200);
+  parts.brackets(c, 20, 20, 100, 80, 10, 2);
+  assert.equal(at(c, 20, 20), 0);
+  assert.equal(at(c, 119, 99), 0);
+  assert.equal(at(c, 70, 20), 1, "the middle of an edge is open");
+  assert.equal(at(c, 20, 60), 1);
+});
+
+test("dotFill density follows the level and stays in its box", () => {
+  const box = 40 * 40;
+  const fill = (level) => {
+    const c = cv.createCanvas(60, 60);
+    parts.dotFill(c, 10, 10, 40, 40, level);
+    assert.equal(at(c, 5, 5), 1);
+    assert.equal(at(c, 55, 55), 1);
+    return cv.countBlack(c) / box;
+  };
+  assert.equal(fill(0), 0);
+  assert.equal(fill(1), 1);
+  assert.ok(Math.abs(fill(0.5) - 0.5) < 0.07);
+  assert.ok(fill(0.25) < fill(0.75));
+});
+
+test("hatch draws diagonal stripes inside its box only", () => {
+  const c = cv.createCanvas(60, 40);
+  parts.hatch(c, 10, 10, 40, 20, 6);
+  const black = cv.countBlack(c);
+  assert.ok(black > 0 && black < 40 * 20);
+  assert.equal(at(c, 5, 15), 1);
+  assert.equal(at(c, 55, 15), 1);
+});
+
+test("accentBlock is a solid block with white text and reports its width", () => {
+  const c = cv.createCanvas(300, 60);
+  const w = parts.accentBlock(c, 10, 10, "KEY", 2);
+  assert.equal(w, cv.textWidth("KEY", 2) + 12);
+  assert.equal(at(c, 10, 10), 0, "block corner is black");
+  let white = 0;
+  for (let y = 10; y < 10 + 24; y++) for (let x = 10; x < 10 + w; x++) if (at(c, x, y) === 1) white++;
+  assert.ok(white > 0, "text shows as white inside the block");
+});
+
+test("ruler, crosshair, titleBar and bigNumber all draw without throwing", () => {
+  const c = cv.createCanvas();
+  parts.ruler(c, 40, 100, 300);
+  parts.crosshair(c, 400, 240, 60);
+  parts.titleBar(c, "LEFT / TITLE", "2026-10-12");
+  parts.bigNumber(c, 40, 300, "14", "VSL");
+  assert.ok(cv.countBlack(c) > 500);
+});
