@@ -403,3 +403,16 @@ test("?word and ?date select the page; bad input falls back instead of failing",
   await pageBytes("?date=yesterday&word=%F0%9F%9A%80");
   assert.notEqual(await pageBytes("?sheet"), daily, "?sheet still shows the check sheet");
 });
+
+test("consecutive days do not walk the themed word list in order", () => {
+  const n = words.WORDS.length;
+  const idx = (d) => words.WORDS.indexOf(words.pickWord(d));
+  const days = ["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-12-31", "2027-01-01", "2027-01-02"];
+  for (let i = 0; i < days.length - 1; i++) {
+    const step = (idx(days[i + 1]) - idx(days[i]) + n) % n;
+    assert.ok(step > 10 && step < n - 10, `${days[i]} -> ${days[i + 1]} moved ${step} places`);
+  }
+  const year = new Set();
+  for (let d = 0; d < n; d++) year.add(words.pickWord(new Date(Date.UTC(2026, 0, 1 + d)).toISOString().slice(0, 10)));
+  assert.equal(year.size, n, "every word still appears once per cycle");
+});

@@ -43,8 +43,15 @@ export function dayOfYear(dateStr: string): number {
   return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
 }
 
+/**
+ * WORDS is grouped by theme, so stepping through it one at a time would show
+ * twenty planet names in a row. A stride that shares no factor with the list
+ * length jumps between themes while still visiting every word once per cycle.
+ */
+const STRIDE = 77;
+
 /** The same date always gives the same word; the year offsets the cycle so years differ. */
 export function pickWord(dateStr: string): string {
   const year = Number(dateStr.slice(0, 4));
-  return WORDS[(dayOfYear(dateStr) + year * 7) % WORDS.length];
+  return WORDS[(dayOfYear(dateStr) * STRIDE + year * 7) % WORDS.length];
 }
