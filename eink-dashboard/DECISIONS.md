@@ -2708,7 +2708,7 @@ from 10px up so the owner can say which is the smallest that reads cleanly.
 - Four files named "Aurebesh AF" share one family name, so load only the cut you want when
   rasterising.
 
-### Follow-up (2026-10-12): more words, birthdays and special days
+### Follow-up (v3.17.2, 2026-10-12): more words, birthdays and special days
 
 After seeing the page on the panel ("looks excellent") the owner asked for four things.
 
