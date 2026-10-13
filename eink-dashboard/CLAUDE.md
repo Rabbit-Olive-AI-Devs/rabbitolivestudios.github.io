@@ -355,7 +355,7 @@ eink-dashboard/
       page.ts             — canvas → 1-bit PNG → one-request HTML page; a draw failure becomes the text page
       test-card.ts        — the calibration card drawn at /desk/test
       aurebesh.ts         — the check sheet: 26 letters + 10 numerals
-      aurebesh-words.ts   — word list, themes, letter names, date-to-word picker, ?word=/?date= cleaning
+      aurebesh-words.ts   — word list (180), themes, letter names, date-to-word picker, special days, ?word=/?date= cleaning
       aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)
@@ -369,7 +369,7 @@ eink-dashboard/
       color-moment.ts     — /color/moment + color birthday + test endpoints
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
-      desk.ts             — /desk/test + /desk/aurebesh handlers for the desk panel (DECISIONS #66)
+      desk.ts             — /desk/test + /desk/aurebesh handlers; picks the day's occasion (birthday, special day) (DECISIONS #66, #67)
   photos/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)

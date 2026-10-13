@@ -49,7 +49,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/apod` | 301 redirect to `/skyline` (legacy compatibility) | — |
 | **Desk Panel (second E1001)** | *Worker-drawn 1-bit pages set in real fonts (IBM Plex Mono, Aurebesh AF) pre-rendered to 1-bit glyphs; PNG inlined in one request; no KV and no AI (DECISIONS #66, #67)* | |
-| `GET /desk/aurebesh` | 800x480 Aurebesh word of the day: the word in Aurebesh inside a crosshair, a key column with each letter's glyph and name, and cards with the translation and the word's place in the 120-word cycle. Depends only on the Chicago date | none |
+| `GET /desk/aurebesh` | 800x480 Aurebesh word of the day: the word in Aurebesh inside a crosshair, a key column with each letter's glyph and name, and cards with the translation and the word's place in the 180-word cycle. On a family birthday the word is that person's name with their age, and a few fixed dates show a themed word. Depends only on the Chicago date | none |
 | `GET /desk/aurebesh?date=YYYY-MM-DD&word=HELLO` | Free test overrides. Unusable input falls back to today and the daily word | none |
 | `GET /desk/aurebesh?sheet` | All 26 Aurebesh letters with their names, and the ten Aurebesh numerals, for checking against a chart | none |
 | `GET /desk/test` | Calibration card: every text size from 10px up, large type, Aurebesh sizes, rules, dots and hatch, for judging on the real panel | none |

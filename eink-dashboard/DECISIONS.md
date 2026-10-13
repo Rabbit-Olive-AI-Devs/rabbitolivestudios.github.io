@@ -2707,3 +2707,25 @@ from 10px up so the owner can say which is the smallest that reads cleanly.
   reading it inside a pixel loop exhausted memory.
 - Four files named "Aurebesh AF" share one family name, so load only the cut you want when
   rasterising.
+
+### Follow-up (2026-10-12): more words, birthdays and special days
+
+After seeing the page on the panel ("looks excellent") the owner asked for four things.
+
+- **Dates day first.** The top bar shows `DD/MM/YYYY` (`displayDate` in `chrome.ts`). URLs and
+  cache-style date strings stay `YYYY-MM-DD`.
+- **A longer list.** 120 → 180 words, adding sixty Star Wars character names as a fifteenth
+  group, `CAST`. The stride of 77 needs a list length with no factor of 7 or 11; a test asserts
+  every word still appears once per cycle. Lengthening the list changes which word falls on which
+  day, which is acceptable for a page with no history.
+- **Family birthdays.** On a birthday in `src/birthday.ts` (the list the portrait easter egg
+  already uses) the word is that person's name, tagged `HAPPY BIRTHDAY`, in a `FAMILY` group,
+  and the last card shows their age in Aurebesh numerals in place of the cycle number.
+- **Special days.** A small table of fixed dates in `aurebesh-words.ts` (`SPECIAL_DAYS`) swaps in
+  a themed word with a tag, and where a founding year is given, a count of years. Birthdays win
+  over special days; `?word=` overrides both, so the test parameter still shows exactly what it
+  is asked for.
+
+Both are an `Occasion` passed to `drawAurebeshPage`. Still no KV, AI or cron: an occasion is a
+function of the date. Names are taken from the ASCII `key` field, since Aurebesh has no accents.
+`npm run test:utils` is at 155 tests.

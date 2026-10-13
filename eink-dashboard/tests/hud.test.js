@@ -399,3 +399,83 @@ test("the cycle card writes the word's number in Aurebesh numerals", () => {
     if (expected.px[i] === 0) assert.equal(page52.px[i], 0, `Aurebesh 52 missing at pixel ${i % 800},${Math.floor(i / 800)}`);
   }
 });
+
+// --- Date format, the longer list, birthdays and special days ---------------------
+
+const chrome = fromBuild("src/hud/chrome.js");
+const { getBirthdayToday } = fromBuild("src/birthday.js");
+
+test("dates are shown day first", () => {
+  assert.equal(chrome.displayDate("2026-10-12"), "12/10/2026");
+  assert.equal(chrome.displayDate("2027-01-05"), "05/01/2027");
+});
+
+test("the list has grown past 120 and includes Star Wars characters as their own group", () => {
+  assert.ok(words.WORDS.length >= 180, `only ${words.WORDS.length} words`);
+  for (const name of ["LUKE", "LEIA", "YODA", "VADER", "GROGU", "SKYWALKER"]) {
+    const i = words.WORDS.indexOf(name);
+    assert.ok(i >= 0, `${name} missing`);
+    assert.equal(words.groupOf(i), "CAST");
+  }
+  assert.equal(words.groupOf(words.WORDS.indexOf("TWILIGHT")), "TERRAIN", "older groups keep their words");
+});
+
+test("special days replace the daily word and carry a short tag", () => {
+  assert.equal(words.specialDay("2026-10-12"), null, "an ordinary day");
+  const may4 = words.specialDay("2026-05-04");
+  assert.equal(may4.word, "FORCE");
+  assert.equal(may4.group, "SPECIAL");
+  assert.equal(words.specialDay("2031-05-04").word, "FORCE", "every year");
+  let found = 0;
+  for (let d = 0; d < 366; d++) {
+    const date = new Date(Date.UTC(2028, 0, 1 + d)).toISOString().slice(0, 10);
+    const s = words.specialDay(date);
+    if (!s) continue;
+    found++;
+    assert.match(s.word, /^[A-Z]{3,9}$/, `${date} word`);
+    assert.ok(s.tag.length >= 3 && s.tag.length <= 24, `${date} tag "${s.tag}"`);
+    if (s.count) assert.ok(Number.isInteger(s.count.value) && s.count.value > 0 && s.count.value < 1000, `${date} count`);
+  }
+  assert.ok(found >= 6, "a handful of surprises through the year");
+});
+
+/** First family birthday in the calendar, found without naming anyone here. */
+function firstBirthday() {
+  for (let m = 1; m <= 12; m++) for (let d = 1; d <= 31; d++) {
+    const p = getBirthdayToday(m, d);
+    if (p) return { p, date: `2026-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` };
+  }
+  throw new Error("no birthdays configured");
+}
+
+test("on a family birthday the word is that person's name, with their age", () => {
+  const { p, date } = firstBirthday();
+  const o = desk.occasionFor(date);
+  assert.equal(o.word, words.cleanWord(p.key));
+  assert.equal(o.group, "FAMILY");
+  assert.equal(o.tag, "HAPPY BIRTHDAY");
+  assert.deepEqual(o.count, { label: "AGE", value: 2026 - p.birthYear, unit: "YEARS" });
+  assert.equal(desk.occasionFor("2026-10-12"), null);
+});
+
+test("an occasion changes the page: its tag is drawn and its count replaces the cycle number", () => {
+  const b64 = (c) => Buffer.from(c.px).toString("base64");
+  const plain = ap.drawAurebeshPage("FORCE", "2026-05-04");
+  const tagged = ap.drawAurebeshPage("FORCE", "2026-05-04", { word: "FORCE", tag: "MAY THE FOURTH", group: "SPECIAL" });
+  assert.notEqual(b64(plain), b64(tagged));
+  assert.equal(tagged.px[52 * 800 + 192], 0, "the tag is an inverted block in the corner of the view");
+  const aged = ap.drawAurebeshPage("LUKE", "2026-05-04", {
+    word: "LUKE", tag: "HAPPY BIRTHDAY", group: "FAMILY", count: { label: "AGE", value: 12, unit: "YEARS" },
+  });
+  const expected = cv.createCanvas();
+  ty.drawType(expected, "af36", 628, 410, "12");
+  for (let i = 0; i < expected.px.length; i++) if (expected.px[i] === 0) assert.equal(aged.px[i], 0, "age in Aurebesh numerals");
+});
+
+test("the handler uses the occasion for the date, and ?word still overrides it", async () => {
+  const { date } = firstBirthday();
+  const birthday = await pageBytes(`?date=${date}`);
+  const daily = await pageBytes(`?date=${date}&word=${words.pickWord(date)}`);
+  assert.notEqual(birthday, daily);
+  assert.notEqual(await pageBytes("?date=2026-05-04"), await pageBytes(`?date=2026-05-04&word=${words.pickWord("2026-05-04")}`));
+});

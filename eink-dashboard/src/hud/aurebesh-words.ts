@@ -19,13 +19,19 @@ export const WORDS: readonly string[] = [
   "CRYSTAL", "KYBER", "HOLOCRON", "HOLOGRAM", "BEACON", "SIGNAL", "CIPHER", "SECRET", "MISSION", "SQUADRON",
   "COMMAND", "CAPTAIN", "ADMIRAL", "GENERAL", "TROOPER", "SCOUT", "RANGER", "GUARDIAN", "SENTINEL", "WARRIOR",
   "DESERT", "FOREST", "SWAMP", "CANYON", "GLACIER", "VOLCANO", "ASTEROID", "HORIZON", "SUNSET", "TWILIGHT",
+  "LUKE", "LEIA", "HAN", "CHEWIE", "YODA", "VADER", "KENOBI", "ANAKIN", "PADME", "AHSOKA",
+  "REY", "FINN", "POE", "KYLO", "LANDO", "BOBA", "JABBA", "GROGU", "MANDO", "ARTOO",
+  "THREEPIO", "PALPATINE", "DOOKU", "MAUL", "QUIGON", "WINDU", "SOLO", "SKYWALKER", "ORGANA", "AMIDALA",
+  "TARKIN", "GRIEVOUS", "EZRA", "HERA", "SABINE", "KANAN", "ZEB", "THRAWN", "CASSIAN", "JYN",
+  "ANDOR", "CHIRRUT", "BODHI", "KRENNIC", "HUX", "PHASMA", "SNOKE", "ROSE", "HOLDO", "ACKBAR",
+  "WEDGE", "BIGGS", "GREEDO", "WATTO", "JARJAR", "BAZE", "SAW", "CHOPPER", "REX", "CODY",
 ];
 
 /** Where each themed run of WORDS starts. Kept next to the list so they change together. */
 const GROUPS: readonly (readonly [number, string])[] = [
   [0, "CORE"], [10, "ORDER"], [16, "FLEET"], [21, "FRINGE"], [25, "CREATURES"], [36, "PLANETS"],
   [60, "VIRTUES"], [73, "KIN"], [80, "SPACE"], [85, "TECH"], [90, "LORE"], [94, "SIGNALS"],
-  [98, "RANKS"], [110, "TERRAIN"],
+  [98, "RANKS"], [110, "TERRAIN"], [120, "CAST"],
 ];
 
 /** Theme of the word at `index` in WORDS; "CUSTOM" for a word that is not in the list. */
@@ -69,6 +75,8 @@ export function dayOfYear(dateStr: string): number {
  * WORDS is grouped by theme, so stepping through it one at a time would show
  * twenty planet names in a row. A stride that shares no factor with the list
  * length jumps between themes while still visiting every word once per cycle.
+ * 77 = 7 x 11, so keep the list length free of those two factors; a test
+ * checks that every word still appears once per cycle.
  */
 const STRIDE = 77;
 
@@ -76,4 +84,40 @@ const STRIDE = 77;
 export function pickWord(dateStr: string): string {
   const year = Number(dateStr.slice(0, 4));
   return WORDS[(dayOfYear(dateStr) * STRIDE + year * 7) % WORDS.length];
+}
+
+/** A day on which something other than the daily word is shown. */
+export interface Occasion {
+  word: string;
+  /** Short line shown as a tag on the page. */
+  tag: string;
+  group: string;
+  /** A number worth showing in place of the word's position, such as an age. */
+  count?: { label: string; value: number; unit: string };
+}
+
+/** Fixed dates, as MM-DD. `since` turns into a count of years. */
+const SPECIAL_DAYS: Readonly<Record<string, { word: string; tag: string; since?: number; label?: string }>> = {
+  "01-01": { word: "HOPE", tag: "A NEW HOPE" },
+  "05-04": { word: "FORCE", tag: "MAY THE FOURTH" },
+  "05-05": { word: "SITH", tag: "REVENGE OF THE FIFTH" },
+  "05-25": { word: "STARWARS", tag: "FIRST FILM 1977", since: 1977, label: "SAGA" },
+  "07-04": { word: "REBEL", tag: "INDEPENDENCE DAY" },
+  "09-07": { word: "BRASIL", tag: "SETE DE SETEMBRO" },
+  "10-31": { word: "VADER", tag: "HALLOWEEN" },
+  "11-07": { word: "MURPH", tag: "STAY" },
+  "11-15": { word: "FLAMENGO", tag: "FOUNDED 1895", since: 1895, label: "CLUB" },
+  "11-17": { word: "LIFEDAY", tag: "WOOKIEE LIFE DAY" },
+  "12-25": { word: "NATAL", tag: "FELIZ NATAL" },
+};
+
+/** The occasion for a fixed special date, or null on an ordinary day. */
+export function specialDay(dateStr: string): Occasion | null {
+  const day = SPECIAL_DAYS[dateStr.slice(5)];
+  if (!day) return null;
+  const occasion: Occasion = { word: day.word, tag: day.tag, group: "SPECIAL" };
+  if (day.since) {
+    occasion.count = { label: day.label ?? "SINCE", value: Number(dateStr.slice(0, 4)) - day.since, unit: "YEARS" };
+  }
+  return occasion;
 }

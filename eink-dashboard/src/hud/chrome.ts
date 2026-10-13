@@ -7,6 +7,12 @@ import type { Canvas } from "./canvas";
 import { fillRect, hline } from "./canvas";
 import { drawType, measureType } from "./type";
 
+/** YYYY-MM-DD as the owner reads dates: DD/MM/YYYY. */
+export function displayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 /** Y of the rule under the top bar; page content starts below it. */
 export const TOP_BAR_BOTTOM = 36;
 

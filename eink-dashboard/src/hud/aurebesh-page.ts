@@ -8,7 +8,8 @@ import { shiftDateStr } from "../date-utils";
 import type { Canvas } from "./canvas";
 import { createCanvas, fillRect, hline, strokeRect, vline } from "./canvas";
 import { dayOfYear, groupOf, LETTER_NAMES, pickWord, WORDS } from "./aurebesh-words";
-import { topBar, TOP_BAR_BOTTOM } from "./chrome";
+import type { Occasion } from "./aurebesh-words";
+import { displayDate, topBar, TOP_BAR_BOTTOM } from "./chrome";
 import type { FaceKey } from "./fonts-data";
 import { brackets, dotGrid, hatch, plus, ruler } from "./parts";
 import { drawType, measureType } from "./type";
@@ -40,16 +41,20 @@ function dataRow(c: Canvas, x: number, y: number, w: number, key: string, value:
   if (rule) hline(c, x, y + 6, w);
 }
 
-export function drawAurebeshPage(word: string, dateStr: string): Canvas {
+/**
+ * `occasion` marks a birthday or special day: its tag is shown in the corner of
+ * the view, and its count, if any, takes the place of the word's number.
+ */
+export function drawAurebeshPage(word: string, dateStr: string, occasion?: Occasion): Canvas {
   const c = createCanvas();
   const index = WORDS.indexOf(word);
   const position = index < 0 ? "---" : pad3(index + 1);
-  const group = groupOf(index);
+  const group = occasion?.group ?? groupOf(index);
   const unique = [...new Set(word)];
 
   topBar(
     c, ["Desk", "Aurebesh", "Word of the day"],
-    [dateStr, `DAY ${dayOfYear(dateStr)}`], `${position}/${WORDS.length}`,
+    [displayDate(dateStr), `DAY ${dayOfYear(dateStr)}`], `${position}/${WORDS.length}`,
   );
 
   // Key column
@@ -87,7 +92,13 @@ export function drawAurebeshPage(word: string, dateStr: string): Canvas {
   const faceSize = Number(face.slice(2));
   drawType(c, face, WORD_CX, WORD_CY + Math.round(faceSize * 0.36), word, { align: "center" });
 
-  label(c, 190, 56, "TARGET");
+  if (occasion) {
+    const tagW = measureType("plex12s", occasion.tag) + 16;
+    fillRect(c, 190, 44, tagW, 19);
+    drawType(c, "plex12s", 198, 58, occasion.tag, { white: true });
+  } else {
+    label(c, 190, 56, "TARGET");
+  }
   drawType(c, "plex11m", 786, 56, "CANON", { align: "right", spacing: 1 });
   ruler(c, WORD_CX - 150, 296, 300);
   const caption = unique.length <= 5
@@ -115,16 +126,19 @@ export function drawAurebeshPage(word: string, dateStr: string): Canvas {
   [["LETTERS", String(word.length)], ["UNIQUE", String(unique.length)], ["GROUP", group], ["INDEX", position]]
     .forEach(([key, value], i) => dataRow(c, 424, 386 + i * 21, 154, key, value, true));
 
-  label(c, 628, 362, "CYCLE");
+  const count = occasion?.count;
+  label(c, 628, 362, count ? count.label : "CYCLE");
   strokeRect(c, 738, 350, 45, 17);
   drawType(c, "plex10s", 760, 362, "DAILY", { align: "center" });
-  // the word's number in Aurebesh numerals, with the same number in Latin beside it
-  const number = index < 0 ? "--" : String(index + 1);
-  const numberW = index < 0 ? 0 : drawType(c, "af36", 628, 410, number);
+  // a number in Aurebesh numerals with the same number in Latin beside it: the
+  // occasion's count if it has one, otherwise the word's place in the cycle
+  const value = count ? count.value : index + 1;
+  const number = value > 0 ? String(value) : "--";
+  const numberW = value > 0 ? drawType(c, "af36", 628, 410, number) : 0;
   const latinX = 628 + numberW + (numberW > 0 ? 10 : 0);
   drawType(c, "plex15s", latinX, 394, number);
-  drawType(c, "plex11m", latinX + measureType("plex15s", number) + 3, 394, `/${WORDS.length}`);
-  label(c, latinX, 410, "WORDS");
+  if (!count) drawType(c, "plex11m", latinX + measureType("plex15s", number) + 3, 394, `/${WORDS.length}`);
+  label(c, latinX, 410, count ? count.unit : "WORDS");
   // word lengths for the ten days before today and the nineteen after; today is the wide bar
   for (let i = 0; i < 30; i++) {
     const h = pickWord(shiftDateStr(dateStr, i - 10)).length * 3;

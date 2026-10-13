@@ -233,7 +233,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 149 tests at v3.17.1
+npm run test:utils        # compiles to /tmp, runs node --test; 155 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
