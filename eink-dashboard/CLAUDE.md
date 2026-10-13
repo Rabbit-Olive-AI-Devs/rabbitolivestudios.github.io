@@ -51,7 +51,7 @@ Every session must begin with these steps:
 | Touching the daily cron or `dailyWarmTargetDate` | The warm must fill the **next** Chicago date before it rolls (`35 4,5 * * *`). Warming "right after midnight" reopens the hole that blanked the skyline (DECISIONS #64) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
-| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as a 1-bit image, never with live HTML text. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters, and **never smaller than `plex11m`**, the owner's minimum on the panel (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep these pages free of KV, AI and cron (DECISIONS #66) |
+| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as a 1-bit image, never with live HTML text. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters, and **never smaller than `plex11m`**, the owner's minimum on the panel (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep them free of AI, and of KV unless the page truly needs outside data: then one write a day, warmed by the cron, with an older value and a built-in fallback (`src/planet.ts`, DECISIONS #68) |
 
 ---
 
@@ -117,6 +117,7 @@ curl "http://localhost:8790/skyline-test?date=2026-06-01"
 curl http://localhost:8790/desk/test
 curl "http://localhost:8790/desk/aurebesh?word=JEDI&date=2026-10-12"
 curl "http://localhost:8790/desk/aurebesh?sheet"
+curl "http://localhost:8790/desk/planet?date=2026-10-20"   # live NASA lookup, no cache write
 ```
 
 Always build before committing. Do not commit code that doesn't compile.
@@ -315,6 +316,7 @@ eink-dashboard/
     convert-1bit.ts       — 1-bit conversion engine (Bayer + threshold)
     styles-1bit.ts        — Pipeline B style table, picker, hash
     birthday.ts           — Birthday data + detection
+    planet.ts             — Desk panel planet of the day: NASA Exoplanet Archive queries + daily KV cache `planet:v1:DATE` (DECISIONS #68)
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
     images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)
     escape.ts             — HTML escaping utility (escapeHTML)
@@ -358,6 +360,8 @@ eink-dashboard/
       aurebesh-words.ts   — word list (180), themes, letter names, date-to-word picker, special days, ?word=/?date= cleaning
       aurebesh-pronounce.ts — hand-written "how to say it" respelling for every word
       aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
+      planet-draw.ts      — draws a planet from its data: class, surface, lighting, name-seeded pattern (DECISIONS #68)
+      planet-page.ts      — layout of the planet-of-the-day page + number formatting
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)
       fact.ts             — /fact HTML wrapper for fact.png (falls back to a text page)
@@ -370,7 +374,7 @@ eink-dashboard/
       color-moment.ts     — /color/moment + color birthday + test endpoints
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
-      desk.ts             — /desk/test + /desk/aurebesh handlers; picks the day's occasion (birthday, special day) (DECISIONS #66, #67)
+      desk.ts             — /desk/test, /desk/aurebesh, /desk/planet handlers; picks the day's occasion (birthday, special day) (DECISIONS #66–#68)
   photos/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)

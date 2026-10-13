@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 67 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 68 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -65,6 +65,7 @@ A **third panel** is being set up: a second E1001 (mono) on the home-office desk
 | `/skyline.png` | — | The skyline PNG itself (`?bw=1`, `?mode=daily\|rotate\|random`) |
 | `/color/headlines` | E1002 | Steel/trade headlines, ranked without an LLM |
 | `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
+| `/desk/planet` | Desk E1001 | Planet of the day from NASA's Exoplanet Archive, drawn from its data; `?date=` (#68) |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
 | `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
@@ -90,11 +91,11 @@ A **third panel** is being set up: a second E1001 (mono) on the home-office desk
 **Cron triggers** (`wrangler.toml`), all in UTC:
 
 - `35 4,5 * * *` — the daily image warm. It fires *before* Chicago midnight and fills the keys for the date the panels are **about to** ask for (`dailyWarmTargetDate()`), so a panel poll is never the thing that triggers generation (#64). It is one expression with two fire times because the account is at the free plan's cap of 5 cron triggers.
-- `5 0,6,12,18 * * *` — refreshes headlines, both weather locations and both devices' telemetry, then runs the failure-alert check.
+- `5 0,6,12,18 * * *` — refreshes headlines, both weather locations and both devices' telemetry, warms the desk panel's planet for today and tomorrow, then runs the failure-alert check.
 
 The daily warm runs its pipelines **sequentially in priority order** (Pipeline A or birthday, Pipeline B, colour moment, skyline, skyline BW), skips any key that already exists, and stops at the first neuron-budget error.
 
-**External data sources:** Wikipedia "On This Day", Open-Meteo (weather, primary), NWS `api.weather.gov` (alerts, and keyless weather fallback), SenseCraft HMI API (battery, indoor temperature and humidity), Steel Industry News / SteelOrbis / Google News RSS (headlines).
+**External data sources:** NASA Exoplanet Archive (desk planet, no key), Wikipedia "On This Day", Open-Meteo (weather, primary), NWS `api.weather.gov` (alerts, and keyless weather fallback), SenseCraft HMI API (battery, indoor temperature and humidity), Steel Industry News / SteelOrbis / Google News RSS (headlines).
 
 ## 5. Image pipelines
 
@@ -126,6 +127,7 @@ Dates in cache keys are **America/Chicago** dates. Cache versions live in `src/c
 | Daily images and data | `fact4:`, `fact1:`, `color-moment:`, `skyline:`, `birthday:`, `moment:`, `headlines:v3:DATE:PERIOD` | 24h (headlines 6h) | 604800 (7 days) |
 | Weather | `weather:{zip}:v2` | 15 min | 86400 |
 | Alerts, device telemetry | `alerts:{zip}:v1`, `device:{id}:v1` | 5 min | 86400 |
+| Desk planet | `planet:v1:DATE` | 24h | 604800 (7 days) |
 | Guards and bookkeeping | `ai-budget:v1:block`, `gen-lock:v1:*`, `stale-idx:v1:<prefix>`, `alert:v1:last`, `nws-points:{zip}` | — | varies |
 
 Rules:
@@ -233,7 +235,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 158 tests at v3.17.3
+npm run test:utils        # compiles to /tmp, runs node --test; 178 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -307,7 +309,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 **Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.
 
-**Third panel, in progress (2026-10-12):** the owner has a second, brand-new E1001 for the home-office desk. Four pages were chosen, all in one targeting-HUD style and drawn by the Worker as 1-bit images (#66) and set in real fonts pre-rendered to 1-bit glyphs (#67; the first version's drawn lettering was rejected by the owner on sight, so **never propose the 8x8 font or hand-drawn letters, and show a mockup before building a look**). **Built:** the drawing kit in `src/hud/`, the calibration card `/desk/test` and the Aurebesh word of the day `/desk/aurebesh`. **Seen on the panel and approved by the owner** ("looks excellent"); the smallest text size is settled at 11px medium (`plex11m`), enforced by a test. The Aurebesh page also shows a pronunciation line, a family member's name on their birthday, and a themed word on a few fixed dates; the owner asked for those dates to stay a surprise, so do not list them back to them. **Still to build, each with its own design first:** NASA planet of the day, a TARS dashboard for two Macs and AI subscription quotas, a Flamengo board. Data sources already checked for those are listed in section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`. This is separate from the Muse firmware experiment above, which concerns the first E1001.
+**Third panel, in progress (2026-10-12):** the owner has a second, brand-new E1001 for the home-office desk. Four pages were chosen, all in one targeting-HUD style and drawn by the Worker as 1-bit images (#66) and set in real fonts pre-rendered to 1-bit glyphs (#67; the first version's drawn lettering was rejected by the owner on sight, so **never propose the 8x8 font or hand-drawn letters, and show a mockup before building a look**). **Built:** the drawing kit in `src/hud/`, the calibration card `/desk/test` and the Aurebesh word of the day `/desk/aurebesh`. **Seen on the panel and approved by the owner** ("looks excellent"); the smallest text size is settled at 11px medium (`plex11m`), enforced by a test. The Aurebesh page also shows a pronunciation line, a family member's name on their birthday, and a themed word on a few fixed dates; the owner asked for those dates to stay a surprise, so do not list them back to them. **Planet of the day is built (#68).** **Still to build, each with a mockup for the owner first:** a TARS dashboard for two Macs and AI subscription quotas, a Flamengo board. Data sources already checked for those are listed in section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`. This is separate from the Muse firmware experiment above, which concerns the first E1001.
 
 **Open items the owner has not chosen to act on:**
 

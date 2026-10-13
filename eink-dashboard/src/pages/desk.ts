@@ -5,11 +5,17 @@
  * /desk/aurebesh — Aurebesh word of the day, a family member's name on their
  *                  birthday, or a special day's word; ?date=YYYY-MM-DD,
  *                  ?word=HELLO, ?sheet for the check sheet
+ * /desk/planet   — a real exoplanet each day from NASA's archive; ?date=YYYY-MM-DD
  *
- * Every page here is a Worker-drawn 1-bit PNG inlined in one HTML document, a
- * pure function of the date: no KV, no AI, no cron (DECISIONS #66).
+ * Every page here is a Worker-drawn 1-bit PNG inlined in one HTML document, with
+ * no AI. The Aurebesh pages are pure functions of the date; the planet page reads
+ * one small KV entry a day (DECISIONS #66, #67, #68).
  */
 
+import type { Env } from "../types";
+import { getPlanetOfDay } from "../planet";
+import type { ArchiveQuery } from "../planet";
+import { drawPlanetPage } from "../hud/planet-page";
 import { hudPageResponse } from "../hud/page";
 import { drawTestCard } from "../hud/test-card";
 import { drawAurebeshSheet } from "../hud/aurebesh";
@@ -55,4 +61,17 @@ export function handleDeskAurebesh(url: URL): Promise<Response> {
   const occasion = override ? null : occasionFor(dateStr);
   const word = override ?? occasion?.word ?? pickWord(dateStr);
   return hudPageResponse("Aurebesh Word of the Day", () => drawAurebeshPage(word, dateStr, occasion ?? undefined));
+}
+
+/**
+ * /desk/planet — a real exoplanet each day. `?date=YYYY-MM-DD` previews another
+ * day without touching the cache. `query` replaces NASA's archive in tests.
+ */
+export async function handleDeskPlanet(
+  env: Env, url: URL, ctx?: ExecutionContext, query?: ArchiveQuery,
+): Promise<Response> {
+  const today = getChicagoDateParts().dateStr;
+  const dateStr = parseDateParam(url.searchParams.get("date")) ?? today;
+  const day = await getPlanetOfDay(env, dateStr, { ctx, query, store: dateStr === today });
+  return hudPageResponse("Planet of the Day", () => drawPlanetPage(day, dateStr));
 }

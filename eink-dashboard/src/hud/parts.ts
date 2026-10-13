@@ -75,3 +75,18 @@ export function dotGrid(
     }
   }
 }
+
+/** A circle, filled or as a one-pixel outline. */
+export function disc(c: Canvas, cx: number, cy: number, r: number, filled: boolean): void {
+  if (!Number.isFinite(r) || r <= 0) return;
+  const radius = Math.min(r, c.w + c.h);
+  const b = clip(c, cx - radius, cy - radius, radius * 2 + 1, radius * 2 + 1);
+  const outer = radius * radius;
+  const inner = (radius - 1) * (radius - 1);
+  for (let y = b.y0; y < b.y1; y++) {
+    for (let x = b.x0; x < b.x1; x++) {
+      const d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+      if (d <= outer && (filled || d > inner)) setPixel(c, x, y);
+    }
+  }
+}

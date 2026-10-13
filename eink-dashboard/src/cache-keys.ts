@@ -47,6 +47,13 @@ export function skylineCacheKey(
   return `skyline:${SKYLINE_CACHE_VERSION}:${dateStr}:r${rotateMin}:b${bucket}${bwSuffix}`;
 }
 
+export const PLANET_CACHE_VERSION = "v1";
+
+/** Planet of the day for the desk panel (src/planet.ts). */
+export function planetCacheKey(dateStr: string): string {
+  return `planet:${PLANET_CACHE_VERSION}:${dateStr}`;
+}
+
 export function generationLockKey(cacheKey: string): string {
   return `gen-lock:v1:${cacheKey}`;
 }

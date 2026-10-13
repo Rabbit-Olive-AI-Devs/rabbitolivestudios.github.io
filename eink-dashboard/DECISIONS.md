@@ -2747,3 +2747,79 @@ no entry (a birthday name, a `?word=` test value) keeps the old `LANG  BASIC` ro
 guessed. The unusual names are the entries most likely to need correcting.
 
 `npm run test:utils` is at 158 tests.
+
+---
+
+## 68. Planet of the Day: Real Archive Data, Drawn From That Data (2026-10-12)
+
+### What it is
+
+The second desk panel page, `/desk/planet`: one real exoplanet a day from NASA's Exoplanet
+Archive, in the style and fonts of #67. The owner approved the layout from a mockup ("loved
+it!!!") and then asked whether the picture should follow NASA's photos so that planets do not all
+look alike, without overcomplicating it.
+
+### There are no photos, so the drawing is made from the data
+
+Exoplanets are detected, not photographed; the pictures in the news are paintings, and NASA has
+those for a small share of the catalogue. Three routes were put to the owner, who chose the
+first:
+
+- **A. Drawn from the planet's own data (chosen).** `src/hud/planet-draw.ts` shades a sphere and
+  ordered-dithers it straight to black and white. Radius picks the class (rocky, super-Earth,
+  Neptune-like, gas giant); equilibrium temperature picks the surface (glowing cracks above
+  1000 K, seas and cloud between 200 and 330 K, ice below 200 K, cratered rock otherwise); a
+  planet with two or more suns is lit from two sides; the name seeds the pattern, so a planet
+  always looks the same and no two match. Free, cannot fail, no AI.
+- **B. One AI picture a day.** About 1,364 neurons with FLUX, 14% of the daily budget, and a new
+  failure mode. Left as a possible later upgrade.
+- **C. NASA's artist concepts.** Exist for few planets, and would need name matching.
+
+It is an interpretation and the code says so. Rings in particular are a guess for any exoplanet,
+so they are rare and only on cold gas giants. A value the archive lacks reads `UNKNOWN`; nothing
+is invented in the data columns.
+
+### Data
+
+Table Access Protocol at `exoplanetarchive.ipac.caltech.edu/TAP/sync`, no key, table
+`pscomppars`. The archive's SQL has no `OFFSET`, so picking "the Nth planet" takes two steps:
+fetch the list of usable names (about 6,000, 170 KB), choose one by a hash of the date, then
+fetch that planet's row. Two more small queries give discoveries per year and the planet's
+siblings, which places it among its star's planets. About 3.5 seconds in all, once a day.
+
+`sy_dist` is in parsecs and is converted to light years. Right ascension and declination are kept
+on the page at the owner's request.
+
+### Caching and failure
+
+This is the first desk page that needs anything from outside, so it follows the rules the image
+routes learned the hard way (#42, #64):
+
+- The day's result is stored as `planet:v1:DATE`, seven-day TTL: **one KV write a day** (#62).
+- The six-hourly cron warms today's and tomorrow's planet, so the key is filled hours before the
+  Chicago date rolls. A warm key costs a read.
+- A panel request with a cold key and an older planet in cache shows the older one at once and
+  refreshes under `ctx.waitUntil`. With nothing older it waits up to six seconds, then shows one
+  of four built-in real planets, marked `OFFLINE` in the top bar, while the lookup finishes in
+  the background.
+- `?date=` previews another day live and never writes, so a visitor cannot spend KV writes.
+
+**Not covered by the alert check (#60), deliberately.** Every failure here still shows a real
+planet, and the top bar says `OFFLINE` when it is a built-in one. If the archive changed its
+schema the page would sit on built-in planets until someone noticed; that is acceptable for a
+desk ornament and would not be for the image routes.
+
+### Verified
+
+- `npm run typecheck`, `npm run test:utils` (178 tests) and `npm run dry-run` pass. The planet
+  tests use a stand-in for the archive and cover: row parsing with missing fields, safe quoting,
+  the same date picking the same planet, a cached day making no request, one write on a cold day,
+  serve-older-and-refresh, the built-in fallback writing nothing, `?date=` writing nothing, class
+  and surface from size and temperature, two suns, determinism, shading direction, bounded
+  drawing, number formatting, and the page for small, huge, long-named and sparse planets.
+- The real archive was queried from a development machine for four dates and the pages rendered
+  and inspected.
+
+### Not yet verified
+
+Not seen on the panel. The cron warm has not run in production yet.
