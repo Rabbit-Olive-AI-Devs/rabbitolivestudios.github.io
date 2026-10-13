@@ -2619,7 +2619,7 @@ note belongs here when that is done.
 
 ---
 
-## 67. Desk Panel Type Is Real Fonts, Rasterised Offline to 1-Bit Glyphs (2026-10-12)
+## 67. Desk Panel Type Is Real Fonts, Rasterised Offline to 1-Bit Glyphs (v3.17.1, 2026-10-12)
 
 ### What happened
 
@@ -2658,15 +2658,17 @@ breadcrumb and an inverted pill (`chrome.ts`, shared by every desk page); a key 
 each letter used with its glyph and its Aurebesh name; the word inside hairline brackets on a
 crosshair that spans the view, over a sparse dot field; three cards with "+" corner marks and
 striped dividers. Every number on the page is real: the word's place in the 120-word cycle, its
-theme, and a strip of word lengths for the ten days before and nineteen after today.
+theme, and a strip of word lengths for the ten days before and nineteen after today. At the
+owner's request the word's number is also written in **Aurebesh numerals**, with the Latin number
+beside it, and the check sheet (`?sheet`) carries the ten numerals under the 26 letters.
 
 The word is set in the largest of six Aurebesh sizes that fits its box. The smallest was added
 when a test showed nine W's overflowing at 50px.
 
 ### Cost
 
-`fonts-data.ts` is 207 KiB of source. The Worker goes from 245 KiB (60 KiB gzip) to 481 KiB
-(99 KiB gzip), against a 3 MiB limit. Still no KV, no AI, no cron: a page is drawn per request
+`fonts-data.ts` is 212 KiB of source. The Worker goes from 245 KiB (60 KiB gzip) to 486 KiB
+(100 KiB gzip), against a 3 MiB limit. Still no KV, no AI, no cron: a page is drawn per request
 from the date.
 
 ### Rejected
@@ -2682,13 +2684,13 @@ from the date.
 
 ### Verified
 
-- `npm run typecheck`, `npm run test:utils` (147 tests) and `npm run dry-run` pass. New tests
+- `npm run typecheck`, `npm run test:utils` (149 tests) and `npm run dry-run` pass. New tests
   cover: every face carries the characters the pages use and each bitmap is the size its metrics
   imply; measuring and alignment; ink staying inside its text box and on its baseline; clipping;
   white type on a block; the word fitting its box for the widest nine-letter input; `hatch` and
   `dotGrid` doing work bounded by the canvas when asked for an absurd area.
 - The word page (JEDI, MANDALORE, nine W's), the check sheet and the calibration card were
-  rendered to PNG and inspected.
+  rendered to PNG and inspected. This rebuild had no independent review, unlike #66.
 
 ### Not yet verified
 

@@ -22,7 +22,8 @@ const THRESHOLD = 150;
 
 const ASCII = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join("");
 const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const BIG = " " + UPPER + "0123456789/.:-%";
+const DIGITS = "0123456789";
+const BIG = " " + UPPER + DIGITS + "/.:-%";
 
 const PLEX = { family: "IBM Plex Mono", files: ["IBMPlexMono-Regular.ttf", "IBMPlexMono-Medium.ttf", "IBMPlexMono-SemiBold.ttf"] };
 const AF = { family: "Aurebesh AF", files: ["AurebeshAF-Canon.otf"] };
@@ -41,8 +42,9 @@ const FACES = {
   plex36r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 36, chars: BIG },
   plex50r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 50, chars: BIG },
   af20: { ...AF, metrics: AF.files[0], weight: 400, size: 20, chars: UPPER },
+  af36: { ...AF, metrics: AF.files[0], weight: 400, size: 36, chars: DIGITS },
   af44: { ...AF, metrics: AF.files[0], weight: 400, size: 44, chars: UPPER },
-  af50: { ...AF, metrics: AF.files[0], weight: 400, size: 50, chars: UPPER },
+  af50: { ...AF, metrics: AF.files[0], weight: 400, size: 50, chars: UPPER + DIGITS },
   af60: { ...AF, metrics: AF.files[0], weight: 400, size: 60, chars: UPPER },
   af72: { ...AF, metrics: AF.files[0], weight: 400, size: 72, chars: UPPER },
   af88: { ...AF, metrics: AF.files[0], weight: 400, size: 88, chars: UPPER },

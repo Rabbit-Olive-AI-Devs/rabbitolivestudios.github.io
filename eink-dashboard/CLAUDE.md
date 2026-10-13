@@ -354,7 +354,7 @@ eink-dashboard/
       parts.ts            — pieces of the HUD look: brackets, ruler, hatch, dot grid, "+" marks; all bounded by the canvas
       page.ts             — canvas → 1-bit PNG → one-request HTML page; a draw failure becomes the text page
       test-card.ts        — the calibration card drawn at /desk/test
-      aurebesh.ts         — the 26-letter check sheet
+      aurebesh.ts         — the check sheet: 26 letters + 10 numerals
       aurebesh-words.ts   — word list, themes, letter names, date-to-word picker, ?word=/?date= cleaning
       aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
     pages/

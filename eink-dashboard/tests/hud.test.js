@@ -87,7 +87,7 @@ test("every generated face carries the characters the pages need", () => {
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   for (const [key, face] of Object.entries(FACES)) {
     assert.ok(face.height > 0 && face.baseline > 0 && face.baseline <= face.height, key);
-    for (const ch of upper) assert.ok(face.glyphs[ch], `${key} lacks ${ch}`);
+    if (key !== "af36") for (const ch of upper) assert.ok(face.glyphs[ch], `${key} lacks ${ch}`); // af36 is numerals only
     if (key.startsWith("plex")) for (const ch of "0123456789/.:- ") assert.ok(face.glyphs[ch], `${key} lacks "${ch}"`);
     for (const g of Object.values(face.glyphs)) {
       assert.equal(Buffer.from(g.d, "base64").length, Math.ceil((g.a * face.height) / 8), `${key} bitmap size`);
@@ -100,7 +100,7 @@ test("measureType adds advances and spacing, and ignores characters with no glyp
   assert.equal(ty.measureType("plex11m", "AB"), a * 2, "Plex Mono is monospaced");
   assert.equal(ty.measureType("plex11m", "ABC", 2), a * 3 + 4);
   assert.equal(ty.measureType("plex11m", ""), 0);
-  assert.equal(ty.measureType("af50", "Aé1"), FACES.af50.glyphs.A.a, "no glyph, no width");
+  assert.equal(ty.measureType("af50", "Aé!"), FACES.af50.glyphs.A.a, "no glyph, no width");
   assert.ok(ty.measureType("af50", "I") < ty.measureType("af50", "A"), "Aurebesh AF is proportional");
 });
 
@@ -131,7 +131,7 @@ test("drawType clips at the canvas edge and skips unknown characters", () => {
   assert.doesNotThrow(() => ty.drawType(c, "af112", -30, 15, "WWWW"));
   assert.doesNotThrow(() => ty.drawType(c, "plex11m", 5, 9999, "OFF"));
   const d = cv.createCanvas(100, 40);
-  ty.drawType(d, "af50", 10, 35, "é\u{1F680}5");
+  ty.drawType(d, "af50", 10, 35, "é\u{1F680}!");
   assert.equal(cv.countBlack(d), 0);
 });
 
@@ -379,4 +379,23 @@ test("consecutive days do not walk the themed word list in order", () => {
   const year = new Set();
   for (let d = 0; d < n; d++) year.add(words.pickWord(new Date(Date.UTC(2026, 0, 1 + d)).toISOString().slice(0, 10)));
   assert.equal(year.size, n, "every word still appears once per cycle");
+});
+
+test("Aurebesh numerals exist at the sizes the pages draw them", () => {
+  for (const key of ["af36", "af50"]) {
+    for (const d of "0123456789") assert.ok(FACES[key].glyphs[d], `${key} lacks the numeral ${d}`);
+  }
+  const shapes = new Set([..."0123456789"].map((d) => FACES.af50.glyphs[d].d));
+  assert.equal(shapes.size, 10, "ten different numerals");
+  assert.notEqual(FACES.af50.glyphs["1"].d, FACES.af50.glyphs.I.d, "the numeral 1 is not the letter Isk");
+});
+
+test("the cycle card writes the word's number in Aurebesh numerals", () => {
+  const page52 = ap.drawAurebeshPage("MANDALORE", "2026-10-12"); // word 52 of 120
+  const expected = cv.createCanvas();
+  ty.drawType(expected, "af36", 628, 410, "52");
+  assert.ok(cv.countBlack(expected) > 200, "the numerals have real ink");
+  for (let i = 0; i < expected.px.length; i++) {
+    if (expected.px[i] === 0) assert.equal(page52.px[i], 0, `Aurebesh 52 missing at pixel ${i % 800},${Math.floor(i / 800)}`);
+  }
 });

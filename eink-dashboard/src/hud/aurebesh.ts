@@ -1,6 +1,7 @@
 /**
- * The 26-letter Aurebesh check sheet (/desk/aurebesh?sheet): every letter in
- * Aurebesh AF with its Latin letter and name, for comparing against a chart.
+ * The Aurebesh check sheet (/desk/aurebesh?sheet): all 26 letters and the ten
+ * numerals in Aurebesh AF, each with its Latin character, for comparing against
+ * a chart.
  *
  * The 26 single letters only; the digraph letters (CH, SH, TH and others) are
  * dated and left out. The glyphs come from Aurebesh AF by AurekFonts, released
@@ -19,17 +20,19 @@ export function drawAurebeshSheet(): Canvas {
   const c = createCanvas();
   topBar(c, ["Desk", "Aurebesh", "Check sheet"], ["AUREBESH AF", "CANON"], `${WORDS.length} WORDS`);
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const cols = 9;
-  const cellW = 84;
-  const cellH = 138;
+  const rowH = 104;
+  /** One cell: the Aurebesh glyph over a rule, its Latin character, and an optional name. */
+  const cell = (cx: number, y: number, ch: string, name?: string) => {
+    drawType(c, "af50", cx, y + 40, ch, { align: "center" });
+    hline(c, cx - 28, y + 50, 57);
+    drawType(c, "plex15s", cx, y + 70, ch, { align: "center" });
+    if (name) drawType(c, "plex10s", cx, y + 85, name, { align: "center", spacing: 1 });
+  };
   for (let i = 0; i < letters.length; i++) {
-    const cx = 64 + (i % cols) * cellW;
-    const y = 60 + Math.floor(i / cols) * cellH;
-    drawType(c, "af50", cx, y + 52, letters[i], { align: "center" });
-    hline(c, cx - 30, y + 66, 61);
-    drawType(c, "plex15s", cx, y + 88, letters[i], { align: "center" });
-    drawType(c, "plex10s", cx, y + 106, LETTER_NAMES[letters[i]], { align: "center", spacing: 1 });
+    cell(64 + (i % 9) * 84, 50 + Math.floor(i / 9) * rowH, letters[i], LETTER_NAMES[letters[i]]);
   }
-  for (const [x, y] of [[20, 52], [780, 52], [20, 466], [780, 466]]) plus(c, x, y);
+  const digits = "0123456789";
+  for (let i = 0; i < digits.length; i++) cell(58 + i * 76, 50 + 3 * rowH, digits[i]);
+  for (const [x, y] of [[20, 48], [780, 48], [20, 468], [780, 468]]) plus(c, x, y);
   return c;
 }

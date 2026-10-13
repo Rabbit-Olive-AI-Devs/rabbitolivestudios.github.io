@@ -118,10 +118,13 @@ export function drawAurebeshPage(word: string, dateStr: string): Canvas {
   label(c, 628, 362, "CYCLE");
   strokeRect(c, 738, 350, 45, 17);
   drawType(c, "plex10s", 760, 362, "DAILY", { align: "center" });
-  const big = index < 0 ? "--" : String(index + 1);
-  const bigW = drawType(c, "plex36r", 628, 410, big);
-  drawType(c, "plex11m", 628 + bigW + 8, 396, `/${WORDS.length}`);
-  label(c, 628 + bigW + 8, 410, "WORDS");
+  // the word's number in Aurebesh numerals, with the same number in Latin beside it
+  const number = index < 0 ? "--" : String(index + 1);
+  const numberW = index < 0 ? 0 : drawType(c, "af36", 628, 410, number);
+  const latinX = 628 + numberW + (numberW > 0 ? 10 : 0);
+  drawType(c, "plex15s", latinX, 394, number);
+  drawType(c, "plex11m", latinX + measureType("plex15s", number) + 3, 394, `/${WORDS.length}`);
+  label(c, latinX, 410, "WORDS");
   // word lengths for the ten days before today and the nineteen after; today is the wide bar
   for (let i = 0; i < 30; i++) {
     const h = pickWord(shiftDateStr(dateStr, i - 10)).length * 3;

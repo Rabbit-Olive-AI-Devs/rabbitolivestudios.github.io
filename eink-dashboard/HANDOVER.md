@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-12 · **Describes:** v3.17.0 (code as of `660ae02`), which is what production runs.
+**Last verified:** 2026-10-12 · **Describes:** v3.17.1 (code as of `29c0f6e` plus the Aurebesh numerals commit that follows it), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -233,7 +233,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 147 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 149 tests at v3.17.1
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
