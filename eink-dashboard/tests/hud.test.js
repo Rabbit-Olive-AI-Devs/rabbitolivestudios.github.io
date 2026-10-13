@@ -257,3 +257,42 @@ test("/desk/test serves the card as an inlined page", async () => {
   assert.equal(res.status, 200);
   assert.equal(pngHeader(inlinedPng(await res.text())).h, 480);
 });
+const aur = fromBuild("src/hud/aurebesh.js");
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+test("AUREBESH has exactly A-Z, each with real strokes inside the grid", () => {
+  assert.deepEqual(Object.keys(aur.AUREBESH.glyphs).sort(), LETTERS);
+  for (const ch of LETTERS) {
+    const polys = st.parseGlyph(aur.AUREBESH.glyphs[ch]);
+    const points = polys.flat();
+    assert.ok(points.length >= 3, `${ch} needs at least three points`);
+    for (const [x, y] of points) {
+      assert.ok(Number.isFinite(x) && x >= 0 && x <= aur.AUREBESH.w, `${ch} x=${x}`);
+      assert.ok(Number.isFinite(y) && y >= 0 && y <= aur.AUREBESH.h, `${ch} y=${y}`);
+    }
+  }
+});
+
+test("no two Aurebesh letters render identically", () => {
+  const seen = new Map();
+  for (const ch of LETTERS) {
+    const c = cv.createCanvas(80, 80);
+    st.drawStrokeText(c, aur.AUREBESH, 8, 8, ch, 10, 2);
+    const key = Buffer.from(c.px).toString("base64");
+    assert.ok(!seen.has(key), `${ch} looks the same as ${seen.get(key)}`);
+    seen.set(key, ch);
+  }
+});
+
+test("the check sheet shows all 26 letters on one panel", () => {
+  const c = aur.drawAurebeshSheet();
+  assert.equal(c.w, 800);
+  assert.equal(c.h, 480);
+  assert.ok(cv.countBlack(c) > 3000);
+});
+
+test("/desk/aurebesh?sheet serves the check sheet", async () => {
+  const res = await desk.handleDeskAurebesh(new URL("https://x/desk/aurebesh?sheet"));
+  assert.equal(res.status, 200);
+  assert.equal(pngHeader(inlinedPng(await res.text())).w, 800);
+});

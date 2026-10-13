@@ -9,7 +9,7 @@ import { handleColorWeatherPage } from "./pages/color-weather";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
-import { handleDeskTest } from "./pages/desk";
+import { handleDeskTest, handleDeskAurebesh } from "./pages/desk";
 import { getBirthdayToday, getBirthdayByKey } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
 import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID } from "./device";
@@ -1275,6 +1275,8 @@ export default {
       }
       case "/desk/test":
         return handleDeskTest();
+      case "/desk/aurebesh":
+        return handleDeskAurebesh(url);
       case "/health":
         return handleHealth();
       case "/health-detailed":
@@ -1286,7 +1288,7 @@ export default {
             endpoints: [
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
-              "/skyline", "/skyline-bw", "/skyline.png", "/desk/test",
+              "/skyline", "/skyline-bw", "/skyline.png", "/desk/test", "/desk/aurebesh",
               "/test-birthday.png", "/health", "/health-detailed",
             ],
           },
