@@ -245,3 +245,21 @@ test("/desk/planet serves one inlined page and survives a dead archive", async (
   assert.match(html, /src="data:image\/png;base64,/);
   assert.doesNotMatch(html, /<script/i);
 });
+
+test("the daily pick walks the whole archive: no planet repeats for years", () => {
+  const total = 6024;
+  const seen = new Set();
+  for (let d = 0; d < 365 * 5; d++) {
+    const date = new Date(Date.UTC(2026, 9, 13 + d)).toISOString().slice(0, 10);
+    const i = pl.pickIndex(date, total);
+    assert.ok(Number.isInteger(i) && i >= 0 && i < total, `${date} -> ${i}`);
+    assert.ok(!seen.has(i), `${date} repeats a planet already shown`);
+    seen.add(i);
+  }
+  assert.notEqual(pl.pickIndex("2026-10-13", total), pl.pickIndex("2027-10-13", total), "a year later it is a different planet");
+  for (const awkward of [1, 2, 7919, 7919 * 2]) {
+    const s = new Set();
+    for (let d = 0; d < Math.min(awkward, 400); d++) s.add(pl.pickIndex(new Date(Date.UTC(2026, 0, 1 + d)).toISOString().slice(0, 10), awkward));
+    assert.equal(s.size, Math.min(awkward, 400), `list of ${awkward}: every day a different planet`);
+  }
+});

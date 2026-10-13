@@ -125,6 +125,24 @@ function hash(s: string): number {
   return h;
 }
 
+/**
+ * Which planet of the list a date shows. It steps through the list by a fixed
+ * stride, so every planet is shown once before any comes back: with about
+ * 6,000 planets that is more than sixteen years. (A plain hash of the date
+ * would repeat about eleven planets within a single year.) The stride is a
+ * prime; when the list length happens to be a multiple of it, stepping by one
+ * more keeps the walk complete.
+ */
+export function pickIndex(dateStr: string, total: number): number {
+  if (total <= 0) return 0;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dayNumber = Math.round(Date.UTC(y, m - 1, d) / 86400000);
+  let stride = 7919 % total;
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  while (stride === 0 || gcd(stride, total) !== 1) stride = (stride + 1) % total || 1;
+  return (((dayNumber % total) * stride) % total + total) % total;
+}
+
 // --- Days and planets that get something extra -----------------------------------
 
 /** A reason to show a particular planet, or a planet from a particular year, with a tag. */
@@ -177,7 +195,8 @@ export function planetOccasion(dateStr: string): PlanetOccasion | null {
 
 /**
  * Ask the archive for the date's planet. Returns null on any failure; never
- * throws. The same date always picks the same planet.
+ * throws. The same date always picks the same planet (while the archive's list
+ * is unchanged; a new discovery shifts the walk, which is harmless).
  */
 export async function loadPlanet(
   dateStr: string, query: ArchiveQuery = queryArchive, occasion: PlanetOccasion | null = planetOccasion(dateStr),
@@ -188,7 +207,7 @@ export async function loadPlanet(
 
     let name = occasion?.name;
     if (!name && occasion?.year) name = str(rows(await query(yearQuery(occasion.year)))[0]?.pl_name) || undefined;
-    if (!name) name = names[hash(dateStr) % names.length];
+    if (!name) name = names[pickIndex(dateStr, names.length)];
 
     const planet = toPlanet(rows(await query(planetQuery(name)))[0]);
     if (!planet) return null;

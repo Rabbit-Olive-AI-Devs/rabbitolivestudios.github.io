@@ -2750,7 +2750,7 @@ guessed. The unusual names are the entries most likely to need correcting.
 
 ---
 
-## 68. Planet of the Day: Real Archive Data, Drawn From That Data (2026-10-12)
+## 68. Planet of the Day: Real Archive Data, Drawn From That Data (v3.18.0, 2026-10-12)
 
 ### What it is
 
@@ -2783,8 +2783,11 @@ is invented in the data columns.
 
 Table Access Protocol at `exoplanetarchive.ipac.caltech.edu/TAP/sync`, no key, table
 `pscomppars`. The archive's SQL has no `OFFSET`, so picking "the Nth planet" takes two steps:
-fetch the list of usable names (about 6,000, 170 KB), choose one by a hash of the date, then
-fetch that planet's row. Two more small queries give discoveries per year and the planet's
+fetch the list of usable names (about 6,000, 170 KB), choose one from the date, then fetch that
+planet's row. The choice steps through the list by a prime stride (`pickIndex`), so every planet
+is shown once before any repeats, more than sixteen years' worth; the owner asked whether the
+page would cycle through the same 365, and a plain hash of the date would in fact have repeated
+about eleven planets a year. Two more small queries give discoveries per year and the planet's
 siblings, which places it among its star's planets. About 3.5 seconds in all, once a day.
 
 `sy_dist` is in parsecs and is converted to light years. Right ascension and declination are kept
@@ -2811,7 +2814,7 @@ desk ornament and would not be for the image routes.
 
 ### Verified
 
-- `npm run typecheck`, `npm run test:utils` (178 tests) and `npm run dry-run` pass. The planet
+- `npm run typecheck`, `npm run test:utils` (179 tests) and `npm run dry-run` pass. The planet
   tests use a stand-in for the archive and cover: row parsing with missing fields, safe quoting,
   the same date picking the same planet, a cached day making no request, one write on a cold day,
   serve-older-and-refresh, the built-in fallback writing nothing, `?date=` writing nothing, class
