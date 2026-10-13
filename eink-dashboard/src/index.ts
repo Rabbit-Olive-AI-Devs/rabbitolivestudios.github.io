@@ -9,7 +9,7 @@ import { handleColorWeatherPage } from "./pages/color-weather";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
-import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet } from "./pages/desk";
+import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport } from "./pages/desk";
 import { getPlanetOfDay } from "./planet";
 import { getBirthdayToday, getBirthdayByKey } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
@@ -1284,6 +1284,8 @@ export default {
         return handleDeskAurebesh(url);
       case "/desk/planet":
         return handleDeskPlanet(env, url, ctx);
+      case "/desk/tars":
+        return request.method === "POST" ? handleDeskTarsReport(request, env) : handleDeskTars(env, url);
       case "/health":
         return handleHealth();
       case "/health-detailed":

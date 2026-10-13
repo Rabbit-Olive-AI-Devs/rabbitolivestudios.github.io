@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 68 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 69 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -66,6 +66,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/color/headlines` | E1002 | Steel/trade headlines, ranked without an LLM |
 | `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
 | `/desk/planet` | Desk E1001 | Planet of the day from NASA's Exoplanet Archive, drawn from its data; `?date=` (#68) |
+| `/desk/tars` | Desk E1001 | TARS: the owner's Macs and AI allowances. `GET ?key=` shows the page, `POST` with a bearer key takes a report from a Mac (#69) |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
 | `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
@@ -86,6 +87,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `env.PHOTOS` | R2 bucket `eink-birthday-photos` | `portraits/` (birthday references), `skylines/` (city references) |
 | `env.SEND_EMAIL` | Email Routing | Failure-alert email |
 | `TEST_AUTH_KEY`, `ALERT_TO`, `ALERT_FROM` | Secrets | Test-route auth; alert addresses (secrets because the repo is public) |
+| `TARS_KEY` | Secret | Lets the owner's Macs post to `/desk/tars` and unlocks that page |
 | `FOOTBALL_DATA_KEY` | Secret | Only for the retired World Cup code |
 
 **Cron triggers** (`wrangler.toml`), all in UTC:
@@ -128,6 +130,7 @@ Dates in cache keys are **America/Chicago** dates. Cache versions live in `src/c
 | Weather | `weather:{zip}:v2` | 15 min | 86400 |
 | Alerts, device telemetry | `alerts:{zip}:v1`, `device:{id}:v1` | 5 min | 86400 |
 | Desk planet | `planet:v1:DATE` | 24h | 604800 (7 days) |
+| Desk TARS | `tars:v1:state` (one document, rewritten by each Mac's report) | 75 min per machine, 3 h per provider | 604800 (7 days) |
 | Guards and bookkeeping | `ai-budget:v1:block`, `gen-lock:v1:*`, `stale-idx:v1:<prefix>`, `alert:v1:last`, `nws-points:{zip}` | — | varies |
 
 Rules:
@@ -144,7 +147,7 @@ Everything here runs inside hard free-tier limits. Cost any change against them 
 | Budget | Limit | Normal use | Notes |
 |---|---|---|---|
 | Workers AI neurons | 10,000/day, resets 00:00 UTC | ~5,500 | FLUX.2 klein-9b costs ~1,364 per image and is essentially the whole bill. Both panels share one account-wide pool: either can blank the other. |
-| KV writes | 1,000/day | ~590 | The tightest budget. Mostly weather/alerts/device caches refreshed by two panels polling every 15 minutes. About 400 spare (#62). |
+| KV writes | 1,000/day | ~590, plus ~96 once both Macs report to TARS | The tightest budget. Mostly weather/alerts/device caches refreshed by two panels polling every 15 minutes. About 400 spare (#62). |
 | KV lists | 1,000/day | 0 on a healthy day | Only the stale fallback lists, and its listings are memoised for 6h. |
 | Cron triggers | 5 per account, shared by six Workers | 2 used here | A deploy that exceeds it fails with `code: 10072` but **still uploads the Worker** on the old schedule. |
 
@@ -236,7 +239,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 179 tests at v3.18.0
+npm run test:utils        # compiles to /tmp, runs node --test; 194 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -314,7 +317,8 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 - **Built and deployed:** the drawing kit in `src/hud/` (#66), real fonts pre-rendered to 1-bit glyphs (#67), the Aurebesh word of the day with pronunciation, numerals, birthdays and special days (#67 and its follow-ups), and the planet of the day from NASA's Exoplanet Archive (#68).
 - **To check first next session:** (1) that the six-hourly cron warmed the next day's planet in production: `npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "planet:v1:"` should list today and tomorrow (Chicago dates); (2) whether the owner added `/desk/planet` to the panel's pagelist, and how it looks there.
-- **Still to build, in this order, each with a mockup shown to the owner before any code:** a TARS dashboard for the owner's two Macs and AI subscription quotas, then a Flamengo board. What is already known about their data sources is in section 4 and section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`.
+- **TARS (#69) is built** (2026-10-13): the Worker side, the page, and `scripts/tars-report.sh` for the Macs. Check `/health` and DECISIONS #69's "Not yet verified" for whether it is deployed and whether both Macs are reporting.
+- **Still to build, with a mockup shown to the owner before any code:** a Flamengo board. A self-playing adventure page was also saved as an idea for later. What is already known about their data sources is in section 4 and section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`.
 - **How this work went, so it is not repeated:** the first version used drawn lettering and was rejected on sight; a written spec and plan had not caught it, and three rounds of pictures did. For this owner, on this panel: **show a mockup first, use real fonts, never go below 11px medium.**
 - **Surprises:** the Aurebesh page and the planet page each carry a few date-based and data-based easter eggs the owner asked to be kept as surprises. They are in the code (`SPECIAL_DAYS` in `src/hud/aurebesh-words.ts`; `NICKNAMES` and `DATE_PLANETS` in `src/planet.ts`). Do not list them back to the owner.
 - **Not done:** the planet page and the real-font rebuild had no independent code review (the first version did). The pronunciations are hand-written; only seven were confirmed against Wookieepedia. The panel's SenseCraft device ID is not in the repo, and no telemetry is fetched for it.

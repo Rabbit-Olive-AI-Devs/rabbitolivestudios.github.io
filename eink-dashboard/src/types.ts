@@ -11,6 +11,9 @@ export interface Env {
   SEND_EMAIL?: SendEmail;
   ALERT_TO?: string;
   ALERT_FROM?: string;
+  // Desk panel TARS page (DECISIONS #69): one secret both lets the owner's Macs post
+  // their reports and unlocks the page, which shows plans and spend.
+  TARS_KEY?: string;
 }
 
 // --- Moment Before types ---

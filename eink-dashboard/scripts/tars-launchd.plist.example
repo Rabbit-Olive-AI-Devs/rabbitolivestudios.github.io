@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs the TARS reporter every 30 minutes for the logged-in user (DECISIONS #69).
+
+  1. Copy scripts/tars-report.sh to ~/Library/Application Support/eink-tars/tars-report.sh
+  2. Copy this file to ~/Library/LaunchAgents/com.eink.tars-report.plist and replace
+     HOME_DIR, MACHINE_ID (mini, macbook, ...) and MACHINE_NAME ("Mac mini", ...)
+  3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eink.tars-report.plist
+
+  Stop it with: launchctl bootout gui/$(id -u)/com.eink.tars-report
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.eink.tars-report</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>HOME_DIR/Library/Application Support/eink-tars/tars-report.sh</string>
+    <string>MACHINE_ID</string>
+    <string>MACHINE_NAME</string>
+  </array>
+  <key>StartInterval</key><integer>1800</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/tmp/eink-tars-report.log</string>
+  <key>StandardErrorPath</key><string>/tmp/eink-tars-report.log</string>
+</dict>
+</plist>

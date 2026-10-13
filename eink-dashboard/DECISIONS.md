@@ -2826,3 +2826,82 @@ desk ornament and would not be for the image routes.
 ### Not yet verified
 
 Not seen on the panel. The cron warm has not run in production yet.
+
+---
+
+## 69. TARS: The Macs Report In, the Worker Only Listens (2026-10-13)
+
+### What it is
+
+The third desk panel page, `/desk/tars`: the owner's two Macs (free disk, memory, uptime or when
+last seen) and their AI subscription allowances (session and weekly use per provider, time to the
+next refill), with a short dry summary line. Named for the robot in Interstellar. The owner
+approved the layout from a mockup ("the layout is perfect").
+
+### The shape of the problem
+
+A Worker cannot see a Mac, and AI allowances are not available from any one API. Both come from
+the machines themselves:
+
+- AI usage comes from **CodexBar** (github.com/steipete/CodexBar), which the owner already runs.
+  `codexbar dashboard --identity redacted` prints one JSON snapshot, headless, in about twelve
+  seconds: per provider a plan, usage windows with `usedPercent` and `resetAt`, and an estimated
+  30-day spend.
+- Each Mac runs `scripts/tars-report.sh` every 30 minutes under launchd. It reads disk, memory and
+  boot time, attaches the snapshot if CodexBar is installed, and POSTs it to `/desk/tars`.
+
+### Decisions
+
+- **One KV document, `tars:v1:state`, one write per report** (#62). Two Macs at 30 minutes is
+  about 96 writes a day. A machine that reports again within five minutes is answered `too-soon`
+  and nothing is written, so a reporter stuck in a loop cannot spend the write budget.
+- **The newest good reading wins, per provider, whichever Mac sent it.** One Mac is always on and
+  the other sleeps by day; allowances belong to accounts, not machines, so either can supply them.
+  A provider that errors keeps its last good reading; after three hours without one its row shows
+  `NO DATA` and when it last worked. A provider that has never answered still gets a row
+  (`NEVER READ`): the first live test showed Cursor simply vanishing, which hid the fault.
+- **A machine that misses two reports is shown `ASLEEP`** with the time it was last seen. That is
+  information, not an error, and it raises no alert.
+- **Nothing in a report is trusted.** Every number is bounded, every label is cut down to a short
+  run of capitals, ids must match `[a-z0-9-]{1,16}`, lists are capped, bodies over 64 KB are
+  refused. Account emails are dropped even though CodexBar has already redacted them.
+- **One secret, `TARS_KEY`,** is the bearer token for reports and the `?key=` that unlocks the
+  page, which shows plans and spend. A wrong or missing key gets a 404, as with `TEST_AUTH_KEY`.
+  With no key configured nobody can post, and the page is open for local development. One key
+  rather than two because the stakes are a status page; a leaked view key could post fake numbers.
+- **The key lives in the login Keychain on each Mac**, not in a file, and is never in the repo.
+- **Spend** is CodexBar's estimate at list prices, not a bill. Codex and Claude are estimated from
+  each machine's local logs, so the machines are added together; anything else is counted once.
+- **"TARS says"** is written by rules from the numbers, most pressing first, at most three lines
+  of 31 characters. No AI. A cue light marks a joke, as in the film.
+
+### Not covered by the alert check (#60)
+
+Deliberately. A reporter that dies shows on the page itself as a machine `ASLEEP` and providers
+going to `NO DATA`; an email would add little for a desk display.
+
+### Rejected
+
+- **The Worker polling the Macs.** They are behind NAT and one of them sleeps.
+- **A key in a dotfile.** The Keychain is one command and keeps the secret out of backups and
+  editors.
+- **Cloudflare's own neuron and KV budgets on the page.** Wanted eventually, but it needs an
+  analytics API token as a further secret; left out to keep the first version to one key.
+- **Storing every report for history.** One document is enough for a status page and costs the
+  same single write.
+
+### Verified
+
+- `npm run typecheck`, `npm run test:utils` (194 tests) and `npm run dry-run` pass. The TARS tests
+  cover cleaning hostile reports, per-provider merging, the flood guard, countdown formatting,
+  sleeping machines, stale and never-read providers, alert limits, the summary lines fitting their
+  card, the page when empty, normal and crowded, and the key on both routes.
+- End to end on the Mac mini against a local Worker: the real reporter posted real CodexBar data,
+  got `stored`, got `too-soon` on an immediate second run, and the page rendered it. That run
+  found two bugs, both now tested: the boot time was parsed from the microseconds field (uptime
+  showed ten years), and a provider that had never answered was missing from the table.
+
+### Not yet verified
+
+Not deployed. The reporter has not run under launchd, and nothing has come from the MacBook.
+Whether a locked (not sleeping) Mac still reports is still to be observed.

@@ -118,6 +118,10 @@ curl http://localhost:8790/desk/test
 curl "http://localhost:8790/desk/aurebesh?word=JEDI&date=2026-10-12"
 curl "http://localhost:8790/desk/aurebesh?sheet"
 curl "http://localhost:8790/desk/planet?date=2026-10-20"   # live NASA lookup, no cache write
+# TARS locally: start dev with a throwaway key, then run the real reporter against it
+#   npx wrangler dev --port 8790 --var TARS_KEY:localtestkey
+#   TARS_URL=http://localhost:8790/desk/tars TARS_KEY=localtestkey ./scripts/tars-report.sh mini "Mac mini"
+curl "http://localhost:8790/desk/tars?key=localtestkey"
 ```
 
 Always build before committing. Do not commit code that doesn't compile.
@@ -316,6 +320,7 @@ eink-dashboard/
     convert-1bit.ts       — 1-bit conversion engine (Bayer + threshold)
     styles-1bit.ts        — Pipeline B style table, picker, hash
     birthday.ts           — Birthday data + detection
+    tars.ts               — Desk panel TARS: cleans and merges the Macs' reports into KV `tars:v1:state`, builds the page's view (DECISIONS #69)
     planet.ts             — Desk panel planet of the day: NASA Exoplanet Archive queries + daily KV cache `planet:v1:DATE` (DECISIONS #68)
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
     images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)
@@ -362,6 +367,7 @@ eink-dashboard/
       aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
       planet-draw.ts      — draws a planet from its data: class, surface, lighting, name-seeded pattern (DECISIONS #68)
       planet-page.ts      — layout of the planet-of-the-day page + number formatting
+      tars-page.ts        — layout of the TARS page (machines, quota table, cards)
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)
       fact.ts             — /fact HTML wrapper for fact.png (falls back to a text page)
@@ -374,7 +380,7 @@ eink-dashboard/
       color-moment.ts     — /color/moment + color birthday + test endpoints
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
-      desk.ts             — /desk/test, /desk/aurebesh, /desk/planet handlers; picks the day's occasion (birthday, special day) (DECISIONS #66–#68)
+      desk.ts             — /desk/test, /desk/aurebesh, /desk/planet, /desk/tars (view + report) handlers (DECISIONS #66–#69)
   photos/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)
@@ -382,6 +388,8 @@ eink-dashboard/
     upload-photos.sh      — Upload birthday photos to R2
     download-skyline-photos.sh — Download skyline photos from Unsplash
     upload-skyline-photos.sh   — Upload skyline photos to R2
+    tars-report.sh             — Runs on each Mac every 30 min (launchd): posts disk/memory/uptime + CodexBar snapshot to /desk/tars; key from the Keychain (DECISIONS #69)
+    tars-launchd.plist.example — launchd template for the reporter
     generate-desk-fonts.mjs    — Offline: rasterise fonts/desk/ into src/hud/fonts-data.ts (`npm run desk-fonts`, DECISIONS #67)
   fonts/
     desk/                 — Source fonts for the desk panel + licences (IBM Plex Mono OFL, Aurebesh AF CC0); not shipped

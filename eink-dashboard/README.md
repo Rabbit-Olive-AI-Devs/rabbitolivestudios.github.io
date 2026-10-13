@@ -53,6 +53,8 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /desk/aurebesh?date=YYYY-MM-DD&word=HELLO` | Free test overrides. Unusable input falls back to today and the daily word | none |
 | `GET /desk/aurebesh?sheet` | All 26 Aurebesh letters with their names, and the ten Aurebesh numerals, for checking against a chart | none |
 | `GET /desk/planet` | 800x480 planet of the day: a real exoplanet from NASA's Exoplanet Archive, drawn in dots from its own data (size, temperature, number of suns), with distance, discovery, its place in its system, scale against Earth, and sky coordinates. `?date=YYYY-MM-DD` previews another day (DECISIONS #68) | 24 hours (KV) |
+| `GET /desk/tars?key=KEY` | 800x480 TARS dashboard: the owner's Macs (disk, memory, uptime or last seen) and AI subscription allowances from CodexBar (session and weekly use, time to refill), with a short summary line. Needs the `TARS_KEY` secret as `?key=`; anything else gets a 404 (DECISIONS #69) | none |
+| `POST /desk/tars` | A report from one of the Macs (`scripts/tars-report.sh`), with `Authorization: Bearer TARS_KEY`. One KV write per report; a repeat within five minutes is ignored | none |
 | `GET /desk/test` | Calibration card: every text size from 10px up, large type, Aurebesh sizes, rules, dots and hatch, for judging on the real panel | none |
 | **Maintenance** | | |
 | `GET /clean` | 800x480 solid-color screen cleaner for clearing e-ink ghosting/retention. Auto-rotates through all 6 Spectra-6 pigments + black/white flushes across fetches (point the device at it with a short refresh interval). Works on both E1001 and E1002. | none (`no-store`) |
@@ -365,6 +367,7 @@ The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `
 | `env.SEND_EMAIL` | Email Routing | Sends failure-alert email via Cloudflare Email Routing (DECISIONS #60) |
 | `env.TEST_AUTH_KEY` | Secret | Auth key for expensive test endpoints (optional, open in dev) |
 | `env.ALERT_TO` / `env.ALERT_FROM` | Secrets | Alert destination + sending identity (secrets, not vars — this repo is public) |
+| `env.TARS_KEY` | Secret | Lets the owner's Macs post reports to `/desk/tars` and unlocks that page (DECISIONS #69) |
 | `env.FOOTBALL_DATA_KEY` | Secret | football-data.org API key for the World Cup dashboard (optional; falls back to openfootball JSON when absent) |
 
 > **Note**: The `APOD_API_KEY` secret was removed in v3.10.1. NASA APOD has been replaced by the World Skyline Series. The Cloudflare secret can be deleted: `npx wrangler secret delete APOD_API_KEY`.
