@@ -1,7 +1,7 @@
 # Desk Panel (third display) — Design
 
 **Date:** 2026-10-12
-**Status:** Approved by the owner on 2026-10-12, including the proposals in sections 5–8. Nothing here is built yet.
+**Status:** Approved by the owner on 2026-10-12. **Steps 1 and 2 are built (v3.17.0, DECISIONS #66)**; the on-panel check of the calibration card is still to come. Steps 3 to 5 are not started.
 **Plan for steps 1 and 2:** `docs/superpowers/plans/2026-10-12-desk-panel-style-kit-and-aurebesh.md`
 
 ## 1. What this is
@@ -165,7 +165,10 @@ other no-AI test parameters.
 
 ## 9. Still open
 
-- Font choice and line weights: decided from the calibration card.
+- Font choice and line weights: decided from the calibration card. As built, small labels use the
+  8x8 bitmap font and large type uses stroke fonts; the Aurebesh font turned out to need a 6x4
+  proportional cell. Final sizes wait for the owner's photo of `/desk/test`.
+- Flamengo news: the owner's source is `https://ge.globo.com/ESP/0,,4870,00.html`. Not checked.
 - Flamengo data source. The owner's other agent reads **FotMob's public calendar feed** for the
   club (`https://pub.fotmob.com/prod/pub/api/v2/calendar/team/9770.ics`). Checked 2026-10-12: it
   answers without a key, lists about a year of fixtures across Série A and the Copa

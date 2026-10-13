@@ -2505,3 +2505,101 @@ No cache key bump: the PNG pipelines are untouched, and the wrapper was already 
 - `wrangler tail` (4.92) silently stops delivering a few minutes after it attaches while the
   process stays alive. Re-attach in rounds and cross-check against the cache ages in
   `/health-detailed`, which record every render whether or not the tail saw it.
+
+---
+
+## 66. Desk Panel Pages Are Drawn by the Worker as 1-Bit Images (v3.17.0, 2026-10-12)
+
+### Context
+
+A third panel joined the project: a second mono reTerminal E1001 for the home-office desk. Its
+pages share one "targeting HUD" look taken from a concept dashboard the owner liked: corner
+brackets, a crosshair, tick rulers, monospace capitals, big numerals with small unit labels,
+hairline rules, dotted fills. The first two pages are a calibration card (`/desk/test`) and an
+Aurebesh word of the day (`/desk/aurebesh`). Design and plan:
+`docs/superpowers/specs/2026-10-12-desk-panel-design.md`,
+`docs/superpowers/plans/2026-10-12-desk-panel-style-kit-and-aurebesh.md`.
+
+### The problem being avoided
+
+#48 established that SenseCraft renders a page in a cloud browser and quantises it for the mono
+panel, turning every anti-aliased text edge into fog; that no CSS prevents it; that it cannot be
+reproduced in a local browser; and that the only crisp result was an image we had already
+reduced to pure black and white. A style made of hairlines, small capitals and dots is the worst
+case for that fog.
+
+### Decision
+
+**The Worker draws every pixel and serves a pure 1-bit PNG.** `src/hud/` holds a small drawing
+kit with no dependencies:
+
+- `canvas.ts`: an 800x480 buffer (0 = black, 1 = white, as `encodePNG1Bit` expects) with
+  primitives that all clip to the buffer.
+- `stroke.ts`: stroke fonts. A glyph is a set of polylines on a small grid, drawn with the line
+  primitive at any size and thickness. It carries angular Latin capitals and digits, and
+  supports proportional fonts that advance by each glyph's own width.
+- `parts.ts` and `style.ts`: the reusable pieces of the look, and the few sizes that are meant
+  to be tuned from the panel.
+- `page.ts`: encodes the canvas and wraps it in one HTML document with the PNG inlined as a
+  `data:` URI (#65). A draw failure becomes the plain text page (#58), never a 500.
+
+Small labels use the existing 8x8 bitmap font. Large type uses stroke fonts, because numerals
+scaled up from 8x8 look crude.
+
+The pages are pure functions of the Chicago date: **no KV reads or writes, no AI calls, no cron,
+nothing to warm and nothing for the alert check to watch.** A third panel polling them costs
+none of the budgets in #62.
+
+### Aurebesh
+
+The 26 single letters only; the digraph letters (CH, SH, TH and others) are left out. The stroke
+data in `src/hud/aurebesh.ts` was traced for this project against a public reference chart on
+Wikimedia Commons and compared with it letter by letter on a rendered sheet
+(`/desk/aurebesh?sheet`). No font file and no film artwork is in the repository. The letterforms
+originate from Star Wars; the use is personal and non-commercial.
+
+Two things were only visible once the page was rendered. The letters are wider than tall and
+vary from about half to one and a half times as wide as they are high, so a fixed cell left a
+narrow letter stranded in a gap: the font is proportional, in a 6x4 cell. And thin strokes
+looked weak, so the word is drawn at 40% of the cell, close to the weight of the real
+letterforms.
+
+The word comes from a curated English list (A–Z only, 3 to 9 letters); the day of the year picks
+it and the year offsets the cycle. `?date=` and `?word=` are free test parameters: unusable input
+falls back to today and to the daily word.
+
+### Rejected
+
+- **Live HTML/SVG like `/weather`.** Fastest to write and the finest typography, but the fog
+  risk is highest for exactly this style and shows only on the device.
+- **Screenshot through Cloudflare Browser Rendering, then threshold** (the World Cup route).
+  Proven, but the `[browser]` binding was removed at retirement (#61) and it is a heavy
+  dependency for pages that are mostly lines and dots.
+- **A second, taller bitmap font.** A stroke engine was needed for Aurebesh anyway and scales
+  to any size.
+- **TRMNL firmware and its Claude connector.** It runs on the E1001, but needs a US$50
+  per-device licence that was listed as sold out, and gives less control over the exact look.
+- **Custom firmware.** The only way to use the buzzer and buttons, and far more work.
+
+### Verified
+
+- `npm run typecheck`, `npm run test:utils` (112 → 151 tests) and `npm run dry-run` pass. The new
+  tests cover clipping at the canvas edges, glyph coverage, proportional spacing, the PNG header
+  (800x480, 1-bit), the one-request page (inline image, no script, no URL), a draw function that
+  throws, leap day and year-end word picking, and hostile `?word=` and `?date=` values.
+- The card, the Aurebesh page with a short and a long word, and the 26-letter sheet were each
+  rendered to PNG and inspected. `/desk/test` served from `wrangler dev` is a 6 KB document with
+  one inline image.
+
+### Not yet verified
+
+**Nothing here has been seen on the panel.** Whether the 8x8 labels, the stroke weights and the
+dot fills read cleanly on real e-ink is exactly what `/desk/test` exists to answer. The values
+in `src/hud/style.ts` are first guesses until the owner has photographed the card; a follow-up
+note belongs here when that is done.
+
+### What to remember
+
+- **A desk page is drawn with `src/hud/`, never with live HTML text.**
+- Tune sizes in `src/hud/style.ts` and judge them on `/desk/test` on the panel, not in a browser.
+- A page that depends only on the date needs no cache at all.

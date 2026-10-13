@@ -51,6 +51,7 @@ Every session must begin with these steps:
 | Touching the daily cron or `dailyWarmTargetDate` | The warm must fill the **next** Chicago date before it rolls (`35 4,5 * * *`). Warming "right after midnight" reopens the hole that blanked the skyline (DECISIONS #64) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
+| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as a 1-bit image, never with live HTML text. Tune sizes in `src/hud/style.ts` and judge them on `/desk/test` **on the panel**. Keep these pages free of KV, AI and cron (DECISIONS #66) |
 
 ---
 
@@ -62,6 +63,7 @@ Every session must begin with these steps:
 - **Subdirectory**: `eink-dashboard/`
 - **Live URL**: `https://eink-dashboard.thiago-oliveira77.workers.dev`
 - **Displays**: reTerminal E1001 (mono, 7.5" ePaper, 800x480) + reTerminal E1002 (Spectra 6 color, 7.3", 800x480)
+- **Third display (being set up)**: a second reTerminal E1001 (mono) on the home-office desk, showing the `/desk/*` pages (DECISIONS #66)
 - **Device manager**: SenseCraft HMI (Web Function screenshots URLs)
 
 ---
@@ -110,6 +112,11 @@ curl http://localhost:8790/skyline
 curl "http://localhost:8790/alert-test"          # run the failure check
 curl "http://localhost:8790/alert-test?force=1"  # send a test alert email
 curl "http://localhost:8790/skyline-test?date=2026-06-01"
+
+# Test endpoints (desk panel) — free, no auth, no AI
+curl http://localhost:8790/desk/test
+curl "http://localhost:8790/desk/aurebesh?word=JEDI&date=2026-10-12"
+curl "http://localhost:8790/desk/aurebesh?sheet"
 ```
 
 Always build before committing. Do not commit code that doesn't compile.
@@ -339,6 +346,16 @@ eink-dashboard/
     worldcup-fonts.ts     — GENERATED: inlined Inter 500/700 WOFF2 (base64) for the B&W image source
     worldcup-flags.ts     — GENERATED: Spectra-6 dithered country-flag PNGs (color page only; `npm run flags`)
     worldcup-testdata.ts  — canned fixtures for ?test-phase previews
+    hud/                  — Desk panel drawing kit: Worker-drawn 1-bit pages (DECISIONS #66)
+      canvas.ts           — 800x480 1-bit buffer + clipping primitives (line, rect, circle, invert, 8x8 text)
+      stroke.ts           — stroke-font engine (glyphs as polylines, optional proportional spacing) + Latin capitals/digits
+      style.ts            — tunable sizes chosen from the on-panel calibration card
+      parts.ts            — pieces of the HUD look: frame, brackets, crosshair, ruler, hatch, dot fill, title bar, accent block
+      page.ts             — canvas → 1-bit PNG → one-request HTML page; a draw failure becomes the text page
+      test-card.ts        — the calibration card drawn at /desk/test
+      aurebesh.ts         — Aurebesh stroke glyphs (26 letters, our own data) + the check sheet
+      aurebesh-words.ts   — word list, date-to-word picker, ?word=/?date= cleaning
+      aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)
       fact.ts             — /fact HTML wrapper for fact.png (falls back to a text page)
@@ -351,6 +368,7 @@ eink-dashboard/
       color-moment.ts     — /color/moment + color birthday + test endpoints
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
+      desk.ts             — /desk/test + /desk/aurebesh handlers for the desk panel (DECISIONS #66)
   photos/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)

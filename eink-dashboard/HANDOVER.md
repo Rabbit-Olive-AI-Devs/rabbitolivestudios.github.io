@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-02 · **Describes:** v3.16.5 (code as of `07c4427`), which is what production runs.
+**Last verified:** 2026-10-12 · **Describes:** v3.17.0 (code as of `7e8b81a`), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 65 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 66 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -41,6 +41,8 @@ The headline feature is **"Moment Before"**: every day the Worker picks a famous
 
 The exact pagelists live in the SenseCraft HMI web app, not in this repo. The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel.
 
+A **third panel** is being set up: a second E1001 (mono) on the home-office desk, for the `/desk/*` pages. It was not yet paired when this was written, so it has no device ID here and no telemetry is fetched for it.
+
 **The mental model that explains most of this project's rules:** the panel never fetches anything itself. SenseCraft HMI's "Web Function" loads each URL in a **headless Chromium in Seeed's cloud**, screenshots it, quantises the screenshot to the panel's palette, and pushes a finished image to the device. Every page of a pagelist is rendered in one burst about every 15 minutes. Consequences:
 
 - The Worker controls only the HTML/CSS/PNG it returns. It cannot control fonts, anti-aliasing, refresh mode or timing.
@@ -62,6 +64,8 @@ The exact pagelists live in the SenseCraft HMI web app, not in this repo. The ro
 | `/skyline`, `/skyline-bw` | E1002, E1001 | HTML with the daily skyline PNG inlined as a `data:` URI |
 | `/skyline.png` | — | The skyline PNG itself (`?bw=1`, `?mode=daily\|rotate\|random`) |
 | `/color/headlines` | E1002 | Steel/trade headlines, ranked without an LLM |
+| `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
+| `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
 | `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
 | `/weather.json`, `/fact.json`, `/fact-raw.jpg` | — | Data and debug outputs |
@@ -229,7 +233,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 112 tests at v3.16.5
+npm run test:utils        # compiles to /tmp, runs node --test; 151 tests at v3.17.0
 npm run dry-run
 
 # Local dev. Port 8787 is often taken by another daemon; check, then use 8790.
@@ -290,6 +294,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 | Aug 2026 | Two-day outage: the Images binding stopped accepting bytes, every generation was billed and then failed, nothing was cached, and the panels regenerated on every poll (#57–#59) | A call billed before it can fail is a budget hazard; check writes first |
 | Aug 2026 | Alerting added; KV operation budget measured; stale-listing memoised (#60, #62) | Degradation without alerting looks like health; an unmeasured resource is unwatched |
 | Sep 2026 | Alert banner clipped the hourly cards (#63); skyline went white at midnight and then all day (#64, #65) | Banners cost whitespace not content; warm before the date rolls; one request per page |
+| Oct 2026 | Third panel started: a desk E1001 with Worker-drawn HUD pages (#66) | For a mono panel, draw the pixels yourself and the cloud renderer has nothing to blur |
 
 ## 15. Unconfirmed points and open items
 
@@ -301,7 +306,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 **Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.
 
-**Third panel planned (2026-10-12, design stage, nothing built):** the owner has a second, brand-new E1001 for the home-office desk. Four pages were chosen (Aurebesh word of the day, NASA planet of the day, a TARS dashboard for two Macs and AI subscription quotas, a Flamengo board), all in one targeting-HUD style, served by this Worker through SenseCraft like the other panels. The proposal is for the Worker to draw these pages as pure 1-bit PNGs because of the cloud-render fog in #48. Decisions, rejected routes (TRMNL, custom firmware) and the proposed design are in `docs/superpowers/specs/2026-10-12-desk-panel-design.md`. Sections marked as proposals there still need the owner's approval; do not build from them without it. This is separate from the Muse firmware experiment above, which concerns the existing E1001.
+**Third panel, in progress (2026-10-12):** the owner has a second, brand-new E1001 for the home-office desk. Four pages were chosen, all in one targeting-HUD style and drawn by the Worker as 1-bit images (#66). **Built:** the drawing kit in `src/hud/`, the calibration card `/desk/test` and the Aurebesh word of the day `/desk/aurebesh`. **Not yet done:** the owner has to pair the panel in SenseCraft HMI and photograph the calibration card, after which the sizes in `src/hud/style.ts` get settled and a follow-up note goes under #66; nothing has been seen on real e-ink yet. **Still to build, each with its own design first:** NASA planet of the day, a TARS dashboard for two Macs and AI subscription quotas, a Flamengo board. Data sources already checked for those are listed in section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`. This is separate from the Muse firmware experiment above, which concerns the first E1001.
 
 **Open items the owner has not chosen to act on:**
 
@@ -329,5 +334,6 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 | Caching and guards | `src/cache-keys.ts`, `src/cache-guard.ts`, `src/stale-cache.ts`, `src/with-budget.ts` |
 | Alerting | `src/alert.ts` |
 | Shared utilities | `src/date-utils.ts`, `src/fetch-timeout.ts`, `src/images-input.ts`, `src/png.ts`, `src/png-decode.ts`, `src/escape.ts`, `src/response.ts`, `src/validate.ts` |
+| Desk panel | `src/hud/*.ts` (drawing kit, test card, Aurebesh), `src/pages/desk.ts` |
 | Tests | `tests/*.test.js` (pure-function tests run with `node --test`) |
 | Design notes for past features | `docs/superpowers/plans/`, `docs/superpowers/specs/` |
