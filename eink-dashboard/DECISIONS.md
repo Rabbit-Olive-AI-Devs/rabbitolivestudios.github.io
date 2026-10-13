@@ -2730,7 +2730,7 @@ Both are an `Occasion` passed to `drawAurebeshPage`. Still no KV, AI or cron: an
 function of the date. Names are taken from the ASCII `key` field, since Aurebesh has no accents.
 `npm run test:utils` is at 155 tests.
 
-### Follow-up (2026-10-12): seen on the panel, 11M minimum, pronunciation
+### Follow-up (v3.17.3, 2026-10-12): seen on the panel, 11M minimum, pronunciation
 
 **The "not yet verified" item above is closed.** The owner put the page on the desk panel
 ("looks excellent") and, after reading the calibration card, set the smallest text size:
