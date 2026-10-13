@@ -296,3 +296,39 @@ test("/desk/aurebesh?sheet serves the check sheet", async () => {
   assert.equal(res.status, 200);
   assert.equal(pngHeader(inlinedPng(await res.text())).w, 800);
 });
+const words = fromBuild("src/hud/aurebesh-words.js");
+
+test("every word is 3-9 capital letters and the list has no duplicates", () => {
+  assert.ok(words.WORDS.length >= 100);
+  for (const w of words.WORDS) assert.match(w, /^[A-Z]{3,9}$/, w);
+  assert.equal(new Set(words.WORDS).size, words.WORDS.length);
+});
+
+test("dayOfYear handles the ends of the year and leap day", () => {
+  assert.equal(words.dayOfYear("2026-01-01"), 1);
+  assert.equal(words.dayOfYear("2026-12-31"), 365);
+  assert.equal(words.dayOfYear("2028-02-29"), 60);
+  assert.equal(words.dayOfYear("2028-12-31"), 366);
+});
+
+test("pickWord is stable per date, valid on day 366, and changes day to day", () => {
+  assert.equal(words.pickWord("2026-10-12"), words.pickWord("2026-10-12"));
+  assert.ok(words.WORDS.includes(words.pickWord("2028-12-31")));
+  assert.notEqual(words.pickWord("2026-10-12"), words.pickWord("2026-10-13"));
+});
+
+test("parseDateParam accepts only real calendar dates", () => {
+  assert.equal(words.parseDateParam("2026-10-12"), "2026-10-12");
+  assert.equal(words.parseDateParam("2028-02-29"), "2028-02-29");
+  for (const bad of [null, "", "yesterday", "2026-13-45", "2026-02-30", "2026-1-5", "20261012", "2026-10-12T00:00"]) {
+    assert.equal(words.parseDateParam(bad), null, String(bad));
+  }
+});
+
+test("cleanWord reduces any input to A-Z, capped at 9 letters", () => {
+  assert.equal(words.cleanWord("hello"), "HELLO");
+  assert.equal(words.cleanWord("R2-D2 droid!"), "RDDROID");
+  assert.equal(words.cleanWord("supercalifragilistic"), "SUPERCALI");
+  assert.equal(words.cleanWord("café \u{1F680}"), "CAF");
+  for (const empty of [null, "", "   ", "1234", "\u{1F680}"]) assert.equal(words.cleanWord(empty), null);
+});
