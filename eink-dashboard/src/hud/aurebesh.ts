@@ -26,7 +26,7 @@ export function drawAurebeshSheet(): Canvas {
     drawType(c, "af50", cx, y + 40, ch, { align: "center" });
     hline(c, cx - 28, y + 50, 57);
     drawType(c, "plex15s", cx, y + 70, ch, { align: "center" });
-    if (name) drawType(c, "plex10s", cx, y + 85, name, { align: "center", spacing: 1 });
+    if (name) drawType(c, "plex11m", cx, y + 86, name, { align: "center", spacing: 1 });
   };
   for (let i = 0; i < letters.length; i++) {
     cell(64 + (i % 9) * 84, 50 + Math.floor(i / 9) * rowH, letters[i], LETTER_NAMES[letters[i]]);

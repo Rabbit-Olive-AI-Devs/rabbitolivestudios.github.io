@@ -2729,3 +2729,21 @@ After seeing the page on the panel ("looks excellent") the owner asked for four 
 Both are an `Occasion` passed to `drawAurebeshPage`. Still no KV, AI or cron: an occasion is a
 function of the date. Names are taken from the ASCII `key` field, since Aurebesh has no accents.
 `npm run test:utils` is at 155 tests.
+
+### Follow-up (2026-10-12): seen on the panel, 11M minimum, pronunciation
+
+**The "not yet verified" item above is closed.** The owner put the page on the desk panel
+("looks excellent") and, after reading the calibration card, set the smallest text size:
+**11px medium (`plex11m`)**. The 10px face is removed from the generator, a test fails if a text
+face smaller than 11px is ever added, and the labels that used it (the DAILY tag, the letter
+names on the check sheet, the card's own captions) moved up to 11M.
+
+The owner also asked whether Aurebesh has phonetics. It does not: it is a letter-for-letter
+cipher of the Latin alphabet and the words are plain English, so the only "sounds" it has are
+the letter names already on the page. What was added instead is a dictionary-style respelling
+under the translation (`SAY  MAN-duh-lor`), from a hand-written table in
+`src/hud/aurebesh-pronounce.ts` covering all 180 words and the special-day words. A word with
+no entry (a birthday name, a `?word=` test value) keeps the old `LANG  BASIC` row; nothing is
+guessed. The unusual names are the entries most likely to need correcting.
+
+`npm run test:utils` is at 158 tests.

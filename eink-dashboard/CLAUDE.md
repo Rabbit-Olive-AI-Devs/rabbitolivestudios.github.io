@@ -51,7 +51,7 @@ Every session must begin with these steps:
 | Touching the daily cron or `dailyWarmTargetDate` | The warm must fill the **next** Chicago date before it rolls (`35 4,5 * * *`). Warming "right after midnight" reopens the hole that blanked the skyline (DECISIONS #64) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
-| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as a 1-bit image, never with live HTML text. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep these pages free of KV, AI and cron (DECISIONS #66) |
+| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as a 1-bit image, never with live HTML text. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters, and **never smaller than `plex11m`**, the owner's minimum on the panel (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep these pages free of KV, AI and cron (DECISIONS #66) |
 
 ---
 
@@ -64,7 +64,7 @@ Every session must begin with these steps:
 - **Live URL**: `https://eink-dashboard.thiago-oliveira77.workers.dev`
 - **Displays**: reTerminal E1001 (mono, 7.5" ePaper, 800x480) + reTerminal E1002 (Spectra 6 color, 7.3", 800x480)
 - **Third display (being set up)**: a second reTerminal E1001 (mono) on the home-office desk, showing the `/desk/*` pages (DECISIONS #66)
-- **Device manager**: SenseCraft HMI (Web Function screenshots URLs)
+- **Device manager**: SenseCraft HMI (screenshots URLs; since v1.3.2 a URL is added through the HTML widget in the Canvas Editor at 800x480, formerly the "Web Function" page type)
 
 ---
 
@@ -356,6 +356,7 @@ eink-dashboard/
       test-card.ts        — the calibration card drawn at /desk/test
       aurebesh.ts         — the check sheet: 26 letters + 10 numerals
       aurebesh-words.ts   — word list (180), themes, letter names, date-to-word picker, special days, ?word=/?date= cleaning
+      aurebesh-pronounce.ts — hand-written "how to say it" respelling for every word
       aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)

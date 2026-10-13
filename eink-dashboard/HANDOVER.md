@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-12 · **Describes:** v3.17.2 (code as of `005218f`), which is what production runs.
+**Last verified:** 2026-10-12 · **Describes:** v3.17.2 plus the pronunciation line and the 11M minimum text size (deployed without a version bump), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -39,7 +39,7 @@ The headline feature is **"Moment Before"**: every day the Worker picks a famous
 | SenseCraft device ID | `20225290` | `20225358` |
 | Routes it uses | `/fact.png`, `/weather`, `/skyline-bw` | `/color/moment`, `/color/weather`, `/skyline`, `/color/headlines` |
 
-The exact pagelists live in the SenseCraft HMI web app, not in this repo. The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel.
+The exact pagelists live in the SenseCraft HMI web app, not in this repo. (Since SenseCraft HMI v1.3.2, February 2026, there is no separate "Web Function" page type: a URL is shown through the **HTML widget** in the Canvas Editor, sized 800x480 at position 0,0. Older notes in this repo still say "Web Function"; they mean the same mechanism.) The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel.
 
 A **third panel** is being set up: a second E1001 (mono) on the home-office desk, for the `/desk/*` pages. It was not yet paired when this was written, so it has no device ID here and no telemetry is fetched for it.
 
@@ -233,7 +233,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 155 tests at v3.17.2
+npm run test:utils        # compiles to /tmp, runs node --test; 158 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -307,7 +307,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 **Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.
 
-**Third panel, in progress (2026-10-12):** the owner has a second, brand-new E1001 for the home-office desk. Four pages were chosen, all in one targeting-HUD style and drawn by the Worker as 1-bit images (#66) and set in real fonts pre-rendered to 1-bit glyphs (#67; the first version's drawn lettering was rejected by the owner on sight, so **never propose the 8x8 font or hand-drawn letters, and show a mockup before building a look**). **Built:** the drawing kit in `src/hud/`, the calibration card `/desk/test` and the Aurebesh word of the day `/desk/aurebesh`. **Not yet done:** the owner has to pair the panel in SenseCraft HMI and photograph the calibration card, after which the smallest usable text size gets settled and a follow-up note goes under #67; nothing has been seen on real e-ink yet. **Still to build, each with its own design first:** NASA planet of the day, a TARS dashboard for two Macs and AI subscription quotas, a Flamengo board. Data sources already checked for those are listed in section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`. This is separate from the Muse firmware experiment above, which concerns the first E1001.
+**Third panel, in progress (2026-10-12):** the owner has a second, brand-new E1001 for the home-office desk. Four pages were chosen, all in one targeting-HUD style and drawn by the Worker as 1-bit images (#66) and set in real fonts pre-rendered to 1-bit glyphs (#67; the first version's drawn lettering was rejected by the owner on sight, so **never propose the 8x8 font or hand-drawn letters, and show a mockup before building a look**). **Built:** the drawing kit in `src/hud/`, the calibration card `/desk/test` and the Aurebesh word of the day `/desk/aurebesh`. **Seen on the panel and approved by the owner** ("looks excellent"); the smallest text size is settled at 11px medium (`plex11m`), enforced by a test. The Aurebesh page also shows a pronunciation line, a family member's name on their birthday, and a themed word on a few fixed dates; the owner asked for those dates to stay a surprise, so do not list them back to them. **Still to build, each with its own design first:** NASA planet of the day, a TARS dashboard for two Macs and AI subscription quotas, a Flamengo board. Data sources already checked for those are listed in section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`. This is separate from the Muse firmware experiment above, which concerns the first E1001.
 
 **Open items the owner has not chosen to act on:**
 

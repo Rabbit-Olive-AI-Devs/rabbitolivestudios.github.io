@@ -9,6 +9,7 @@ import type { Canvas } from "./canvas";
 import { createCanvas, fillRect, hline, strokeRect, vline } from "./canvas";
 import { dayOfYear, groupOf, LETTER_NAMES, pickWord, WORDS } from "./aurebesh-words";
 import type { Occasion } from "./aurebesh-words";
+import { pronounce } from "./aurebesh-pronounce";
 import { displayDate, topBar, TOP_BAR_BOTTOM } from "./chrome";
 import type { FaceKey } from "./fonts-data";
 import { brackets, dotGrid, hatch, plus, ruler } from "./parts";
@@ -120,7 +121,9 @@ export function drawAurebeshPage(word: string, dateStr: string, occasion?: Occas
   label(c, 204, 362, "TRANSLATION");
   const latinFace: FaceKey = word.length <= 5 ? "plex50r" : word.length <= 7 ? "plex36r" : "plex28r";
   drawType(c, latinFace, 204, 418, word);
-  dataRow(c, 204, 446, 170, "LANG", "BASIC", true);
+  const spoken = pronounce(word);
+  if (spoken) dataRow(c, 204, 446, 170, "SAY", spoken, true);
+  else dataRow(c, 204, 446, 170, "LANG", "BASIC", true);
 
   label(c, 424, 362, "WORD DATA");
   [["LETTERS", String(word.length)], ["UNIQUE", String(unique.length)], ["GROUP", group], ["INDEX", position]]
@@ -129,7 +132,7 @@ export function drawAurebeshPage(word: string, dateStr: string, occasion?: Occas
   const count = occasion?.count;
   label(c, 628, 362, count ? count.label : "CYCLE");
   strokeRect(c, 738, 350, 45, 17);
-  drawType(c, "plex10s", 760, 362, "DAILY", { align: "center" });
+  drawType(c, "plex11m", 760, 362, "DAILY", { align: "center" });
   // a number in Aurebesh numerals with the same number in Latin beside it: the
   // occasion's count if it has one, otherwise the word's place in the cycle
   const value = count ? count.value : index + 1;

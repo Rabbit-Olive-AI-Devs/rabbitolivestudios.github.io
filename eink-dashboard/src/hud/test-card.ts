@@ -20,10 +20,11 @@ export function drawTestCard(): Canvas {
 
   // A: text sizes, smallest first
   drawType(c, "plex11m", 20, 58, "A  TEXT SIZES", { spacing: 1 });
-  const faces: FaceKey[] = ["plex10s", "plex11m", "plex12m", "plex12s", "plex13r", "plex13s", "plex15m", "plex15s"];
+  // 11M is the smallest size the owner reads comfortably on the panel; nothing goes below it
+  const faces: FaceKey[] = ["plex11m", "plex12m", "plex12s", "plex13r", "plex13s", "plex15m", "plex15s"];
   faces.forEach((face, i) => {
-    const y = 80 + i * 21;
-    drawType(c, "plex10s", 20, y, face.slice(4).toUpperCase());
+    const y = 82 + i * 23;
+    drawType(c, "plex11m", 20, y, face.slice(4).toUpperCase());
     drawType(c, face, 64, y, SAMPLE);
   });
 
@@ -63,7 +64,7 @@ export function drawTestCard(): Canvas {
   fillRect(c, 600, 416, 62, 19);
   drawType(c, "plex12s", 631, 430, "ALERT", { align: "center", white: true });
   strokeRect(c, 676, 417, 45, 17);
-  drawType(c, "plex10s", 698, 429, "DAILY", { align: "center" });
+  drawType(c, "plex11m", 698, 430, "DAILY", { align: "center" });
 
   return c;
 }

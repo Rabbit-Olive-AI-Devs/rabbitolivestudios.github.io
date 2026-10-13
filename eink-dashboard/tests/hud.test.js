@@ -479,3 +479,39 @@ test("the handler uses the occasion for the date, and ?word still overrides it",
   assert.notEqual(birthday, daily);
   assert.notEqual(await pageBytes("?date=2026-05-04"), await pageBytes(`?date=2026-05-04&word=${words.pickWord("2026-05-04")}`));
 });
+
+// --- Pronunciation line and the 11M minimum text size --------------------------------
+
+const say = fromBuild("src/hud/aurebesh-pronounce.js");
+
+test("every listed word and every special-day word has a pronunciation that fits its row", () => {
+  const specials = new Set();
+  for (let d = 0; d < 366; d++) {
+    const s = words.specialDay(new Date(Date.UTC(2028, 0, 1 + d)).toISOString().slice(0, 10));
+    if (s) specials.add(s.word);
+  }
+  for (const w of [...words.WORDS, ...specials]) {
+    const p = say.pronounce(w);
+    assert.ok(p, `no pronunciation for ${w}`);
+    assert.match(p, /^[A-Za-z]+(-[A-Za-z]+)*$/, `${w}: "${p}"`);
+    assert.match(p, /[A-Z]{2}/, `${w}: "${p}" marks no stressed syllable`);
+    assert.ok(ty.measureType("plex12s", p) <= 120, `${w}: "${p}" is too long for its row`);
+  }
+  assert.equal(say.pronounce("MANDALORE"), "MAN-duh-lor");
+  assert.equal(say.pronounce("QQQ"), null, "no guess for a word that is not known");
+});
+
+test("the translation card shows how to say the word", () => {
+  const page = ap.drawAurebeshPage("MANDALORE", "2026-10-12");
+  const expected = cv.createCanvas();
+  ty.drawType(expected, "plex12s", 374, 446, "MAN-duh-lor", { align: "right" });
+  assert.ok(cv.countBlack(expected) > 100);
+  for (let i = 0; i < expected.px.length; i++) if (expected.px[i] === 0) assert.equal(page.px[i], 0, "pronunciation missing");
+});
+
+test("no face is smaller than the owner's minimum, 11px medium", () => {
+  for (const [key, face] of Object.entries(FACES)) {
+    if (key.startsWith("plex")) assert.ok(face.size >= 11, `${key} is below the 11M minimum`);
+  }
+  assert.equal(FACES.plex10s, undefined);
+});

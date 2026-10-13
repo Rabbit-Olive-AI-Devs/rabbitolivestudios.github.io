@@ -28,9 +28,11 @@ const BIG = " " + UPPER + DIGITS + "/.:-%";
 const PLEX = { family: "IBM Plex Mono", files: ["IBMPlexMono-Regular.ttf", "IBMPlexMono-Medium.ttf", "IBMPlexMono-SemiBold.ttf"] };
 const AF = { family: "Aurebesh AF", files: ["AurebeshAF-Canon.otf"] };
 
-/** key → what to rasterise. `metrics` names the file whose tables give the advances. */
+/**
+ * key → what to rasterise. `metrics` names the file whose tables give the advances.
+ * Text never goes below 11px medium: the owner's minimum for the panel (DECISIONS #67).
+ */
 const FACES = {
-  plex10s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 10, chars: ASCII },
   plex11m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 11, chars: ASCII },
   plex12m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 12, chars: ASCII },
   plex12s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 12, chars: ASCII },
