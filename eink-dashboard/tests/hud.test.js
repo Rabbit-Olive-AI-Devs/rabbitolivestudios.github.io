@@ -198,3 +198,62 @@ test("ruler, crosshair, titleBar and bigNumber all draw without throwing", () =>
   parts.bigNumber(c, 40, 300, "14", "VSL");
   assert.ok(cv.countBlack(c) > 500);
 });
+const page = fromBuild("src/hud/page.js");
+const card = fromBuild("src/hud/test-card.js");
+const desk = fromBuild("src/pages/desk.js");
+
+/** Width, height and bit depth from a PNG's IHDR chunk. */
+function pngHeader(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return { sig: [...bytes.slice(0, 4)], w: dv.getUint32(16), h: dv.getUint32(20), depth: bytes[24] };
+}
+
+const inlinedPng = (html) => {
+  const m = html.match(/src="data:image\/png;base64,([^"]+)"/);
+  assert.ok(m, "page must inline a PNG data URI");
+  return new Uint8Array(Buffer.from(m[1], "base64"));
+};
+
+test("canvasToPng produces an 800x480 1-bit PNG", async () => {
+  const png = await page.canvasToPng(cv.createCanvas());
+  const h = pngHeader(png);
+  assert.deepEqual(h.sig, [137, 80, 78, 71]);
+  assert.equal(h.w, 800);
+  assert.equal(h.h, 480);
+  assert.equal(h.depth, 1);
+});
+
+test("hudPageResponse is one request: inline image, no script, no other URLs", async () => {
+  const res = await page.hudPageResponse("Desk Test", () => cv.createCanvas());
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("Content-Type"), /^text\/html/);
+  assert.equal(res.headers.get("Cache-Control"), "no-store");
+  const html = await res.text();
+  assert.equal(pngHeader(inlinedPng(html)).w, 800);
+  assert.doesNotMatch(html, /<script/i);
+  assert.doesNotMatch(html, /src="\//, "no second request to the Worker");
+  assert.doesNotMatch(html, /https?:\/\//, "no external URL");
+});
+
+test("a draw function that throws becomes the text page, not an error", async () => {
+  const res = await page.hudPageResponse("Desk Test", () => { throw new Error("boom"); });
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /Desk Test/);
+  assert.doesNotMatch(html, /<img/i);
+  assert.doesNotMatch(html, /boom/, "the error text is not shown on the panel");
+});
+
+test("the calibration card fills the panel with a moderate amount of ink", () => {
+  const c = card.drawTestCard();
+  assert.equal(c.w, 800);
+  assert.equal(c.h, 480);
+  const ratio = cv.countBlack(c) / (800 * 480);
+  assert.ok(ratio > 0.02 && ratio < 0.5, `black ratio ${ratio}`);
+});
+
+test("/desk/test serves the card as an inlined page", async () => {
+  const res = await desk.handleDeskTest();
+  assert.equal(res.status, 200);
+  assert.equal(pngHeader(inlinedPng(await res.text())).h, 480);
+});
