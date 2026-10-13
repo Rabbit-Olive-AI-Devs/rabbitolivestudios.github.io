@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-12 · **Describes:** v3.17.0 (code as of `7e8b81a`), which is what production runs.
+**Last verified:** 2026-10-12 · **Describes:** v3.17.0 (code as of `660ae02`), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -233,7 +233,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 151 tests at v3.17.0
+npm run test:utils        # compiles to /tmp, runs node --test; 152 tests at v3.17.0
 npm run dry-run
 
 # Local dev. Port 8787 is often taken by another daemon; check, then use 8790.

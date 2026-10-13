@@ -2565,7 +2565,8 @@ looked weak, so the word is drawn at 40% of the cell, close to the weight of the
 letterforms.
 
 The word comes from a curated English list (A–Z only, 3 to 9 letters); the day of the year picks
-it and the year offsets the cycle. `?date=` and `?word=` are free test parameters: unusable input
+it, stepping through the list with a stride so neighbouring days land in different themes, and
+the year offsets the cycle. `?date=` and `?word=` are free test parameters: unusable input
 falls back to today and to the daily word.
 
 ### Rejected
@@ -2583,13 +2584,20 @@ falls back to today and to the daily word.
 
 ### Verified
 
-- `npm run typecheck`, `npm run test:utils` (112 → 151 tests) and `npm run dry-run` pass. The new
+- `npm run typecheck`, `npm run test:utils` (112 → 152 tests) and `npm run dry-run` pass. The new
   tests cover clipping at the canvas edges, glyph coverage, proportional spacing, the PNG header
   (800x480, 1-bit), the one-request page (inline image, no script, no URL), a draw function that
   throws, leap day and year-end word picking, and hostile `?word=` and `?date=` values.
 - The card, the Aurebesh page with a short and a long word, and the 26-letter sheet were each
   rendered to PNG and inspected. `/desk/test` served from `wrangler dev` is a 6 KB document with
   one inline image.
+- After deploy, `/desk/aurebesh` was loaded in Chromium at an 800x480 viewport: the image sits at
+  0,0 at exactly 800x480, nothing scrolls, there is no script, and the only request beyond the
+  document is the browser's own `/favicon.ico`.
+- An independent review of the branch found no critical or important defects. Its one
+  user-visible point, that the themed word list was being walked in order, is fixed. Its other
+  notes are small; the one that matters later is that `circle`, `ruler`, `hatch` and `dotFill`
+  must be bounded before a page feeds them numbers from outside (the planet and TARS pages).
 
 ### Not yet verified
 
