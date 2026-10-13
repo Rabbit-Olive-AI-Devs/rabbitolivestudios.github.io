@@ -1,8 +1,8 @@
 # Desk Panel (third display) — Design
 
 **Date:** 2026-10-12
-**Status:** Sections 1–4 agreed with the owner. Sections 5–8 are a **proposal awaiting the owner's review**. Nothing here is built.
-**Branch:** none yet
+**Status:** Approved by the owner on 2026-10-12, including the proposals in sections 5–8. Nothing here is built yet.
+**Plan for steps 1 and 2:** `docs/superpowers/plans/2026-10-12-desk-panel-style-kit-and-aurebesh.md`
 
 ## 1. What this is
 
@@ -96,6 +96,9 @@ this document (see 6.3).
 src/hud/
   canvas.ts     — 800x480 1-bit buffer (0 = black, 1 = white, as encodePNG1Bit expects) and
                   primitives: pixel, hline, vline, line, rect, fillRect, invertRect, circle
+  stroke.ts     — stroke fonts: glyphs as polylines on a grid, drawn at any size and thickness;
+                  Latin capitals and digits. The same engine draws Aurebesh
+  style.ts      — the few tunable constants chosen from the calibration card
   parts.ts      — the reusable pieces of the look: frame with "+" registration marks, corner
                   brackets, crosshair, tick ruler, hatched divider, title bar, inverted accent
                   block, big-number-with-unit block, dotted (ordered-dither) fill
@@ -119,7 +122,9 @@ fallback, at one write a day.
 ### 6.3 First deliverable: a calibration card
 
 `/desk/test` renders one screen that puts the open questions side by side: the 8x8 font at 1x,
-2x and 3x; a taller bitmap font candidate; 1px and 2px rules; dot fills at several densities;
+2x and 3x; stroke-drawn type at three sizes and thicknesses (chosen over a second bitmap font
+because big numerals scaled up from 8x8 look crude, and the engine is needed for Aurebesh
+anyway); 1px, 2px and 3px rules; dot fills at several densities;
 an inverted block; a hatched band. The owner looks at it on the real panel and the choices are
 made from that photo. It stays in the codebase as the reference card for later pages.
 
@@ -161,7 +166,12 @@ other no-AI test parameters.
 ## 9. Still open
 
 - Font choice and line weights: decided from the calibration card.
-- Whether the free football feed covers the Libertadores as well as the Brazilian league.
+- Flamengo data source. The owner's other agent reads **FotMob's public calendar feed** for the
+  club (`https://pub.fotmob.com/prod/pub/api/v2/calendar/team/9770.ics`). Checked 2026-10-12: it
+  answers without a key, lists about a year of fixtures across Série A and the Copa
+  Libertadores, and carries kickoff time (UTC), venue, competition and, for played matches, the
+  score in the event title. It has **no league table**, so table position needs a second source
+  or is dropped. It is an unofficial feed and could change without notice.
 - Which exoplanet fields NASA's archive returns reliably enough to show every day.
 - Whether a locked (not sleeping) Mac still runs the reporter.
 - The new panel's SenseCraft device ID, once paired.
