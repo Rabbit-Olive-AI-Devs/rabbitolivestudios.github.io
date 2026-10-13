@@ -1,14 +1,22 @@
 /**
- * The reusable pieces of the desk panel's "targeting HUD" look. Every function
- * draws black on the white canvas; nothing here knows about any specific page.
+ * The reusable pieces of the desk panel's "targeting HUD" look: fine rules,
+ * corner marks, a sparse dot field, striped dividers. Every function draws black
+ * on the white canvas and does work bounded by the canvas, never by its
+ * arguments, so a page can pass it numbers that came from outside.
  */
 
 import type { Canvas } from "./canvas";
-import {
-  circle, fillRect, hline, invertRect, setPixel, strokeRect, text, textWidth, vline,
-} from "./canvas";
-import { drawStrokeText, LATIN, strokeTextWidth } from "./stroke";
-import { LABEL_SCALE, MARGIN, RULE, SMALL_SCALE, STROKE_BIG } from "./style";
+import { hline, setPixel, vline } from "./canvas";
+
+/** The part of a box that lies on the canvas, as whole-pixel bounds. */
+function clip(c: Canvas, x: number, y: number, w: number, h: number) {
+  return {
+    x0: Math.max(0, Math.round(x)),
+    y0: Math.max(0, Math.round(y)),
+    x1: Math.min(c.w, Math.round(x + w)),
+    y1: Math.min(c.h, Math.round(y + h)),
+  };
+}
 
 /** A "+" registration mark centred on (x, y). */
 export function plus(c: Canvas, x: number, y: number, arm: number = 4): void {
@@ -16,96 +24,54 @@ export function plus(c: Canvas, x: number, y: number, arm: number = 4): void {
   vline(c, x, y - arm, arm * 2 + 1);
 }
 
-/** Outer border inset by MARGIN, with a "+" inside each corner. */
-export function frame(c: Canvas): void {
-  strokeRect(c, MARGIN, MARGIN, c.w - MARGIN * 2, c.h - MARGIN * 2, RULE);
-  const inset = MARGIN + 12;
-  plus(c, inset, inset);
-  plus(c, c.w - inset - 1, inset);
-  plus(c, inset, c.h - inset - 1);
-  plus(c, c.w - inset - 1, c.h - inset - 1);
-}
-
-/** Corner brackets around a box, leaving the middle of each edge open. */
-export function brackets(
-  c: Canvas, x: number, y: number, w: number, h: number, len: number = 18, t: number = 2,
-): void {
-  hline(c, x, y, len, t); vline(c, x, y, len, t);
-  hline(c, x + w - len, y, len, t); vline(c, x + w - t, y, len, t);
-  hline(c, x, y + h - t, len, t); vline(c, x, y + h - len, len, t);
-  hline(c, x + w - len, y + h - t, len, t); vline(c, x + w - t, y + h - len, len, t);
-}
-
-/** A circle with four tick lines that stop `gap` pixels short of the centre. */
-export function crosshair(c: Canvas, cx: number, cy: number, r: number, gap: number = 6): void {
-  circle(c, cx, cy, r);
-  hline(c, cx - r - 10, cy, r + 10 - gap);
-  hline(c, cx + gap + 1, cy, r + 10 - gap);
-  vline(c, cx, cy - r - 10, r + 10 - gap);
-  vline(c, cx, cy + gap + 1, r + 10 - gap);
+/** Hairline corner brackets around a box, leaving the middle of each edge open. */
+export function brackets(c: Canvas, x: number, y: number, w: number, h: number, len: number = 22): void {
+  hline(c, x, y, len); vline(c, x, y, len);
+  hline(c, x + w - len, y, len); vline(c, x + w - 1, y, len);
+  hline(c, x, y + h - 1, len); vline(c, x, y + h - len, len);
+  hline(c, x + w - len, y + h - 1, len); vline(c, x + w - 1, y + h - len, len);
 }
 
 /** Horizontal ruler: a baseline at `y` with ticks rising above it. */
 export function ruler(
   c: Canvas, x: number, y: number, len: number, step: number = 10, majorEvery: number = 5,
 ): void {
-  hline(c, x, y, len);
-  for (let i = 0, n = 0; i <= len; i += step, n++) {
+  if (step <= 0) return;
+  const end = Math.min(len, c.w);
+  hline(c, x, y, end + 1);
+  for (let i = 0, n = 0; i <= end; i += step, n++) {
     const tick = n % majorEvery === 0 ? 8 : 4;
     vline(c, x + i, y - tick, tick);
   }
 }
 
 /** Diagonal stripes, one pixel wide, every `step` pixels. */
-export function hatch(c: Canvas, x: number, y: number, w: number, h: number, step: number = 6): void {
-  for (let yy = 0; yy < h; yy++) {
-    for (let xx = 0; xx < w; xx++) {
-      if ((xx + yy) % step === 0) setPixel(c, x + xx, y + yy);
+export function hatch(c: Canvas, x: number, y: number, w: number, h: number, step: number = 5): void {
+  const b = clip(c, x, y, w, h);
+  const ox = Math.round(x);
+  const oy = Math.round(y);
+  for (let yy = b.y0; yy < b.y1; yy++) {
+    for (let xx = b.x0; xx < b.x1; xx++) {
+      if ((((xx - ox) + (yy - oy)) % step + step) % step === 0) setPixel(c, xx, yy);
     }
   }
 }
 
-const BAYER4 = [
-  [0, 8, 2, 10],
-  [12, 4, 14, 6],
-  [3, 11, 1, 9],
-  [15, 7, 13, 5],
-];
+export interface Box { x: number; y: number; w: number; h: number }
 
-/** Ordered-dither fill. `level` runs from 0 (white) to 1 (solid black). */
-export function dotFill(c: Canvas, x: number, y: number, w: number, h: number, level: number): void {
-  const threshold = Math.max(0, Math.min(1, level)) * 16;
-  for (let yy = 0; yy < h; yy++) {
-    for (let xx = 0; xx < w; xx++) {
-      if (BAYER4[(y + yy) & 3][(x + xx) & 3] < threshold) setPixel(c, x + xx, y + yy);
+/** Single-pixel dots every `step` pixels, skipping the optional keep-out box. */
+export function dotGrid(
+  c: Canvas, x: number, y: number, w: number, h: number, step: number = 12, keepOut?: Box,
+): void {
+  if (step <= 0) return;
+  const b = clip(c, x, y, w, h);
+  const ox = Math.round(x);
+  const oy = Math.round(y);
+  const first = (lo: number, origin: number) => lo + ((((origin - lo) % step) + step) % step);
+  for (let yy = first(b.y0, oy); yy < b.y1; yy += step) {
+    for (let xx = first(b.x0, ox); xx < b.x1; xx += step) {
+      if (keepOut && xx >= keepOut.x && xx < keepOut.x + keepOut.w && yy >= keepOut.y && yy < keepOut.y + keepOut.h) continue;
+      setPixel(c, xx, yy);
     }
   }
-}
-
-/** Page title on the left, a short stamp on the right, and a rule beneath. */
-export function titleBar(c: Canvas, left: string, right: string): void {
-  const x = MARGIN + 28;
-  const y = MARGIN + 16;
-  text(c, x, y, left, LABEL_SCALE);
-  text(c, c.w - x - textWidth(right, LABEL_SCALE), y, right, LABEL_SCALE);
-  hline(c, x, y + 8 * LABEL_SCALE + 8, c.w - x * 2, RULE);
-}
-
-/**
- * The one accent this look has on a mono panel: a solid black block with white
- * text. Returns the block's width so callers can place what follows.
- */
-export function accentBlock(c: Canvas, x: number, y: number, label: string, scale: number = LABEL_SCALE): number {
-  const w = textWidth(label, scale) + 12;
-  const h = 8 * scale + 8;
-  fillRect(c, x, y, w, h, 1);
-  text(c, x + 6, y + 4, label, scale);
-  invertRect(c, x, y, w, h);
-  return w;
-}
-
-/** A large stroke-drawn value with a small unit caption to its right. */
-export function bigNumber(c: Canvas, x: number, y: number, value: string, unit: string, cell: number = 8): void {
-  drawStrokeText(c, LATIN, x, y, value, cell, STROKE_BIG);
-  text(c, x + strokeTextWidth(LATIN, value, cell) + 8, y, unit, SMALL_SCALE);
 }

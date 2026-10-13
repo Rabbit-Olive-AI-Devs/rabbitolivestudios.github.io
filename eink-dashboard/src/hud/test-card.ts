@@ -1,70 +1,69 @@
 /**
- * Calibration card for the desk panel (/desk/test). It puts the open style
- * questions side by side so they can be judged on the real panel, where
- * SenseCraft's cloud render and the e-ink itself decide what is legible
- * (DECISIONS #48). Keep it: later pages are tuned against it.
+ * Calibration card for the desk panel (/desk/test). It shows every type size
+ * and line treatment the pages use, so their legibility can be judged on the
+ * real panel, where SenseCraft's cloud render and the e-ink itself decide what
+ * survives (DECISIONS #48, #67). Keep it: later pages are tuned against it.
  */
 
 import type { Canvas } from "./canvas";
-import { createCanvas, fillRect, hline, text, vline } from "./canvas";
-import { accentBlock, bigNumber, brackets, crosshair, dotFill, frame, hatch, ruler, titleBar } from "./parts";
-import { drawStrokeText, LATIN } from "./stroke";
+import { createCanvas, fillRect, hline, strokeRect, vline } from "./canvas";
+import { topBar } from "./chrome";
+import type { FaceKey } from "./fonts-data";
+import { brackets, dotGrid, hatch, plus, ruler } from "./parts";
+import { drawType } from "./type";
+
+const SAMPLE = "STORAGE 512 GB / 89%  Mac mini";
 
 export function drawTestCard(): Canvas {
   const c = createCanvas();
-  frame(c);
-  titleBar(c, "DESK PANEL / CALIBRATION", "CARD 1");
+  topBar(c, ["Desk", "Calibration"], ["IBM PLEX MONO", "AUREBESH AF"], "CARD 2");
 
-  // Column 1: the 8x8 bitmap font at three sizes.
-  text(c, 36, 66, "A  8X8 FONT", 1);
-  text(c, 36, 82, "1X  STORAGE 512 GB / 89%", 1);
-  text(c, 36, 98, "2X  STORAGE 89%", 2);
-  text(c, 36, 122, "3X  STORAGE", 3);
+  // A: text sizes, smallest first
+  drawType(c, "plex11m", 20, 58, "A  TEXT SIZES", { spacing: 1 });
+  const faces: FaceKey[] = ["plex10s", "plex11m", "plex12m", "plex12s", "plex13r", "plex13s", "plex15m", "plex15s"];
+  faces.forEach((face, i) => {
+    const y = 80 + i * 21;
+    drawType(c, "plex10s", 20, y, face.slice(4).toUpperCase());
+    drawType(c, face, 64, y, SAMPLE);
+  });
 
-  // Column 2: stroke text at three sizes and thicknesses.
-  text(c, 420, 66, "B  STROKE FONT", 1);
-  drawStrokeText(c, LATIN, 420, 82, "ORION 0123456789", 3, 2);
-  drawStrokeText(c, LATIN, 420, 110, "ORION 89%", 5, 3);
-  drawStrokeText(c, LATIN, 420, 150, "14:30", 9, 4);
+  // B: large numerals
+  vline(c, 404, 46, 208);
+  drawType(c, "plex11m", 420, 58, "B  LARGE TYPE", { spacing: 1 });
+  drawType(c, "plex28r", 420, 96, "14:30 89%");
+  drawType(c, "plex36r", 420, 142, "MANDALORE");
+  drawType(c, "plex50r", 420, 204, "JEDI 041");
 
-  hline(c, 36, 214, 728);
+  hline(c, 0, 254, c.w);
 
-  // Row 2: rule thickness.
-  text(c, 36, 224, "C  RULES 1 / 2 / 3 PX", 1);
-  hline(c, 36, 242, 150, 1);
-  hline(c, 36, 252, 150, 2);
-  hline(c, 36, 264, 150, 3);
-  vline(c, 200, 240, 28, 1);
-  vline(c, 210, 240, 28, 2);
-  vline(c, 222, 240, 28, 3);
+  // C: Aurebesh at the smaller sizes the word page uses (88 and 112 are larger still)
+  drawType(c, "plex11m", 20, 274, "C  AUREBESH", { spacing: 1 });
+  drawType(c, "af20", 20, 300, "JEDI");
+  drawType(c, "af44", 20, 350, "JEDI");
+  drawType(c, "af50", 200, 350, "JEDI");
+  drawType(c, "af60", 20, 408, "JEDI");
+  drawType(c, "af72", 20, 470, "JEDI");
 
-  // Row 2: dot fills from light to solid.
-  text(c, 260, 224, "D  DOT FILL 12/25/50/75/100", 1);
-  const levels = [0.125, 0.25, 0.5, 0.75, 1];
-  levels.forEach((lv, i) => dotFill(c, 260 + i * 60, 240, 52, 30, lv));
+  // D: lines and fills
+  vline(c, 404, 255, 225);
+  drawType(c, "plex11m", 420, 274, "D  RULES 1 / 2 / 3 PX", { spacing: 1 });
+  hline(c, 420, 290, 150, 1);
+  hline(c, 420, 298, 150, 2);
+  hline(c, 420, 308, 150, 3);
+  drawType(c, "plex11m", 600, 274, "E  DOTS + HATCH", { spacing: 1 });
+  dotGrid(c, 600, 286, 90, 30, 6);
+  dotGrid(c, 600, 322, 90, 30, 12);
+  hatch(c, 700, 286, 80, 30, 5);
+  hatch(c, 700, 322, 80, 30, 3);
 
-  // Row 2: hatch band and accent block.
-  text(c, 580, 224, "E  HATCH + ACCENT", 1);
-  hatch(c, 580, 240, 90, 30, 6);
-  accentBlock(c, 684, 240, "CRIT", 2);
-
-  hline(c, 36, 284, 728);
-
-  // Row 3: the composed look.
-  text(c, 36, 294, "F  COMPOSED", 1);
-  brackets(c, 36, 312, 220, 130);
-  crosshair(c, 146, 377, 34);
-  dotFill(c, 124, 355, 44, 44, 0.5);
-
-  bigNumber(c, 290, 316, "14", "VSL");
-  bigNumber(c, 290, 384, "89", "PCT");
-  ruler(c, 420, 440, 330);
-  text(c, 420, 316, "TARGET INSPECTOR", 2);
-  text(c, 420, 344, "VESSEL  MV ORION", 1);
-  text(c, 420, 358, "SPEED   9.4 KN", 1);
-  text(c, 420, 372, "HDG     011 T", 1);
-  fillRect(c, 420, 392, 60, 6);
-  accentBlock(c, 620, 340, "GAP 18M", 2);
+  drawType(c, "plex11m", 420, 346, "F  MARKS", { spacing: 1 });
+  brackets(c, 420, 360, 150, 90);
+  plus(c, 495, 405);
+  ruler(c, 600, 400, 180);
+  fillRect(c, 600, 416, 62, 19);
+  drawType(c, "plex12s", 631, 430, "ALERT", { align: "center", white: true });
+  strokeRect(c, 676, 417, 45, 17);
+  drawType(c, "plex10s", 698, 429, "DAILY", { align: "center" });
 
   return c;
 }

@@ -35,8 +35,6 @@ test("drawing outside the canvas clips and never wraps to another row", () => {
   assert.equal(at(c, 9, 4), 0);
   assert.equal(at(c, 0, 5), 1, "must not wrap onto the next row");
   assert.doesNotThrow(() => cv.line(c, -100, -100, 500, 500, 3));
-  assert.doesNotThrow(() => cv.circle(c, 5, 5, 400, 2));
-  assert.doesNotThrow(() => cv.text(c, -20, 9999, "OUT", 3));
 });
 
 test("strokeRect draws a hollow box of the given thickness", () => {
@@ -71,133 +69,134 @@ test("line joins its endpoints and thickness widens it", () => {
   for (let i = 0; i < 10; i++) assert.equal(at(e, i, i), 0);
 });
 
-test("circle is symmetric and hollow", () => {
-  const c = cv.createCanvas(41, 41);
-  cv.circle(c, 20, 20, 10);
-  assert.equal(at(c, 30, 20), 0);
-  assert.equal(at(c, 10, 20), 0);
-  assert.equal(at(c, 20, 30), 0);
-  assert.equal(at(c, 20, 10), 0);
-  assert.equal(at(c, 20, 20), 1);
-});
 
-test("text draws black pixels and textWidth matches the font metrics", () => {
-  const c = cv.createCanvas(100, 20);
-  cv.text(c, 0, 0, "A", 2);
-  assert.ok(cv.countBlack(c) > 0);
-  assert.equal(cv.textWidth("AB", 2), 2 * 16 + 2);
-});
-const st = fromBuild("src/hud/stroke.js");
+// --- Real fonts as 1-bit glyph bitmaps (DECISIONS #67) -----------------------
 
-test("parseGlyph splits polylines and points", () => {
-  assert.deepEqual(st.parseGlyph("0,0 4,0|2,0 2,6"), [[[0, 0], [4, 0]], [[2, 0], [2, 6]]]);
-  assert.deepEqual(st.parseGlyph("2,6"), [[[2, 6]]]);
-});
+const ty = fromBuild("src/hud/type.js");
+const { FACES } = fromBuild("src/hud/fonts-data.js");
 
-test("LATIN covers A-Z and 0-9 with points inside its grid", () => {
-  const need = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.:/%".split("");
-  for (const ch of need) {
-    const g = st.LATIN.glyphs[ch];
-    assert.ok(g, `missing glyph ${ch}`);
-    for (const poly of st.parseGlyph(g)) {
-      for (const [x, y] of poly) {
-        assert.ok(x >= 0 && x <= st.LATIN.w, `${ch} x=${x}`);
-        assert.ok(y >= 0 && y <= st.LATIN.h, `${ch} y=${y}`);
-      }
+const inkBox = (c) => {
+  let x0 = Infinity, x1 = -1, y0 = Infinity, y1 = -1;
+  for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (c.px[y * c.w + x] === 0) {
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+  }
+  return { x0, x1, y0, y1 };
+};
+
+test("every generated face carries the characters the pages need", () => {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for (const [key, face] of Object.entries(FACES)) {
+    assert.ok(face.height > 0 && face.baseline > 0 && face.baseline <= face.height, key);
+    for (const ch of upper) assert.ok(face.glyphs[ch], `${key} lacks ${ch}`);
+    if (key.startsWith("plex")) for (const ch of "0123456789/.:- ") assert.ok(face.glyphs[ch], `${key} lacks "${ch}"`);
+    for (const g of Object.values(face.glyphs)) {
+      assert.equal(Buffer.from(g.d, "base64").length, Math.ceil((g.a * face.height) / 8), `${key} bitmap size`);
     }
   }
 });
 
-test("strokeTextWidth counts advances without a trailing gap", () => {
-  // 3 glyphs of width 4 plus 2 gaps of 2 = 16 units
-  assert.equal(st.strokeTextWidth(st.LATIN, "ABC", 5), 16 * 5);
-  assert.equal(st.strokeTextWidth(st.LATIN, "", 5), 0);
+test("measureType adds advances and spacing, and ignores characters with no glyph", () => {
+  const a = FACES.plex11m.glyphs.A.a;
+  assert.equal(ty.measureType("plex11m", "AB"), a * 2, "Plex Mono is monospaced");
+  assert.equal(ty.measureType("plex11m", "ABC", 2), a * 3 + 4);
+  assert.equal(ty.measureType("plex11m", ""), 0);
+  assert.equal(ty.measureType("af50", "Aé1"), FACES.af50.glyphs.A.a, "no glyph, no width");
+  assert.ok(ty.measureType("af50", "I") < ty.measureType("af50", "A"), "Aurebesh AF is proportional");
 });
 
-test("drawStrokeText draws ink, skips unknown characters, and stays in its box", () => {
-  const c = cv.createCanvas(200, 100);
-  st.drawStrokeText(c, st.LATIN, 10, 10, "L", 10, 2);
-  assert.ok(cv.countBlack(c) > 0);
-  // L is "0,0 0,6 4,6": nothing above y=10 or left of x=10 (minus stamp offset 0 for t=2)
-  for (let x = 0; x < 200; x++) assert.equal(c.px[5 * 200 + x], 1);
-  const d = cv.createCanvas(200, 100);
-  assert.doesNotThrow(() => st.drawStrokeText(d, st.LATIN, 10, 10, "é~", 10, 2));
-  assert.equal(cv.countBlack(d), 0, "unknown characters draw nothing");
+test("drawType puts ink inside the text box, on the baseline it was given", () => {
+  const c = cv.createCanvas(300, 80);
+  const w = ty.drawType(c, "plex15s", 40, 50, "HELLO");
+  assert.equal(w, ty.measureType("plex15s", "HELLO"));
+  const b = inkBox(c);
+  assert.ok(b.x0 >= 40 && b.x1 < 40 + w, `x ${b.x0}..${b.x1}`);
+  assert.ok(b.y0 >= 50 - FACES.plex15s.baseline, "nothing above the cell");
+  assert.ok(b.y1 <= 50, "capitals sit on the baseline, nothing below it");
+  assert.ok(50 - b.y0 >= 8, "capitals are a real height, not a sliver");
 });
 
-test("a space advances without drawing", () => {
-  const c = cv.createCanvas(300, 100);
-  st.drawStrokeText(c, st.LATIN, 0, 0, "I I", 10, 1);
-  const cols = new Set();
-  for (let y = 0; y < 100; y++) for (let x = 0; x < 300; x++) if (c.px[y * 300 + x] === 0) cols.add(x);
-  assert.ok([...cols].some((x) => x < 50));
-  assert.ok([...cols].some((x) => x >= 120), "second I sits two advances to the right");
+test("drawType aligns right and centre from the same x", () => {
+  const w = ty.measureType("plex15s", "HELLO");
+  const r = cv.createCanvas(300, 40);
+  ty.drawType(r, "plex15s", 200, 30, "HELLO", { align: "right" });
+  assert.ok(inkBox(r).x1 < 200 && inkBox(r).x0 >= 200 - w);
+  const m = cv.createCanvas(300, 40);
+  ty.drawType(m, "plex15s", 150, 30, "HELLO", { align: "center" });
+  const b = inkBox(m);
+  assert.ok(Math.abs((b.x0 + b.x1) / 2 - 150) <= 3, "centred on x");
 });
+
+test("drawType clips at the canvas edge and skips unknown characters", () => {
+  const c = cv.createCanvas(40, 20);
+  assert.doesNotThrow(() => ty.drawType(c, "af112", -30, 15, "WWWW"));
+  assert.doesNotThrow(() => ty.drawType(c, "plex11m", 5, 9999, "OFF"));
+  const d = cv.createCanvas(100, 40);
+  ty.drawType(d, "af50", 10, 35, "é\u{1F680}5");
+  assert.equal(cv.countBlack(d), 0);
+});
+
+test("white type shows on a black block", () => {
+  const c = cv.createCanvas(120, 30);
+  cv.fillRect(c, 0, 0, 120, 30);
+  ty.drawType(c, "plex12s", 10, 20, "041/120", { white: true });
+  const white = c.px.length - cv.countBlack(c);
+  assert.ok(white > 40, "letters are cut out of the block");
+  assert.equal(at(c, 0, 0), 0, "the block itself stays black");
+});
+
+// --- Parts ---------------------------------------------------------------------
+
 const parts = fromBuild("src/hud/parts.js");
-const style = fromBuild("src/hud/style.js");
-
-test("frame draws a border inset by the margin and leaves the centre white", () => {
-  const c = cv.createCanvas();
-  parts.frame(c);
-  const m = style.MARGIN;
-  assert.equal(at(c, m, m), 0);
-  assert.equal(at(c, 800 - m - 1, 480 - m - 1), 0);
-  assert.equal(at(c, 400, m), 0);
-  assert.equal(at(c, 0, 0), 1, "outside the margin stays white");
-  assert.equal(at(c, 400, 240), 1);
-});
 
 test("brackets mark only the corners", () => {
   const c = cv.createCanvas(200, 200);
-  parts.brackets(c, 20, 20, 100, 80, 10, 2);
+  parts.brackets(c, 20, 20, 100, 80, 10);
   assert.equal(at(c, 20, 20), 0);
   assert.equal(at(c, 119, 99), 0);
   assert.equal(at(c, 70, 20), 1, "the middle of an edge is open");
   assert.equal(at(c, 20, 60), 1);
 });
 
-test("dotFill density follows the level and stays in its box", () => {
-  const box = 40 * 40;
-  const fill = (level) => {
-    const c = cv.createCanvas(60, 60);
-    parts.dotFill(c, 10, 10, 40, 40, level);
-    assert.equal(at(c, 5, 5), 1);
-    assert.equal(at(c, 55, 55), 1);
-    return cv.countBlack(c) / box;
-  };
-  assert.equal(fill(0), 0);
-  assert.equal(fill(1), 1);
-  assert.ok(Math.abs(fill(0.5) - 0.5) < 0.07);
-  assert.ok(fill(0.25) < fill(0.75));
-});
-
-test("hatch draws diagonal stripes inside its box only", () => {
+test("hatch draws diagonal stripes inside its box only, however large it is asked to be", () => {
   const c = cv.createCanvas(60, 40);
-  parts.hatch(c, 10, 10, 40, 20, 6);
+  parts.hatch(c, 10, 10, 40, 20);
   const black = cv.countBlack(c);
   assert.ok(black > 0 && black < 40 * 20);
   assert.equal(at(c, 5, 15), 1);
   assert.equal(at(c, 55, 15), 1);
+  const t0 = Date.now();
+  parts.hatch(c, -1e6, -1e6, 4e6, 4e6);
+  assert.ok(Date.now() - t0 < 200, "work is bounded by the canvas, not by the request");
 });
 
-test("accentBlock is a solid block with white text and reports its width", () => {
-  const c = cv.createCanvas(300, 60);
-  const w = parts.accentBlock(c, 10, 10, "KEY", 2);
-  assert.equal(w, cv.textWidth("KEY", 2) + 12);
-  assert.equal(at(c, 10, 10), 0, "block corner is black");
-  let white = 0;
-  for (let y = 10; y < 10 + 24; y++) for (let x = 10; x < 10 + w; x++) if (at(c, x, y) === 1) white++;
-  assert.ok(white > 0, "text shows as white inside the block");
+test("dotGrid leaves the keep-out box empty and is bounded by the canvas", () => {
+  const c = cv.createCanvas(200, 120);
+  parts.dotGrid(c, 0, 0, 200, 120, 12, { x: 60, y: 30, w: 80, h: 60 });
+  assert.ok(cv.countBlack(c) > 20);
+  for (let y = 30; y < 90; y++) for (let x = 60; x < 140; x++) assert.equal(at(c, x, y), 1);
+  const t0 = Date.now();
+  parts.dotGrid(c, -1e7, -1e7, 3e7, 3e7, 12);
+  assert.ok(Date.now() - t0 < 200);
 });
 
-test("ruler, crosshair, titleBar and bigNumber all draw without throwing", () => {
-  const c = cv.createCanvas();
-  parts.ruler(c, 40, 100, 300);
-  parts.crosshair(c, 400, 240, 60);
-  parts.titleBar(c, "LEFT / TITLE", "2026-10-12");
-  parts.bigNumber(c, 40, 300, "14", "VSL");
-  assert.ok(cv.countBlack(c) > 500);
+test("ruler draws a baseline with ticks and refuses a zero step", () => {
+  const c = cv.createCanvas(200, 40);
+  parts.ruler(c, 10, 30, 100);
+  assert.equal(at(c, 60, 30), 0);
+  assert.equal(at(c, 10, 25), 0, "major tick rises above the line");
+  assert.doesNotThrow(() => parts.ruler(c, 10, 30, 100, 0));
 });
+
+test("plus is a small cross centred on its point", () => {
+  const c = cv.createCanvas(20, 20);
+  parts.plus(c, 10, 10);
+  assert.equal(cv.countBlack(c), 17);
+  assert.equal(at(c, 10, 6), 0);
+  assert.equal(at(c, 14, 10), 0);
+});
+
+// --- Page wrapper ---------------------------------------------------------------
+
 const page = fromBuild("src/hud/page.js");
 const card = fromBuild("src/hud/test-card.js");
 const desk = fromBuild("src/pages/desk.js");
@@ -215,12 +214,9 @@ const inlinedPng = (html) => {
 };
 
 test("canvasToPng produces an 800x480 1-bit PNG", async () => {
-  const png = await page.canvasToPng(cv.createCanvas());
-  const h = pngHeader(png);
+  const h = pngHeader(await page.canvasToPng(cv.createCanvas()));
   assert.deepEqual(h.sig, [137, 80, 78, 71]);
-  assert.equal(h.w, 800);
-  assert.equal(h.h, 480);
-  assert.equal(h.depth, 1);
+  assert.deepEqual([h.w, h.h, h.depth], [800, 480, 1]);
 });
 
 test("hudPageResponse is one request: inline image, no script, no other URLs", async () => {
@@ -244,12 +240,12 @@ test("a draw function that throws becomes the text page, not an error", async ()
   assert.doesNotMatch(html, /boom/, "the error text is not shown on the panel");
 });
 
-test("the calibration card fills the panel with a moderate amount of ink", () => {
+const blackRatio = (c) => cv.countBlack(c) / (c.w * c.h);
+
+test("the calibration card is a full panel with a moderate amount of ink", () => {
   const c = card.drawTestCard();
-  assert.equal(c.w, 800);
-  assert.equal(c.h, 480);
-  const ratio = cv.countBlack(c) / (800 * 480);
-  assert.ok(ratio > 0.02 && ratio < 0.5, `black ratio ${ratio}`);
+  assert.deepEqual([c.w, c.h], [800, 480]);
+  assert.ok(blackRatio(c) > 0.02 && blackRatio(c) < 0.5, `black ratio ${blackRatio(c)}`);
 });
 
 test("/desk/test serves the card as an inlined page", async () => {
@@ -257,45 +253,9 @@ test("/desk/test serves the card as an inlined page", async () => {
   assert.equal(res.status, 200);
   assert.equal(pngHeader(inlinedPng(await res.text())).h, 480);
 });
-const aur = fromBuild("src/hud/aurebesh.js");
-const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-test("AUREBESH has exactly A-Z, each with real strokes inside the grid", () => {
-  assert.deepEqual(Object.keys(aur.AUREBESH.glyphs).sort(), LETTERS);
-  for (const ch of LETTERS) {
-    const polys = st.parseGlyph(aur.AUREBESH.glyphs[ch]);
-    const points = polys.flat();
-    assert.ok(points.length >= 3, `${ch} needs at least three points`);
-    for (const [x, y] of points) {
-      assert.ok(Number.isFinite(x) && x >= 0 && x <= aur.AUREBESH.w, `${ch} x=${x}`);
-      assert.ok(Number.isFinite(y) && y >= 0 && y <= aur.AUREBESH.h, `${ch} y=${y}`);
-    }
-  }
-});
+// --- Aurebesh --------------------------------------------------------------------
 
-test("no two Aurebesh letters render identically", () => {
-  const seen = new Map();
-  for (const ch of LETTERS) {
-    const c = cv.createCanvas(80, 80);
-    st.drawStrokeText(c, aur.AUREBESH, 8, 8, ch, 10, 2);
-    const key = Buffer.from(c.px).toString("base64");
-    assert.ok(!seen.has(key), `${ch} looks the same as ${seen.get(key)}`);
-    seen.set(key, ch);
-  }
-});
-
-test("the check sheet shows all 26 letters on one panel", () => {
-  const c = aur.drawAurebeshSheet();
-  assert.equal(c.w, 800);
-  assert.equal(c.h, 480);
-  assert.ok(cv.countBlack(c) > 3000);
-});
-
-test("/desk/aurebesh?sheet serves the check sheet", async () => {
-  const res = await desk.handleDeskAurebesh(new URL("https://x/desk/aurebesh?sheet"));
-  assert.equal(res.status, 200);
-  assert.equal(pngHeader(inlinedPng(await res.text())).w, 800);
-});
 const words = fromBuild("src/hud/aurebesh-words.js");
 
 test("every word is 3-9 capital letters and the list has no duplicates", () => {
@@ -332,57 +292,60 @@ test("cleanWord reduces any input to A-Z, capped at 9 letters", () => {
   assert.equal(words.cleanWord("café \u{1F680}"), "CAF");
   for (const empty of [null, "", "   ", "1234", "\u{1F680}"]) assert.equal(words.cleanWord(empty), null);
 });
+
+test("every word belongs to a named group, and the groups match the list", () => {
+  for (let i = 0; i < words.WORDS.length; i++) assert.match(words.groupOf(i), /^[A-Z]{3,9}$/, `index ${i}`);
+  const g = (w) => words.groupOf(words.WORDS.indexOf(w));
+  assert.equal(g("FORCE"), "CORE");
+  assert.equal(g("TATOOINE"), "PLANETS");
+  assert.equal(g("EXEGOL"), "PLANETS");
+  assert.equal(g("HOPE"), "VIRTUES");
+  assert.equal(g("MOTHER"), "KIN");
+  assert.equal(g("TWILIGHT"), "TERRAIN");
+  assert.equal(words.groupOf(-1), "CUSTOM", "a ?word= that is not in the list");
+});
+
+test("every letter has an Aurebesh name", () => {
+  for (const ch of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") assert.match(words.LETTER_NAMES[ch], /^[A-Z]{3,6}$/, ch);
+  assert.equal(words.LETTER_NAMES.A, "AUREK");
+  assert.equal(words.LETTER_NAMES.B, "BESH");
+});
+
 const ap = fromBuild("src/hud/aurebesh-page.js");
+const aur = fromBuild("src/hud/aurebesh.js");
 
-test("a proportional font advances by each glyph's own width", () => {
-  const f = { w: 6, h: 4, gap: 2, proportional: true, glyphs: { N: "2,0 2,4|4,0 4,4", W: "0,0 6,0 6,4 0,4" } };
-  assert.equal(st.strokeTextWidth(f, "N", 10), 20, "narrow glyph: extent 2..4");
-  assert.equal(st.strokeTextWidth(f, "W", 10), 60);
-  assert.equal(st.strokeTextWidth(f, "NW", 10), 20 + 20 + 60, "widths plus one gap");
-  assert.equal(st.strokeTextWidth(f, "N?", 10), 20 + 20 + 60, "unknown characters take the full cell");
-  const c = cv.createCanvas(200, 60);
-  st.drawStrokeText(c, f, 50, 10, "NW", 10, 1);
-  const cols = new Set();
-  for (let y = 0; y < 60; y++) for (let x = 0; x < 200; x++) if (c.px[y * 200 + x] === 0) cols.add(x);
-  assert.equal(Math.min(...cols), 50, "the narrow glyph starts at x, not at its cell offset");
-  assert.equal(Math.max(...cols), 50 + 20 + 20 + 60, "the wide glyph ends at the text width");
-});
-
-test("Aurebesh is proportional: a narrow letter takes less room than a wide one", () => {
-  assert.ok(st.strokeTextWidth(aur.AUREBESH, "I", 10) < st.strokeTextWidth(aur.AUREBESH, "A", 10) / 2);
-});
-
-test("fitCell shrinks long words to fit and caps short ones", () => {
-  for (const w of ["EWO", "JEDI", "MANDALORE", "WWWWWWWWW", "IIIIIIIII"]) {
-    const cell = ap.fitCell(w);
-    assert.ok(Number.isInteger(cell) && cell >= 1 && cell <= 30, `${w}: cell ${cell}`);
-    assert.ok(st.strokeTextWidth(aur.AUREBESH, w, cell) <= 620, `${w} overflows`);
+test("the word is set in the largest face that fits its box", () => {
+  for (const w of ["I", "EWO", "JEDI", "MANDALORE", "WWWWWWWWW", "KASHYYYK"]) {
+    const face = ap.wordFace(w);
+    assert.match(face, /^af\d+$/);
+    assert.ok(ty.measureType(face, w) <= 480, `${w} overflows in ${face}`);
   }
-  assert.equal(ap.fitCell("I"), 30, "a tiny word is capped, not blown up");
-  assert.ok(ap.fitCell("MANDALORE") < ap.fitCell("JEDI"));
+  assert.equal(ap.wordFace("JEDI"), "af112");
+  assert.ok(FACES[ap.wordFace("MANDALORE")].size < FACES[ap.wordFace("JEDI")].size);
 });
 
-test("the word page keeps all ink inside the frame for the shortest and longest words", () => {
-  for (const w of ["EWO", "MANDALORE", "WWWWWWWWW"]) {
+test("the word page stays inside the panel and the word stays inside its brackets", () => {
+  for (const w of ["EWO", "MANDALORE", "WWWWWWWWW", "KASHYYYK"]) {
     const c = ap.drawAurebeshPage(w, "2026-10-12");
-    for (let x = 0; x < 800; x++) {
-      for (const y of [0, 1, 2, 3, 4, 5, 6, 7, 472, 473, 474, 475, 476, 477, 478, 479]) {
-        assert.equal(c.px[y * 800 + x], 1, `${w}: ink in the margin at ${x},${y}`);
-      }
+    assert.deepEqual([c.w, c.h], [800, 480]);
+    assert.ok(blackRatio(c) > 0.03 && blackRatio(c) < 0.4, `${w}: black ratio ${blackRatio(c)}`);
+    // the two bracket columns must be clear of word ink between the corner marks
+    for (let y = 140; y <= 232; y++) for (const x of [238, 239, 240, 736, 737, 738]) {
+      assert.equal(c.px[y * 800 + x], 1, `${w}: word touches the bracket at ${x},${y}`);
     }
-    for (let y = 0; y < 480; y++) {
-      for (const x of [0, 1, 2, 3, 4, 5, 6, 7, 792, 793, 794, 795, 796, 797, 798, 799]) {
-        assert.equal(c.px[y * 800 + x], 1, `${w}: ink in the margin at ${x},${y}`);
-      }
-    }
-    assert.ok(cv.countBlack(c) > 4000);
   }
 });
 
-test("different words draw different pages", () => {
-  const a = ap.drawAurebeshPage("JEDI", "2026-10-12");
-  const b = ap.drawAurebeshPage("REBEL", "2026-10-12");
-  assert.notEqual(Buffer.from(a.px).toString("base64"), Buffer.from(b.px).toString("base64"));
+test("different words and different dates draw different pages", () => {
+  const b64 = (c) => Buffer.from(c.px).toString("base64");
+  assert.notEqual(b64(ap.drawAurebeshPage("JEDI", "2026-10-12")), b64(ap.drawAurebeshPage("REBEL", "2026-10-12")));
+  assert.notEqual(b64(ap.drawAurebeshPage("JEDI", "2026-10-12")), b64(ap.drawAurebeshPage("JEDI", "2026-10-13")));
+});
+
+test("the check sheet shows all 26 letters on one panel", () => {
+  const c = aur.drawAurebeshSheet();
+  assert.deepEqual([c.w, c.h], [800, 480]);
+  assert.ok(cv.countBlack(c) > 6000);
 });
 
 const pageBytes = async (qs) => {
@@ -399,9 +362,10 @@ test("?word and ?date select the page; bad input falls back instead of failing",
   assert.equal(await pageBytes("?word=1234&date=2026-10-12"), daily, "unusable word -> daily word");
   assert.equal(await pageBytes("?word=&date=2026-10-12"), daily);
   assert.notEqual(await pageBytes("?date=2026-10-13"), daily);
-  await pageBytes("?date=2026-13-45");            // must not throw
-  await pageBytes("?date=yesterday&word=%F0%9F%9A%80");
-  assert.notEqual(await pageBytes("?sheet"), daily, "?sheet still shows the check sheet");
+  const today = await pageBytes("");
+  assert.equal(await pageBytes("?date=2026-13-45"), today, "impossible date -> today");
+  assert.equal(await pageBytes("?date=yesterday&word=%F0%9F%9A%80"), today);
+  assert.notEqual(await pageBytes("?sheet"), daily, "?sheet shows the check sheet");
 });
 
 test("consecutive days do not walk the themed word list in order", () => {

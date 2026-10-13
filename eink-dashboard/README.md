@@ -4,7 +4,7 @@ A Cloudflare Workers backend for the **reTerminal E1001** (ESP32-S3, 7.5" ePaper
 
 Every day it generates an AI illustration depicting a famous historical event at its most iconic, dramatic moment — the viewer sees the scene, the location, and the date.
 
-Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66).
+Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67).
 
 ## The Concept
 
@@ -48,11 +48,11 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /skyline-test?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline HTML (forwards params to .png, requires `TEST_AUTH_KEY`) | none |
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/apod` | 301 redirect to `/skyline` (legacy compatibility) | — |
-| **Desk Panel (second E1001)** | *Worker-drawn 1-bit pages, PNG inlined in one request, no KV and no AI (DECISIONS #66)* | |
-| `GET /desk/aurebesh` | 800x480 Aurebesh word of the day: the word in Aurebesh, its English spelling, and a decoding key. The word depends only on the Chicago date | none |
+| **Desk Panel (second E1001)** | *Worker-drawn 1-bit pages set in real fonts (IBM Plex Mono, Aurebesh AF) pre-rendered to 1-bit glyphs; PNG inlined in one request; no KV and no AI (DECISIONS #66, #67)* | |
+| `GET /desk/aurebesh` | 800x480 Aurebesh word of the day: the word in Aurebesh inside a crosshair, a key column with each letter's glyph and name, and cards with the translation and the word's place in the 120-word cycle. Depends only on the Chicago date | none |
 | `GET /desk/aurebesh?date=YYYY-MM-DD&word=HELLO` | Free test overrides. Unusable input falls back to today and the daily word | none |
 | `GET /desk/aurebesh?sheet` | All 26 Aurebesh letters with their Latin letters, for checking against a chart | none |
-| `GET /desk/test` | Calibration card: type sizes, rule thickness, dot fills, hatch and accent side by side, for judging on the real panel | none |
+| `GET /desk/test` | Calibration card: every text size from 10px up, large type, Aurebesh sizes, rules, dots and hatch, for judging on the real panel | none |
 | **Maintenance** | | |
 | `GET /clean` | 800x480 solid-color screen cleaner for clearing e-ink ghosting/retention. Auto-rotates through all 6 Spectra-6 pigments + black/white flushes across fetches (point the device at it with a short refresh interval). Works on both E1001 and E1002. | none (`no-store`) |
 | `GET /clean?c=black\|white\|red\|yellow\|green\|blue` | Hold one solid color (also accepts index `0`-`5`) | none |

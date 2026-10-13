@@ -1,61 +1,132 @@
 /**
- * The Aurebesh word-of-the-day page: the word in large Aurebesh glyphs, its
- * English spelling beneath, and a key strip that maps each letter used to its
- * glyph so the word can be decoded by eye.
+ * The Aurebesh word-of-the-day page: a key column that maps each letter used
+ * to its glyph and name, the word in Aurebesh inside a full-width crosshair,
+ * and three cards with the translation and where the word sits in the cycle.
  */
 
+import { shiftDateStr } from "../date-utils";
 import type { Canvas } from "./canvas";
-import { createCanvas, hline, text } from "./canvas";
-import { AUREBESH } from "./aurebesh";
-import { accentBlock, brackets, frame, titleBar } from "./parts";
-import { drawStrokeText, LATIN, strokeTextWidth } from "./stroke";
-import { RULE, STROKE_MED } from "./style";
+import { createCanvas, fillRect, hline, strokeRect, vline } from "./canvas";
+import { dayOfYear, groupOf, LETTER_NAMES, pickWord, WORDS } from "./aurebesh-words";
+import { topBar, TOP_BAR_BOTTOM } from "./chrome";
+import type { FaceKey } from "./fonts-data";
+import { brackets, dotGrid, hatch, plus, ruler } from "./parts";
+import { drawType, measureType } from "./type";
 
-const WORD_BOX_X = 60;
-const WORD_BOX_Y = 78;
-const WORD_BOX_W = 680;
-const WORD_BOX_H = 190;
-const WORD_MAX_W = 620;
-const MAX_CELL = 30;
+const SIDEBAR_W = 176;
+/** Centre and half-size of the bracketed box the word sits in. */
+const WORD_CX = 488;
+const WORD_CY = 186;
+const WORD_HALF_W = 250;
+const WORD_HALF_H = 78;
+const WORD_MAX_W = 480;
+const CARDS_TOP = 334;
 
-/** Pixels per grid unit so the Aurebesh word fits its box, capped for short words. */
-export function fitCell(word: string): number {
-  return Math.min(MAX_CELL, Math.floor(WORD_MAX_W / strokeTextWidth(AUREBESH, word, 1)));
+/** Largest first. The smallest must hold nine of the widest letter (WWWWWWWWW). */
+const WORD_FACES: readonly FaceKey[] = ["af112", "af88", "af72", "af60", "af50", "af44"];
+
+/** The largest Aurebesh face in which the word fits its box. */
+export function wordFace(word: string): FaceKey {
+  return WORD_FACES.find((f) => measureType(f, word) <= WORD_MAX_W) ?? "af44";
+}
+
+const pad3 = (n: number) => String(n).padStart(3, "0");
+const label = (c: Canvas, x: number, y: number, s: string) => drawType(c, "plex11m", x, y, s, { spacing: 1 });
+
+/** A label on the left and its value on the right, over a hairline. */
+function dataRow(c: Canvas, x: number, y: number, w: number, key: string, value: string, rule: boolean): void {
+  label(c, x, y, key);
+  drawType(c, "plex12s", x + w, y, value, { align: "right" });
+  if (rule) hline(c, x, y + 6, w);
 }
 
 export function drawAurebeshPage(word: string, dateStr: string): Canvas {
   const c = createCanvas();
-  frame(c);
-  titleBar(c, "AUREBESH / WORD OF THE DAY", dateStr);
+  const index = WORDS.indexOf(word);
+  const position = index < 0 ? "---" : pad3(index + 1);
+  const group = groupOf(index);
+  const unique = [...new Set(word)];
 
-  brackets(c, WORD_BOX_X, WORD_BOX_Y, WORD_BOX_W, WORD_BOX_H);
-  const cell = fitCell(word);
-  const wordW = strokeTextWidth(AUREBESH, word, cell);
-  const wordH = AUREBESH.h * cell;
-  drawStrokeText(
-    c, AUREBESH,
-    Math.round((c.w - wordW) / 2),
-    WORD_BOX_Y + Math.round((WORD_BOX_H - wordH) / 2),
-    word, cell, Math.max(STROKE_MED, Math.round(cell * 0.4)),
+  topBar(
+    c, ["Desk", "Aurebesh", "Word of the day"],
+    [dateStr, `DAY ${dayOfYear(dateStr)}`], `${position}/${WORDS.length}`,
   );
 
-  const latinCell = 7;
-  drawStrokeText(
-    c, LATIN, Math.round((c.w - strokeTextWidth(LATIN, word, latinCell)) / 2), 288,
-    word, latinCell, STROKE_MED,
-  );
-
-  hline(c, 36, 348, c.w - 72, RULE);
-  const keyX = 36 + accentBlock(c, 36, 360, "KEY") + 20;
-  const letters = [...new Set(word.split(""))];
-  const slot = Math.min(72, Math.floor((c.w - 36 - keyX) / letters.length));
-  letters.forEach((ch, i) => {
-    const x = keyX + i * slot;
-    const keyCell = 6;
-    const glyphX = x + Math.round((AUREBESH.w * keyCell - strokeTextWidth(AUREBESH, ch, keyCell)) / 2);
-    drawStrokeText(c, AUREBESH, glyphX, 364, ch, keyCell, STROKE_MED);
-    text(c, x + 10, 400, ch, 2);
+  // Key column
+  vline(c, SIDEBAR_W, TOP_BAR_BOTTOM + 1, c.h - TOP_BAR_BOTTOM - 1);
+  drawType(c, "plex15m", 20, 64, "[AUREBESH]");
+  fillRect(c, 150, 54, 12, 9);
+  dataRow(c, 20, 92, 140, "LETTERS", String(word.length), false);
+  dataRow(c, 20, 112, 140, "UNIQUE", String(unique.length), false);
+  dataRow(c, 20, 132, 140, "GROUP", group, false);
+  hatch(c, 12, 148, 152, 9);
+  drawType(c, "plex13r", 20, 182, "KEY");
+  const rowStep = unique.length > 8 ? 27 : 29;
+  unique.forEach((ch, i) => {
+    const y = 214 + i * rowStep;
+    drawType(c, "af20", 22, y, ch);
+    drawType(c, "plex15s", 74, y, ch);
+    label(c, 100, y - 1, LETTER_NAMES[ch] ?? "");
+    hline(c, 20, y + 9, 140);
   });
+
+  // The word, inside a crosshair that spans the whole view
+  const boxX = WORD_CX - WORD_HALF_W;
+  const boxY = WORD_CY - WORD_HALF_H;
+  const clear = 12;
+  dotGrid(c, 190, 50, 602, 276, 12, {
+    x: boxX - clear, y: boxY - clear, w: WORD_HALF_W * 2 + clear * 2 + 1, h: WORD_HALF_H * 2 + clear * 2 + 1,
+  });
+  hline(c, SIDEBAR_W + 1, WORD_CY, boxX - clear - SIDEBAR_W - 1);
+  hline(c, WORD_CX + WORD_HALF_W + clear, WORD_CY, c.w - (WORD_CX + WORD_HALF_W + clear));
+  vline(c, WORD_CX, TOP_BAR_BOTTOM + 1, boxY - clear - TOP_BAR_BOTTOM - 1);
+  vline(c, WORD_CX, WORD_CY + WORD_HALF_H + clear, CARDS_TOP - (WORD_CY + WORD_HALF_H + clear));
+  brackets(c, boxX, boxY, WORD_HALF_W * 2 + 1, WORD_HALF_H * 2 + 1);
+
+  const face = wordFace(word);
+  const faceSize = Number(face.slice(2));
+  drawType(c, face, WORD_CX, WORD_CY + Math.round(faceSize * 0.36), word, { align: "center" });
+
+  label(c, 190, 56, "TARGET");
+  drawType(c, "plex11m", 786, 56, "CANON", { align: "right", spacing: 1 });
+  ruler(c, WORD_CX - 150, 296, 300);
+  const caption = unique.length <= 5
+    ? unique.map((ch) => LETTER_NAMES[ch] ?? ch).join("  /  ")
+    : `${word.length} LETTERS  /  ${unique.length} UNIQUE`;
+  // the caption sits on the crosshair line, so clear a strip for it first
+  const captionW = measureType("plex11m", caption, 1);
+  fillRect(c, WORD_CX - captionW / 2 - 6, 304, captionW + 12, 18, 1);
+  drawType(c, "plex11m", WORD_CX, 316, caption, { align: "center", spacing: 1 });
+
+  // Cards
+  hline(c, SIDEBAR_W + 1, CARDS_TOP, c.w - SIDEBAR_W - 1);
+  hatch(c, 392, 342, 7, 130);
+  hatch(c, 596, 342, 7, 130);
+  for (const [x0, x1] of [[190, 384], [410, 588], [614, 788]]) {
+    for (const y of [348, 468]) { plus(c, x0, y); plus(c, x1, y); }
+  }
+
+  label(c, 204, 362, "TRANSLATION");
+  const latinFace: FaceKey = word.length <= 5 ? "plex50r" : word.length <= 7 ? "plex36r" : "plex28r";
+  drawType(c, latinFace, 204, 418, word);
+  dataRow(c, 204, 446, 170, "LANG", "BASIC", true);
+
+  label(c, 424, 362, "WORD DATA");
+  [["LETTERS", String(word.length)], ["UNIQUE", String(unique.length)], ["GROUP", group], ["INDEX", position]]
+    .forEach(([key, value], i) => dataRow(c, 424, 386 + i * 21, 154, key, value, true));
+
+  label(c, 628, 362, "CYCLE");
+  strokeRect(c, 738, 350, 45, 17);
+  drawType(c, "plex10s", 760, 362, "DAILY", { align: "center" });
+  const big = index < 0 ? "--" : String(index + 1);
+  const bigW = drawType(c, "plex36r", 628, 410, big);
+  drawType(c, "plex11m", 628 + bigW + 8, 396, `/${WORDS.length}`);
+  label(c, 628 + bigW + 8, 410, "WORDS");
+  // word lengths for the ten days before today and the nineteen after; today is the wide bar
+  for (let i = 0; i < 30; i++) {
+    const h = pickWord(shiftDateStr(dateStr, i - 10)).length * 3;
+    fillRect(c, 628 + i * 5, 458 - h, i === 10 ? 3 : 2, h);
+  }
 
   return c;
 }

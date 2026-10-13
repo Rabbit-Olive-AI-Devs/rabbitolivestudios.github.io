@@ -1,7 +1,7 @@
 # Desk Panel (third display) — Design
 
 **Date:** 2026-10-12
-**Status:** Approved by the owner on 2026-10-12. **Steps 1 and 2 are built (v3.17.0, DECISIONS #66)**; the on-panel check of the calibration card is still to come. Steps 3 to 5 are not started.
+**Status:** Approved by the owner on 2026-10-12. **Steps 1 and 2 are built (DECISIONS #66)**, and their lettering and layout were then redone with real fonts after the owner rejected the first version (**DECISIONS #67 supersedes sections 5–7 on type and layout**); the on-panel check of the calibration card is still to come. Steps 3 to 5 are not started.
 **Plan for steps 1 and 2:** `docs/superpowers/plans/2026-10-12-desk-panel-style-kit-and-aurebesh.md`
 
 ## 1. What this is

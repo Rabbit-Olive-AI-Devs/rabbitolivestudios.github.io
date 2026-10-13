@@ -51,7 +51,7 @@ Every session must begin with these steps:
 | Touching the daily cron or `dailyWarmTargetDate` | The warm must fill the **next** Chicago date before it rolls (`35 4,5 * * *`). Warming "right after midnight" reopens the hole that blanked the skyline (DECISIONS #64) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
-| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as a 1-bit image, never with live HTML text. Tune sizes in `src/hud/style.ts` and judge them on `/desk/test` **on the panel**. Keep these pages free of KV, AI and cron (DECISIONS #66) |
+| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as a 1-bit image, never with live HTML text. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep these pages free of KV, AI and cron (DECISIONS #66) |
 
 ---
 
@@ -346,15 +346,16 @@ eink-dashboard/
     worldcup-fonts.ts     — GENERATED: inlined Inter 500/700 WOFF2 (base64) for the B&W image source
     worldcup-flags.ts     — GENERATED: Spectra-6 dithered country-flag PNGs (color page only; `npm run flags`)
     worldcup-testdata.ts  — canned fixtures for ?test-phase previews
-    hud/                  — Desk panel drawing kit: Worker-drawn 1-bit pages (DECISIONS #66)
-      canvas.ts           — 800x480 1-bit buffer + clipping primitives (line, rect, circle, invert, 8x8 text)
-      stroke.ts           — stroke-font engine (glyphs as polylines, optional proportional spacing) + Latin capitals/digits
-      style.ts            — tunable sizes chosen from the on-panel calibration card
-      parts.ts            — pieces of the HUD look: frame, brackets, crosshair, ruler, hatch, dot fill, title bar, accent block
+    hud/                  — Desk panel drawing kit: Worker-drawn 1-bit pages (DECISIONS #66, #67)
+      canvas.ts           — 800x480 1-bit buffer + clipping primitives (line, rect, invert)
+      fonts-data.ts       — GENERATED (`npm run desk-fonts`): 1-bit glyph bitmaps of IBM Plex Mono + Aurebesh AF
+      type.ts             — draws text from those glyphs: alignment, letter-spacing, white-on-black
+      chrome.ts           — the top bar every desk page shares (breadcrumb, status, inverted pill)
+      parts.ts            — pieces of the HUD look: brackets, ruler, hatch, dot grid, "+" marks; all bounded by the canvas
       page.ts             — canvas → 1-bit PNG → one-request HTML page; a draw failure becomes the text page
       test-card.ts        — the calibration card drawn at /desk/test
-      aurebesh.ts         — Aurebesh stroke glyphs (26 letters, our own data) + the check sheet
-      aurebesh-words.ts   — word list, date-to-word picker, ?word=/?date= cleaning
+      aurebesh.ts         — the 26-letter check sheet
+      aurebesh-words.ts   — word list, themes, letter names, date-to-word picker, ?word=/?date= cleaning
       aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)
@@ -376,6 +377,9 @@ eink-dashboard/
     upload-photos.sh      — Upload birthday photos to R2
     download-skyline-photos.sh — Download skyline photos from Unsplash
     upload-skyline-photos.sh   — Upload skyline photos to R2
+    generate-desk-fonts.mjs    — Offline: rasterise fonts/desk/ into src/hud/fonts-data.ts (`npm run desk-fonts`, DECISIONS #67)
+  fonts/
+    desk/                 — Source fonts for the desk panel + licences (IBM Plex Mono OFL, Aurebesh AF CC0); not shipped
   CLAUDE.md               — This file
   DECISIONS.md            — Architecture & design decisions
   README.md               — Project documentation

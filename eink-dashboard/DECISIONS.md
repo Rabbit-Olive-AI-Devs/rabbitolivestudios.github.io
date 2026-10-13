@@ -2510,6 +2510,11 @@ No cache key bump: the PNG pipelines are untouched, and the wrapper was already 
 
 ## 66. Desk Panel Pages Are Drawn by the Worker as 1-Bit Images (v3.17.0, 2026-10-12)
 
+> **Partly superseded by #67 the same day.** Drawing the page as a 1-bit image stands. The
+> lettering described below (the 8x8 bitmap font, hand-traced stroke letters for Latin and
+> Aurebesh) and the first layout were rejected by the owner on sight and replaced with real fonts
+> and a lighter layout. `stroke.ts`, `style.ts` and the traced Aurebesh data no longer exist.
+
 ### Context
 
 A third panel joined the project: a second mono reTerminal E1001 for the home-office desk. Its
@@ -2611,3 +2616,92 @@ note belongs here when that is done.
 - **A desk page is drawn with `src/hud/`, never with live HTML text.**
 - Tune sizes in `src/hud/style.ts` and judge them on `/desk/test` on the panel, not in a browser.
 - A page that depends only on the date needs no cache at all.
+
+---
+
+## 67. Desk Panel Type Is Real Fonts, Rasterised Offline to 1-Bit Glyphs (2026-10-12)
+
+### What happened
+
+#66 shipped the desk panel with drawn lettering: the 8x8 bitmap font for labels and hand-traced
+stroke letters for everything large, including Aurebesh. The owner's reaction on seeing it was
+"VERY UGLY! I believe we need to use REAL fonts", and that the layout "could be better, more
+modern but still keeping that dashboard style".
+
+This was a repeat of a known mistake. The 8x8 font had already been rejected once, for the World
+Cup page, as a pixel-font "joke" (#48), and the fix then was a real typeface rendered to a 1-bit
+image. #66 treated lettering as an open question for a calibration card when the answer was
+already on record.
+
+### Decision
+
+**Real typefaces, turned into pure 1-bit glyph bitmaps on a development machine and committed.**
+
+- `npm run desk-fonts` (`scripts/generate-desk-fonts.mjs`) loads the fonts in `fonts/desk/`,
+  renders every needed character with `@resvg/resvg-js` at 4x, averages down and thresholds, and
+  writes `src/hud/fonts-data.ts`. It reads advances and vertical metrics straight from the font's
+  own tables, so spacing is the font's, rounded to whole pixels. This is the same pattern as
+  `npm run flags` (#45): the heavy tool is a devDependency and never ships.
+- `src/hud/type.ts` copies those bitmaps onto the canvas, with alignment, letter-spacing and a
+  white-on-black mode. The Worker still does no font work, and the page still contains no grey.
+- Text: **IBM Plex Mono** (Regular, Medium, SemiBold; SIL OFL 1.1). Aurebesh: **Aurebesh AF,
+  Canon** by AurekFonts, whose name table reads "CC-0 public domain". The owner chose both from
+  mockups; Aurebesh AF is also the default the AurekFonts guide to Aurebesh fonts recommends.
+  Licences are in `fonts/desk/`.
+- A "face" is one font at one size and weight (`plex11m`, `af112`). Sizes are a fixed list in the
+  generator; a page that needs a new size adds a face and regenerates.
+
+### The layout
+
+Rebuilt from mockups the owner approved, after the reference dashboard: a slim top bar with a
+breadcrumb and an inverted pill (`chrome.ts`, shared by every desk page); a key column listing
+each letter used with its glyph and its Aurebesh name; the word inside hairline brackets on a
+crosshair that spans the view, over a sparse dot field; three cards with "+" corner marks and
+striped dividers. Every number on the page is real: the word's place in the 120-word cycle, its
+theme, and a strip of word lengths for the ten days before and nineteen after today.
+
+The word is set in the largest of six Aurebesh sizes that fits its box. The smallest was added
+when a test showed nine W's overflowing at 50px.
+
+### Cost
+
+`fonts-data.ts` is 207 KiB of source. The Worker goes from 245 KiB (60 KiB gzip) to 481 KiB
+(99 KiB gzip), against a 3 MiB limit. Still no KV, no AI, no cron: a page is drawn per request
+from the date.
+
+### Rejected
+
+- **Shipping the font files and rasterising in the Worker.** There is no font rasteriser in the
+  runtime, and a WASM one would not fit the free plan's CPU budget per request.
+- **Live HTML with the fonts inlined as web fonts.** Real type, but drawn by SenseCraft's cloud
+  browser, which is the source of the fog (#48).
+- **Aurebesh Rodian, OmaTres, Docking Bay 94** (MIT, same author). Shown to the owner first;
+  rejected as "very bad still" next to Aurebesh AF.
+- **Geist Mono** for text. The owner preferred the IBM Plex Mono mockup.
+- **Aurebesh AF Bold.** The author marks it a beta, and the regular cut is already heavy.
+
+### Verified
+
+- `npm run typecheck`, `npm run test:utils` (147 tests) and `npm run dry-run` pass. New tests
+  cover: every face carries the characters the pages use and each bitmap is the size its metrics
+  imply; measuring and alignment; ink staying inside its text box and on its baseline; clipping;
+  white type on a block; the word fitting its box for the widest nine-letter input; `hatch` and
+  `dotGrid` doing work bounded by the canvas when asked for an absurd area.
+- The word page (JEDI, MANDALORE, nine W's), the check sheet and the calibration card were
+  rendered to PNG and inspected.
+
+### Not yet verified
+
+Nothing has been seen on the panel. Small sizes are the risk: `/desk/test` shows every text size
+from 10px up so the owner can say which is the smallest that reads cleanly.
+
+### What to remember
+
+- **Do not propose the 8x8 bitmap font or hand-drawn letters for anything the owner reads.**
+  Real fonts, pre-rendered to 1-bit, are both crisp and good-looking.
+- Show the owner a mockup before building a look. Three rounds of pictures settled what a spec
+  and a plan had got wrong.
+- `Resvg.render().pixels` copies the whole buffer on every access. Read it once into a variable;
+  reading it inside a pixel loop exhausted memory.
+- Four files named "Aurebesh AF" share one family name, so load only the cut you want when
+  rasterising.

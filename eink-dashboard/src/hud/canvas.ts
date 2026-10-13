@@ -1,12 +1,11 @@
 /**
- * 1-bit drawing surface for the desk panel pages (DECISIONS #66).
+ * 1-bit drawing surface for the desk panel pages (DECISIONS #66). Text is drawn by
+ * type.ts from pre-rendered glyph bitmaps of real fonts (DECISIONS #67).
  *
  * Values match encodePNG1Bit: 0 = black, 1 = white. Every primitive clips to
  * the buffer, so callers never need to bounds-check and a miscalculated layout
  * degrades to a cut-off shape instead of an exception or a wrapped row.
  */
-
-import { drawText, measureText } from "../font";
 
 export const PANEL_W = 800;
 export const PANEL_H = 480;
@@ -87,31 +86,6 @@ export function line(c: Canvas, x0: number, y0: number, x1: number, y1: number, 
     if (e2 >= dy) { err += dy; x += sx; }
     if (e2 <= dx) { err += dx; y += sy; }
   }
-}
-
-/** Midpoint circle outline. */
-export function circle(c: Canvas, cx: number, cy: number, r: number, t: number = 1): void {
-  let x = Math.round(r);
-  let y = 0;
-  let err = 1 - x;
-  while (x >= y) {
-    stamp(c, cx + x, cy + y, t); stamp(c, cx - x, cy + y, t);
-    stamp(c, cx + x, cy - y, t); stamp(c, cx - x, cy - y, t);
-    stamp(c, cx + y, cy + x, t); stamp(c, cx - y, cy + x, t);
-    stamp(c, cx + y, cy - x, t); stamp(c, cx - y, cy - x, t);
-    y++;
-    if (err < 0) err += 2 * y + 1;
-    else { x--; err += 2 * (y - x) + 1; }
-  }
-}
-
-/** 8x8 bitmap text. `scale` is an integer: 1 = 8px tall, 2 = 16px, 3 = 24px. */
-export function text(c: Canvas, x: number, y: number, s: string, scale: number = 1): void {
-  drawText(c.px, c.w, c.h, Math.round(x), Math.round(y), s, scale);
-}
-
-export function textWidth(s: string, scale: number = 1): number {
-  return measureText(s, scale);
 }
 
 export function countBlack(c: Canvas): number {
