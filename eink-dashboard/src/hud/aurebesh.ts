@@ -3,7 +3,7 @@
  *
  * The 26 single letters only; the digraph letters (CH, SH, TH and others) are
  * left out. Letters are wider than tall and vary in width, so each glyph keeps
- * its true proportions, centred in a 6x4 cell. The letterforms originate from Star Wars. The stroke data below was
+ * its true proportions in a 6x4 cell and the font advances by each glyph's own width. The letterforms originate from Star Wars. The stroke data below was
  * drawn for this project against a public reference chart; no font file or film
  * artwork is in the repository, and the use is personal and non-commercial.
  */
@@ -12,12 +12,13 @@ import type { Canvas } from "./canvas";
 import { createCanvas, text } from "./canvas";
 import { frame, titleBar } from "./parts";
 import type { StrokeFont } from "./stroke";
-import { drawStrokeText } from "./stroke";
+import { drawStrokeText, strokeTextWidth } from "./stroke";
 
 export const AUREBESH: StrokeFont = {
   w: 6,
   h: 4,
   gap: 2,
+  proportional: true,
   glyphs: {
     A: "0.4,0 0.4,1.2 3,1.2 5.7,0.2|0.4,4 0.4,2.8 3,2.8 5.7,3.8",
     B: "0.97,1.53 1.81,0.47 4.19,0.47 5.03,1.53|0.97,2.47 1.81,3.53 4.19,3.53 5.03,2.47|2.41,2 3.59,2",
@@ -60,8 +61,10 @@ export function drawAurebeshSheet(): Canvas {
   for (let i = 0; i < letters.length; i++) {
     const x = 40 + (i % cols) * cellW;
     const y = 70 + Math.floor(i / cols) * cellH;
-    drawStrokeText(c, AUREBESH, x, y, letters[i], 9, 3);
-    text(c, x + 20, y + 66, letters[i], 2);
+    const cell = 9;
+    const glyphX = x + Math.round((AUREBESH.w * cell - strokeTextWidth(AUREBESH, letters[i], cell)) / 2);
+    drawStrokeText(c, AUREBESH, glyphX, y, letters[i], cell, 4);
+    text(c, x + 20, y + 56, letters[i], 2);
   }
   return c;
 }

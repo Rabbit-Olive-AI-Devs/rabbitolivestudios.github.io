@@ -16,6 +16,8 @@ export interface StrokeFont {
   h: number;
   /** Space between glyphs, in grid units. */
   gap: number;
+  /** Advance by each glyph's own drawn width instead of the full cell. */
+  proportional?: boolean;
   glyphs: Record<string, string>;
 }
 
@@ -24,9 +26,20 @@ export function parseGlyph(g: string): number[][][] {
     poly.trim().split(/\s+/).map((p) => p.split(",").map(Number)));
 }
 
+/** Left edge and width of one character, in grid units. */
+function extent(font: StrokeFont, ch: string): { min: number; width: number } {
+  const g = font.glyphs[ch];
+  if (!font.proportional || !g) return { min: 0, width: font.w };
+  const xs = parseGlyph(g).flat().map((p) => p[0]);
+  const min = Math.min(...xs);
+  return { min, width: Math.max(...xs) - min };
+}
+
 export function strokeTextWidth(font: StrokeFont, s: string, cell: number): number {
-  if (s.length === 0) return 0;
-  return (s.length * font.w + (s.length - 1) * font.gap) * cell;
+  const chars = [...s];
+  if (chars.length === 0) return 0;
+  const units = chars.reduce((sum, ch) => sum + extent(font, ch).width, 0) + (chars.length - 1) * font.gap;
+  return units * cell;
 }
 
 /**
@@ -37,9 +50,11 @@ export function strokeTextWidth(font: StrokeFont, s: string, cell: number): numb
 export function drawStrokeText(
   c: Canvas, font: StrokeFont, x: number, y: number, s: string, cell: number, t: number,
 ): void {
-  let gx = x;
+  let penX = x;
   for (const ch of s) {
     const g = font.glyphs[ch];
+    const ext = extent(font, ch);
+    const gx = penX - ext.min * cell;
     if (g) {
       for (const poly of parseGlyph(g)) {
         if (poly.length === 1) {
@@ -52,7 +67,7 @@ export function drawStrokeText(
         }
       }
     }
-    gx += (font.w + font.gap) * cell;
+    penX += (ext.width + font.gap) * cell;
   }
 }
 

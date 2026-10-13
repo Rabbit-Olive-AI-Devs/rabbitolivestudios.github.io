@@ -332,3 +332,74 @@ test("cleanWord reduces any input to A-Z, capped at 9 letters", () => {
   assert.equal(words.cleanWord("café \u{1F680}"), "CAF");
   for (const empty of [null, "", "   ", "1234", "\u{1F680}"]) assert.equal(words.cleanWord(empty), null);
 });
+const ap = fromBuild("src/hud/aurebesh-page.js");
+
+test("a proportional font advances by each glyph's own width", () => {
+  const f = { w: 6, h: 4, gap: 2, proportional: true, glyphs: { N: "2,0 2,4|4,0 4,4", W: "0,0 6,0 6,4 0,4" } };
+  assert.equal(st.strokeTextWidth(f, "N", 10), 20, "narrow glyph: extent 2..4");
+  assert.equal(st.strokeTextWidth(f, "W", 10), 60);
+  assert.equal(st.strokeTextWidth(f, "NW", 10), 20 + 20 + 60, "widths plus one gap");
+  assert.equal(st.strokeTextWidth(f, "N?", 10), 20 + 20 + 60, "unknown characters take the full cell");
+  const c = cv.createCanvas(200, 60);
+  st.drawStrokeText(c, f, 50, 10, "NW", 10, 1);
+  const cols = new Set();
+  for (let y = 0; y < 60; y++) for (let x = 0; x < 200; x++) if (c.px[y * 200 + x] === 0) cols.add(x);
+  assert.equal(Math.min(...cols), 50, "the narrow glyph starts at x, not at its cell offset");
+  assert.equal(Math.max(...cols), 50 + 20 + 20 + 60, "the wide glyph ends at the text width");
+});
+
+test("Aurebesh is proportional: a narrow letter takes less room than a wide one", () => {
+  assert.ok(st.strokeTextWidth(aur.AUREBESH, "I", 10) < st.strokeTextWidth(aur.AUREBESH, "A", 10) / 2);
+});
+
+test("fitCell shrinks long words to fit and caps short ones", () => {
+  for (const w of ["EWO", "JEDI", "MANDALORE", "WWWWWWWWW", "IIIIIIIII"]) {
+    const cell = ap.fitCell(w);
+    assert.ok(Number.isInteger(cell) && cell >= 1 && cell <= 30, `${w}: cell ${cell}`);
+    assert.ok(st.strokeTextWidth(aur.AUREBESH, w, cell) <= 620, `${w} overflows`);
+  }
+  assert.equal(ap.fitCell("I"), 30, "a tiny word is capped, not blown up");
+  assert.ok(ap.fitCell("MANDALORE") < ap.fitCell("JEDI"));
+});
+
+test("the word page keeps all ink inside the frame for the shortest and longest words", () => {
+  for (const w of ["EWO", "MANDALORE", "WWWWWWWWW"]) {
+    const c = ap.drawAurebeshPage(w, "2026-10-12");
+    for (let x = 0; x < 800; x++) {
+      for (const y of [0, 1, 2, 3, 4, 5, 6, 7, 472, 473, 474, 475, 476, 477, 478, 479]) {
+        assert.equal(c.px[y * 800 + x], 1, `${w}: ink in the margin at ${x},${y}`);
+      }
+    }
+    for (let y = 0; y < 480; y++) {
+      for (const x of [0, 1, 2, 3, 4, 5, 6, 7, 792, 793, 794, 795, 796, 797, 798, 799]) {
+        assert.equal(c.px[y * 800 + x], 1, `${w}: ink in the margin at ${x},${y}`);
+      }
+    }
+    assert.ok(cv.countBlack(c) > 4000);
+  }
+});
+
+test("different words draw different pages", () => {
+  const a = ap.drawAurebeshPage("JEDI", "2026-10-12");
+  const b = ap.drawAurebeshPage("REBEL", "2026-10-12");
+  assert.notEqual(Buffer.from(a.px).toString("base64"), Buffer.from(b.px).toString("base64"));
+});
+
+const pageBytes = async (qs) => {
+  const res = await desk.handleDeskAurebesh(new URL(`https://x/desk/aurebesh${qs}`));
+  assert.equal(res.status, 200);
+  return Buffer.from(inlinedPng(await res.text())).toString("base64");
+};
+
+test("?word and ?date select the page; bad input falls back instead of failing", async () => {
+  const jedi = await pageBytes("?word=jedi&date=2026-10-12");
+  assert.equal(await pageBytes("?word=JEDI!!&date=2026-10-12"), jedi, "cleaned to the same word");
+  assert.notEqual(await pageBytes("?word=rebel&date=2026-10-12"), jedi);
+  const daily = await pageBytes("?date=2026-10-12");
+  assert.equal(await pageBytes("?word=1234&date=2026-10-12"), daily, "unusable word -> daily word");
+  assert.equal(await pageBytes("?word=&date=2026-10-12"), daily);
+  assert.notEqual(await pageBytes("?date=2026-10-13"), daily);
+  await pageBytes("?date=2026-13-45");            // must not throw
+  await pageBytes("?date=yesterday&word=%F0%9F%9A%80");
+  assert.notEqual(await pageBytes("?sheet"), daily, "?sheet still shows the check sheet");
+});
