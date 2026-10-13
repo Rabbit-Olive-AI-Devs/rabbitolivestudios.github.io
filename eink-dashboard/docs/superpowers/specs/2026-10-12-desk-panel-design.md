@@ -172,6 +172,14 @@ other no-AI test parameters.
   Libertadores, and carries kickoff time (UTC), venue, competition and, for played matches, the
   score in the event title. It has **no league table**, so table position needs a second source
   or is dropped. It is an unofficial feed and could change without notice.
+- League table source. **ESPN's public endpoint** answers without a key:
+  `https://site.api.espn.com/apis/v2/sports/soccer/bra.1/standings` returned all 20 Série A
+  teams with rank, games played, points and goal difference on 2026-10-12 (Flamengo is ESPN team
+  id 819). The Worker can call it directly; the `espn-pp-cli` tool the owner's other agent
+  mentioned is not needed. Also unofficial.
+- **Sportmonks** (<https://docs.sportmonks.com/v3/>) is a third candidate; the owner has a test
+  API key. Not evaluated: which leagues the test plan covers is unknown, and it would add a
+  secret (`wrangler secret put`, never in the repo) where the two feeds above need none.
 - Which exoplanet fields NASA's archive returns reliably enough to show every day.
 - Whether a locked (not sleeping) Mac still runs the reporter.
 - The new panel's SenseCraft device ID, once paired.
