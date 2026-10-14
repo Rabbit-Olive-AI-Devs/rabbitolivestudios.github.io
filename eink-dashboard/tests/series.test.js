@@ -185,3 +185,68 @@ test("office conversion keeps greys black-and-white and saturated red red", () =
   const ridx = conv.toOfficeIndices(red.rgb, 32, 32);
   assert.ok([...ridx].every((k) => k === 2));
 });
+
+const letter = fromBuild("src/series/letter.js");
+const cvs = fromBuild("src/hud/canvas.js");
+
+const PANEL = { x: 12, y: 46, w: 776, h: 346 };
+const blackCount = (c) => [...c.px].filter((v) => v === 0).length;
+
+test("a balloon is sized to its text and every letter lies inside it", () => {
+  const L = letter.newLayers();
+  const r = letter.placeBalloon(L, { speaker: "BOLT", text: "I have calculated our odds. I will not be sharing them.", anchor: [600, 260] }, PANEL, [], [[600, 260]]);
+  assert.equal(typeof r, "object", r);
+  assert.ok(r.w < 400 && r.h < 140, "balloon not sized to its text");
+  assert.ok(r.x >= PANEL.x && r.y >= PANEL.y && r.x + r.w <= PANEL.x + PANEL.w && r.y + r.h <= PANEL.y + PANEL.h);
+  // letters landed on paper (placeBalloon already checked them against the ellipse)
+  // Black pixels inside the ellipse are letters; the outline sits just outside it.
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rx = r.w / 2, ry = r.h / 2;
+  let lettersOffPaper = 0;
+  for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) {
+    const i = y * 800 + x;
+    const inEllipse = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1;
+    if (inEllipse && L.ink.px[i] === 0 && L.paper.px[i] !== 0) lettersOffPaper++;
+  }
+  assert.equal(lettersOffPaper, 0);
+  assert.ok(blackCount(L.ink) > 200);
+});
+
+test("a balloon never covers a speaker or a keep-clear box", () => {
+  const L = letter.newLayers();
+  const keep = { x: 300, y: 46, w: 488, h: 346 }; // everything right of x=300 is a character
+  const r = letter.placeBalloon(L, { speaker: "VESS", text: "Hold still.", anchor: [250, 300] }, PANEL, [keep], [[250, 300]]);
+  assert.equal(typeof r, "object", r);
+  assert.ok(r.x + r.w <= keep.x - 6, "balloon overlaps the keep-clear box");
+  const dx = 250 - (r.x + r.w / 2), dy = 300 - (r.y + r.h / 2);
+  assert.ok(((dx / (r.w / 2)) ** 2 + (dy / (r.h / 2)) ** 2) > 1, "balloon covers the speaker's head");
+});
+
+test("a line too long for four lines is refused with the speaker's name", () => {
+  const L = letter.newLayers();
+  const long = "word ".repeat(80).trim();
+  const r = letter.placeBalloon(L, { speaker: "FIGURE", text: long, anchor: [400, 300] }, PANEL, [], [[400, 300]]);
+  assert.match(r, /^FIGURE: line too long for any balloon/);
+});
+
+test("no room for a balloon is refused", () => {
+  const L = letter.newLayers();
+  const r = letter.placeBalloon(L, { speaker: "BOLT", text: "Hello there, friend.", anchor: [400, 200] }, PANEL, [PANEL], [[400, 200]]);
+  assert.match(r, /^BOLT: no room for the balloon/);
+});
+
+test("an off-picture voice gets a square box with the speaker's name", () => {
+  const L = letter.newLayers();
+  const r = letter.placeBalloon(L, { speaker: "PATROL", text: "Sweep the district again.", anchor: null }, PANEL, [], []);
+  assert.equal(typeof r, "object", r);
+  // the name bar is solid black across the top of the box
+  assert.equal(L.ink.px[(r.y + 3) * 800 + r.x + 4], 0);
+});
+
+test("caption boxes and text blocks refuse what does not fit", () => {
+  const L = letter.newLayers();
+  assert.equal(typeof letter.captionBox(L, 22, 56, "MERREK PRIME. THE SALT DOCKS.", 760, "caption"), "object");
+  assert.match(letter.captionBox(L, 22, 56, "X".repeat(200), 300, "caption"), /^caption: too long/);
+  const c = cvs.createCanvas();
+  assert.equal(letter.textBlock(c, "plex15m", 16, 420, "Short narration.", 548, 2, 21, "narration"), null);
+  assert.match(letter.textBlock(c, "plex15m", 16, 420, "word ".repeat(60), 548, 2, 21, "narration"), /^narration: needs \d+ lines, room for 2/);
+});
