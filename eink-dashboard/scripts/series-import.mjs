@@ -29,6 +29,7 @@ function compile() {
   return {
     pkgv: load("src/series/package.js"), build: load("src/series/build.js"), art: load("src/series/art.js"),
     tpl: load("src/series/templates.js"), types: load("src/series/types.js"), dec: load("src/png-decode.js"),
+    schedule: load("src/series/schedule.js"),
     hud: { canvas: load("src/hud/canvas.js"), type: load("src/hud/type.js"), parts: load("src/hud/parts.js") },
     png: load("src/png.js"),
   };
@@ -37,6 +38,15 @@ function compile() {
 function arg(name, fallback = null) {
   const i = process.argv.indexOf(name);
   return i > 0 ? process.argv[i + 1] : fallback;
+}
+
+/** Build output is a spoiler: never inside the (public) repo, and only ever a folder we made. */
+function safeOut(dir) {
+  const abs = path.resolve(dir);
+  const repoRoot = path.resolve(REPO, "..");
+  if (abs === repoRoot || abs.startsWith(repoRoot + path.sep)) throw new Error(`--out ${abs} is inside the repo; use ~/series-work/…`);
+  if ([os.homedir(), "/", process.cwd()].includes(abs)) throw new Error(`--out ${abs} would be emptied; give a dedicated folder`);
+  return abs;
 }
 
 function unpack(src) {
@@ -50,7 +60,7 @@ function unpack(src) {
 
 async function cmdBuild() {
   const src = process.argv[3];
-  const out = arg("--out", path.join(os.homedir(), "series-work", "out"));
+  const out = safeOut(arg("--out", path.join(os.homedir(), "series-work", "out")));
   const only = arg("--chapter") ? Number(arg("--chapter")) : null;
   const m = compile();
   const dir = unpack(src);
@@ -73,9 +83,14 @@ async function cmdBuild() {
       try {
         execFileSync("sips", ["-s", "format", "png", path.join(artDir, p.art), "--out", file], { stdio: "ignore" });
       } catch { decoded.set(p.art, null); continue; }
-      const d = await m.dec.decodePNG(new Uint8Array(fs.readFileSync(file)));
-      const rgb = d.rgb ?? Uint8Array.from({ length: d.width * d.height * 3 }, (_, i) => d.gray[Math.floor(i / 3)]);
-      decoded.set(p.art, { w: d.width, h: d.height, rgb: m.art.flattenAlpha(rgb, d.alpha) });
+      try {
+        const d = await m.dec.decodePNG(new Uint8Array(fs.readFileSync(file)));
+        const rgb = d.rgb ?? Uint8Array.from({ length: d.width * d.height * 3 }, (_, i) => d.gray[Math.floor(i / 3)]);
+        decoded.set(p.art, { w: d.width, h: d.height, rgb: m.art.flattenAlpha(rgb, d.alpha) });
+      } catch (err) {
+        console.error(`${p.art}: ${err.message}`);
+        decoded.set(p.art, null); // reported per scene as "could not be read"
+      }
     }
   }
   const all = [...problems];
@@ -87,7 +102,7 @@ async function cmdBuild() {
   }
   for (const [k, v] of await m.build.buildCards(pkg.season)) files.set(k, v);
   if (all.length) return report(out, all);
-  fs.rmSync(out, { recursive: true, force: true });
+  fs.rmSync(path.join(out, "series"), { recursive: true, force: true });
   for (const [k, v] of files) {
     fs.mkdirSync(path.dirname(path.join(out, k)), { recursive: true });
     fs.writeFileSync(path.join(out, k), v);
@@ -109,9 +124,25 @@ function wrangler(args, opts = {}) {
   return execFileSync("npx", ["wrangler", ...args, "--remote"], { cwd: REPO, ...opts });
 }
 
-function readSchedule() {
-  try { return JSON.parse(wrangler(["r2", "object", "get", `${BUCKET}/${SCHEDULE_KEY}`, "--pipe"], { stdio: ["ignore", "pipe", "ignore"] }).toString()); }
-  catch { return { seasons: [] }; }
+/**
+ * Only a definite "no such object" means an empty schedule. Any other failure (network,
+ * expired login, bad JSON) aborts: writing back a guessed schedule would wipe approvals.
+ */
+function readSchedule(m) {
+  let text;
+  try {
+    text = wrangler(["r2", "object", "get", `${BUCKET}/${SCHEDULE_KEY}`, "--pipe"], { stdio: ["ignore", "pipe", "pipe"] }).toString();
+  } catch (err) {
+    const msg = `${err.stderr ?? ""}${err.stdout ?? ""}${err.message}`;
+    if (/does not exist|NoSuchKey|not found/i.test(msg)) return { seasons: [] };
+    throw new Error(`could not read ${SCHEDULE_KEY}; nothing changed:\n${msg}`);
+  }
+  const parsed = JSON.parse(text);
+  if (!m.schedule.isSchedule(parsed)) throw new Error(`${SCHEDULE_KEY} has the wrong shape; nothing changed`);
+  const backups = path.join(os.homedir(), "series-work", "schedule-backups");
+  fs.mkdirSync(backups, { recursive: true });
+  fs.writeFileSync(path.join(backups, `${new Date().toISOString().replace(/[:.]/g, "-")}.json`), text);
+  return parsed;
 }
 
 function writeSchedule(s) {
@@ -123,7 +154,14 @@ function writeSchedule(s) {
 async function cmdUpload() {
   const out = process.argv[3];
   const meta = JSON.parse(fs.readFileSync(path.join(out, "season.json"), "utf8"));
-  const keys = execFileSync("find", ["series", "-name", "*.png"], { cwd: out }).toString().trim().split("\n").filter(Boolean);
+  const m = compile();
+  const before = readSchedule(m);
+  const plan = m.schedule.mergeUpload(before, meta.season, meta.chapters, process.argv.includes("--replace-approved"));
+  if (plan.skipped.length) console.log(`chapters ${plan.skipped.join(", ")} are approved and on air: not replaced (re-run with --replace-approved once the showrunner approved the fix)`);
+  const pad = (n) => String(n).padStart(2, "0");
+  const skip = new Set(plan.skipped.map((c) => `series/s${pad(meta.season.number)}/c${pad(c)}/`));
+  const keys = execFileSync("find", ["series", "-name", "*.png"], { cwd: out }).toString().trim().split("\n").filter(Boolean)
+    .filter((k) => ![...skip].some((prefix) => k.startsWith(prefix)));
   let next = 0, failed = 0;
   const worker = async () => {
     while (next < keys.length) {
@@ -136,19 +174,13 @@ async function cmdUpload() {
   };
   await Promise.all(Array.from({ length: 6 }, worker));
   if (failed) { console.error(`${failed} uploads failed; schedule not changed. Re-run upload.`); process.exit(1); }
-  const s = readSchedule();
-  const m = compile();
-  let entry = s.seasons.find((x) => x.number === meta.season.number);
-  if (!entry) { entry = { ...meta.season, chapters: m.types.plannedChapters(meta.season.number), approved: [], pending: [] }; s.seasons.push(entry); }
-  Object.assign(entry, meta.season, { chapters: m.types.plannedChapters(meta.season.number) });
-  for (const c of meta.chapters) if (!entry.approved.includes(c) && !entry.pending.includes(c)) entry.pending.push(c);
-  writeSchedule(s);
-  console.log(`uploaded ${keys.length} pages; chapters ${meta.chapters.join(", ")} pending approval`);
+  writeSchedule(plan.schedule);
+  console.log(`uploaded ${keys.length} pages; chapters ${plan.upload.join(", ")} uploaded (new ones pending approval)`);
 }
 
 function cmdApprove() {
   const season = Number(arg("--season")), chapter = Number(arg("--chapter"));
-  const s = readSchedule();
+  const s = readSchedule(compile());
   const e = s.seasons.find((x) => x.number === season);
   if (!e || !(e.pending.includes(chapter) || e.approved.includes(chapter))) { console.error("that chapter is not uploaded"); process.exit(1); }
   e.pending = e.pending.filter((c) => c !== chapter);

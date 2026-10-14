@@ -472,7 +472,7 @@ test("the proof page needs the key and lists every scene of a chapter", async ()
   const env = { SERIES: bucket(objects), SERIES_KEY: "k" };
   assert.equal((await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3"))).status, 404);
   const html = await (await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3&key=k"))).text();
-  assert.equal((html.match(/<img /g) || []).length, 25);
+  assert.equal((html.match(/<img /g) || []).length, 26); // 25 scenes + teaser, linked not inlined
   assert.match(html, /PENDING/);
 });
 
@@ -507,4 +507,68 @@ test("end to end: PNG pictures decode, build and give valid pages", async () => 
   assert.deepEqual(problems, []);
   const page = await decodePNG(files.get("series/s00/c01/s02-home.png"));
   assert.equal(page.width, 800);
+});
+
+// --- Final review fixes ---
+
+const sched = fromBuild("src/series/schedule.js");
+
+test("review: an unapproved chapter keeps alerting through its airing week", () => {
+  // Chapter 3 airs Mon 9 Nov and is only pending; Wednesday 11 Nov the panels show chapter 2.
+  const p = watch.scheduleProblems(SCHEDULE, chi("2026-11-11T12:00:00", CST));
+  assert.ok(p.some((x) => /chapter 3 of the Prologue/.test(x)), p.join("\n"));
+});
+
+test("review: a failing series check reports a problem instead of throwing", async () => {
+  const env = { SERIES: { get: async () => { throw new Error("R2 down"); } } };
+  const p = await watch.seriesProblems(env, new Date());
+  assert.equal(p.length, 1);
+  assert.match(p[0], /^The series: check failed: R2 down/);
+});
+
+test("review: a schedule season with the wrong shape gives the text page, not a 500", async () => {
+  const bad = { seasons: [{ number: 0, premiere: "2026-10-26", chapters: 10 }] }; // no approved/pending
+  const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(bad) }) };
+  const res = await sp.handleSeries(env, new URL("https://x/series"), "home", chi("2026-10-26T10:30:00", CDT));
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /<h1>/);
+  assert.equal(sched.isSchedule(bad), false);
+  assert.equal(sched.isSchedule(SCHEDULE), true);
+});
+
+test("review: a held panel's anchor outside the panel is refused", async () => {
+  const p = pkgv.samplePackage();
+  p.chapters[0].scenes[2].panels[0].art = "hold";
+  p.chapters[0].scenes[2].panels[0].balloons[0].anchor = [900, 100]; // panel is 776 wide
+  const { problems } = await build.buildChapter(p, 1, artSource());
+  assert.ok(problems.some((x) => /chapter 1 scene 3: balloon 1 anchor \[900, 100\] is outside the held panel/.test(x)), problems.join("\n"));
+});
+
+test("review: the proof page links its images instead of inlining them", async () => {
+  const objects = { "series/schedule.json": JSON.stringify(SCHEDULE) };
+  for (let s = 1; s <= 25; s++) objects[`series/s00/c03/s${String(s).padStart(2, "0")}-office.png`] = PNG;
+  const env = { SERIES: { ...bucket(objects), async head(k) { return k in objects ? {} : null; } }, SERIES_KEY: "k" };
+  const html = await (await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3&key=k"))).text();
+  assert.doesNotMatch(html, /data:image/);
+  assert.equal((html.match(/<img src="\/series\/proof\/img\?/g) || []).length, 26); // 25 scenes + teaser
+  const img = await sp.handleSeriesProofImage(env, new URL("https://x/series/proof/img?k=series/s00/c03/s01-office.png&key=k"));
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get("Content-Type"), "image/png");
+  assert.equal((await sp.handleSeriesProofImage(env, new URL("https://x/series/proof/img?k=series/s00/c03/s01-office.png"))).status, 404);
+  assert.equal((await sp.handleSeriesProofImage(env, new URL("https://x/series/proof/img?k=series/schedule.json&key=k"))).status, 404);
+});
+
+test("review: uploading does not replace approved chapters unless asked", () => {
+  const info = { number: 0, show: "THE LONG DRIFT", title: "PROLOGUE", writer: "Claude", premiere: "2026-10-26" };
+  const r = sched.mergeUpload(SCHEDULE, info, [1, 2, 3, 4], false);
+  assert.deepEqual(r.upload, [3, 4]);
+  assert.deepEqual(r.skipped, [1, 2]);
+  const s0 = r.schedule.seasons.find((s) => s.number === 0);
+  assert.deepEqual(s0.approved, [1, 2]);
+  assert.deepEqual(s0.pending, [3, 4]);
+  assert.equal(r.schedule.seasons.length, 2, "other seasons are kept");
+  const all = sched.mergeUpload(SCHEDULE, info, [1, 2], true);
+  assert.deepEqual(all.upload, [1, 2]);
+  const fresh = sched.mergeUpload({ seasons: [] }, { ...info, number: 2, premiere: "2027-04-05" }, [1], false);
+  assert.deepEqual(fresh.schedule.seasons[0], { ...info, number: 2, premiere: "2027-04-05", chapters: 13, approved: [], pending: [1] });
 });

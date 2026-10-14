@@ -3150,6 +3150,19 @@ scenes for the showrunner; both reveal unreleased chapters, so both need the **`
 reads: a chapter airing within 7 days that is not approved, a season ending within 14 days with no
 next season, and the page for "now" missing. `/health-detailed` gains `series`.
 
+### Hardened after the branch review
+
+A fresh review found no critical issues and eight important ones, all fixed with tests: the import
+reads `schedule.json` strictly (only "no such object" counts as empty; any other failure aborts, and
+each write keeps a backup in `~/series-work/schedule-backups/`), so a network blip can no longer wipe
+approvals; re-uploading an **approved** chapter is skipped unless `--replace-approved` (the
+showrunner approved the fix); an unapproved chapter keeps alerting through its airing week instead of
+sending a false "recovered"; a series fault returns an alert line instead of silencing the image and
+budget alerts beside it; a schedule with the wrong shape gives the text page; held panels check their
+anchors and keep the previous scene's keep-clear boxes; an unreadable picture is a per-scene problem;
+the proof page links its images (`/series/proof/img`) instead of inlining 26 pages, which would exceed
+the free plan's CPU; and the build output can never be inside the repo.
+
 ### Rejected
 
 - A story kit combined from the date, and a small Workers AI model writing each week: game-like, or

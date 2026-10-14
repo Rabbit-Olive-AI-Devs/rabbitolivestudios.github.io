@@ -10,6 +10,7 @@ import { pngToBase64 } from "../png";
 import { htmlResponse } from "../response";
 import { resolveSlot, seriesSlot } from "../series/clock";
 import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey } from "../series/keys";
+import { isSchedule } from "../series/schedule";
 import type { PanelId, Schedule } from "../series/types";
 import { SCENES_PER_CHAPTER } from "../series/types";
 import type { Env } from "../types";
@@ -26,8 +27,12 @@ export async function loadSchedule(bucket: R2Bucket): Promise<Schedule | null> {
   try {
     const obj = await bucket.get(SCHEDULE_KEY);
     if (!obj) return null;
-    const s = JSON.parse(await obj.text()) as Schedule;
-    return Array.isArray(s?.seasons) ? s : null;
+    const s: unknown = JSON.parse(await obj.text());
+    if (!isSchedule(s)) {
+      console.error("series: schedule has the wrong shape");
+      return null;
+    }
+    return s;
   } catch (err) {
     console.error("series: schedule unreadable:", err);
     return null;
@@ -56,10 +61,9 @@ export async function handleSeries(env: Env, url: URL, panel: PanelId, now: Date
   if (!when) return textPage("The preview time must look like 2026-11-09T08:30.");
   const schedule = await loadSchedule(env.SERIES);
   if (!schedule) return textPage("The series has not started yet.");
-  const slot = resolveSlot(seriesSlot(when, schedule), schedule, at !== null);
-  const key = slotKey(slot, panel);
-  if (!key) return textPage("The series has not started yet.");
   try {
+    const key = slotKey(resolveSlot(seriesSlot(when, schedule), schedule, at !== null), panel);
+    if (!key) return textPage("The series has not started yet.");
     const obj = await env.SERIES.get(key);
     if (!obj) {
       console.error(`series: missing page ${key}`);
@@ -72,6 +76,10 @@ export async function handleSeries(env: Env, url: URL, panel: PanelId, now: Date
   }
 }
 
+/** Proof images are served one per request: inlining 26 pages would blow the CPU budget. */
+const proofImg = (k: string, key: string | null) =>
+  `<img src="/series/proof/img?k=${encodeURIComponent(k)}${key ? `&key=${encodeURIComponent(key)}` : ""}" width="800" height="480" alt="">`;
+
 export async function handleSeriesProof(env: Env, url: URL): Promise<Response> {
   if (!keyOk(env, url)) return notFound();
   const season = Number(url.searchParams.get("season"));
@@ -80,16 +88,23 @@ export async function handleSeriesProof(env: Env, url: URL): Promise<Response> {
   const schedule = await loadSchedule(env.SERIES);
   const s = schedule?.seasons.find((x) => x.number === season);
   const status = s?.approved.includes(chapter) ? "APPROVED" : s?.pending.includes(chapter) ? "PENDING" : "NOT IMPORTED";
+  const key = url.searchParams.get("key");
   const rows: string[] = [];
   for (let n = 1; n <= SCENES_PER_CHAPTER; n++) {
-    const obj = await env.SERIES.get(sceneKey(season, chapter, n, false, "office"));
-    rows.push(obj
-      ? `<figure><figcaption>Scene ${n}</figcaption><img src="data:image/png;base64,${pngToBase64(new Uint8Array(await obj.arrayBuffer()))}" width="800" height="480" alt="Scene ${n}"></figure>`
-      : `<figure><figcaption>Scene ${n}: missing</figcaption></figure>`);
+    rows.push(`<figure><figcaption>Scene ${n}</figcaption>${proofImg(sceneKey(season, chapter, n, false, "office"), key)}</figure>`);
   }
-  const teaser = await env.SERIES.get(teaserKey(season, chapter, "office"));
-  if (teaser) rows.push(`<figure><figcaption>Teaser</figcaption><img src="data:image/png;base64,${pngToBase64(new Uint8Array(await teaser.arrayBuffer()))}" width="800" height="480" alt="Teaser"></figure>`);
+  rows.push(`<figure><figcaption>Teaser</figcaption>${proofImg(teaserKey(season, chapter, "office"), key)}</figure>`);
   return htmlResponse(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Proof S${season} C${chapter}</title>
 <style>body{font-family:Helvetica,Arial,sans-serif;margin:24px;background:#fff;color:#000}figure{margin:0 0 28px}img{border:1px solid #000;max-width:100%;height:auto}</style></head>
-<body><h1>Season ${season}, chapter ${chapter}: ${status}</h1><p>Office panel version. Approve in Slack; the engineer runs the approve step.</p>${rows.join("")}</body></html>`, "no-store");
+<body><h1>Season ${season}, chapter ${chapter}: ${status}</h1><p>Office panel version. A missing scene shows as a broken image. Approve in Slack; the engineer runs the approve step.</p>${rows.join("")}</body></html>`, "no-store");
+}
+
+/** One finished page from the series bucket, for the proof page. Keyed, PNG pages only. */
+export async function handleSeriesProofImage(env: Env, url: URL): Promise<Response> {
+  if (!keyOk(env, url)) return notFound();
+  const k = url.searchParams.get("k") ?? "";
+  if (!/^series\/s\d{2}\/c\d{2}\/[a-z0-9-]+\.png$/.test(k)) return notFound();
+  const obj = await env.SERIES.get(k);
+  if (!obj) return notFound();
+  return new Response(await obj.arrayBuffer(), { headers: { "Content-Type": "image/png", "Cache-Control": "no-store" } });
 }

@@ -10,7 +10,8 @@ import { shiftDateStr } from "../date-utils";
 import { loadSchedule } from "../pages/series";
 import type { Env } from "../types";
 import { chicagoParts, resolveSlot, seriesSlot } from "./clock";
-import { slotKey } from "./keys";
+import { SCHEDULE_KEY, slotKey } from "./keys";
+import { isSchedule } from "./schedule";
 import type { Schedule, ScheduleSeason, Slot } from "./types";
 
 const name = (s: ScheduleSeason) => (s.number === 0 ? "the Prologue" : `season ${s.number}`);
@@ -24,7 +25,9 @@ export function scheduleProblems(schedule: Schedule | null, now: Date): string[]
     for (let c = 1; c <= s.chapters; c++) {
       const airs = shiftDateStr(s.premiere, (c - 1) * 7);
       const until = days(today, airs);
-      if (until < 0 || until > 7 || s.approved.includes(c)) continue;
+      // From 7 days before it airs until the end of its own week: an unapproved chapter
+      // freezes the panels on the previous chapter, which must not read as "recovered".
+      if (until < -6 || until > 7 || s.approved.includes(c)) continue;
       const state = s.pending.includes(c) ? "is waiting for approval" : "is not imported";
       out.push(`The series: chapter ${c} of ${name(s)} airs ${displayDate(airs).slice(0, 5)} and ${state}`);
     }
@@ -38,15 +41,21 @@ export function scheduleProblems(schedule: Schedule | null, now: Date): string[]
   return out;
 }
 
+/** Never throws: a series fault must not silence the image and budget alerts beside it. */
 export async function seriesProblems(env: Env, now: Date): Promise<string[]> {
   if (!env.SERIES) return [];
-  const schedule = await loadSchedule(env.SERIES);
-  const out = scheduleProblems(schedule, now);
-  if (schedule) {
-    const key = slotKey(resolveSlot(seriesSlot(now, schedule), schedule, false), "office");
+  try {
+    const obj = await env.SERIES.get(SCHEDULE_KEY);
+    if (!obj) return [];
+    const parsed: unknown = JSON.parse(await obj.text());
+    if (!isSchedule(parsed)) return ["The series: schedule.json is malformed"];
+    const out = scheduleProblems(parsed, now);
+    const key = slotKey(resolveSlot(seriesSlot(now, parsed), parsed, false), "office");
     if (key && !(await env.SERIES.get(key))) out.push(`The series: the page on the panels now is missing (${key})`);
+    return out;
+  } catch (err) {
+    return [`The series: check failed: ${String((err as Error)?.message ?? err)}`];
   }
-  return out;
 }
 
 export async function seriesHealth(env: Env, now: Date): Promise<{ schedule: boolean; slot: Slot | null; key: string | null; present: boolean }> {

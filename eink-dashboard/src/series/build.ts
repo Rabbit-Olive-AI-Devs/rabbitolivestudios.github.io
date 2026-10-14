@@ -38,7 +38,19 @@ export async function buildChapter(
       if (pn.art === "hold") {
         const held = prevPanels[pi];
         if (!held) { problems.push(`${S}: nothing to hold`); ok = false; return; }
-        panels.push({ ...held, anchors: [], clear: [] });
+        // The held picture is already cropped: this scene's anchors and keep-clear boxes are
+        // in panel pixels. The previous scene's keep-clear boxes still apply (same picture).
+        const anchors = (pn.balloons ?? []).map((b, bi): [number, number] | null => {
+          if (b.anchor === null) return null;
+          const [x, y] = b.anchor;
+          if (x < 0 || y < 0 || x >= rect.w || y >= rect.h) {
+            problems.push(`${S}: balloon ${bi + 1} anchor [${x}, ${y}] is outside the held panel (${rect.w}x${rect.h})`);
+            ok = false;
+          }
+          return [rect.x + x, rect.y + y];
+        });
+        const own: Rect[] = (pn.clear ?? []).map(([x, y, w, h]) => ({ x: rect.x + x, y: rect.y + y, w, h }));
+        panels.push({ image: held.image, anchors, clear: [...held.clear, ...own] });
         return;
       }
       const img = art(pn.art);
@@ -64,11 +76,6 @@ export async function buildChapter(
         return { x: rect.x + x0, y: rect.y + y0, w: x1 - x0, h: y1 - y0 };
       });
       panels.push({ image, anchors, clear });
-    });
-    // Held panels keep the picture but take this scene's own balloons and anchors.
-    scene.panels.forEach((pn, pi) => {
-      if (pn.art !== "hold" || !panels[pi]) return;
-      panels[pi] = { ...panels[pi], anchors: (pn.balloons ?? []).map((b) => (b.anchor === null ? null : [t.panels[pi].x + b.anchor[0], t.panels[pi].y + b.anchor[1]])) };
     });
     if (!ok) continue;
     const { pages, problems: p } = await renderScene(pkg.season, ch, scene, panels);

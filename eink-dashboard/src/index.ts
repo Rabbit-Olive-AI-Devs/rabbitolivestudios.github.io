@@ -10,7 +10,7 @@ import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, 
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo } from "./pages/desk";
-import { handleSeries, handleSeriesProof } from "./pages/series";
+import { handleSeries, handleSeriesProof, handleSeriesProofImage } from "./pages/series";
 import { seriesHealth } from "./series/watch";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
@@ -1303,6 +1303,8 @@ export default {
         return handleSeries(env, url, "office");
       case "/series/proof":
         return handleSeriesProof(env, url);
+      case "/series/proof/img":
+        return handleSeriesProofImage(env, url);
       case "/health":
         return handleHealth();
       case "/health-detailed":

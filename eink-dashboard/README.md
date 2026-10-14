@@ -59,7 +59,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /series` | The same scene in four greys, for the home E1001 | none |
 | `GET /color/series` | The same scene in the E1002's six colours | none |
 | `GET /desk/series?at=YYYY-MM-DDTHH:MM&key=KEY` | Preview any moment (also on `/series` and `/color/series`). Needs `SERIES_KEY`; reveals unreleased chapters | none |
-| `GET /series/proof?season=S&chapter=C&key=KEY` | The showrunner's proof page: every scene of a chapter, approved or pending. Needs `SERIES_KEY` | none |
+| `GET /series/proof?season=S&chapter=C&key=KEY` | The showrunner's proof page: every scene of a chapter and its teaser, approved or pending; images load from `/series/proof/img`. Needs `SERIES_KEY` | none |
 | `POST /desk/tars` | A report from one of the Macs (`scripts/tars-report.sh`), with `Authorization: Bearer TARS_KEY`. One KV write per report; a repeat within five minutes is ignored | none |
 | `GET /desk/test` | Calibration card: every text size from 10px up, large type, Aurebesh sizes, rules, dots and hatch, for judging on the real panel | none |
 | **Maintenance** | | |

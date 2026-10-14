@@ -117,7 +117,7 @@ The import tool re-checks the mechanical rules and lists any failure by chapter 
 
 ### Fixes after a season is live
 
-A typo or a bad picture can be fixed at any time: correct it, re-export, tell the engineer which chapter. One chapter is rebuilt and replaced; the panels pick it up on their next refresh.
+A typo or a bad picture can be fixed at any time: correct it, re-export, tell the engineer which chapter. One chapter is rebuilt; if it is already approved and on air, the engineer replaces it only after **you approve the correction** (the import skips approved chapters otherwise), and the panels pick it up on their next refresh.
 
 ## 9. What never to do
 
