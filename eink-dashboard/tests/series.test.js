@@ -378,3 +378,47 @@ test("teaser and cards are 800x480 PNGs; pills name the prologue", async () => {
   assert.equal(render.pillFor(p.season, 3), "P / CH 03");
   assert.equal(render.pillFor({ ...p.season, number: 2 }, 11), "S2 / CH 11");
 });
+
+const build = fromBuild("src/series/build.js");
+
+const artSource = (w = 1200, h = 800) => (name) => (name.endsWith(".png") ? panelArt(w, h) : null);
+
+test("a chapter builds 153 files under the right keys", async () => {
+  const p = pkgv.samplePackage();
+  const { files, problems } = await build.buildChapter(p, 1, artSource());
+  assert.deepEqual(problems, []);
+  assert.equal(files.size, 25 * 6 + 3);
+  assert.ok(files.has("series/s00/c01/s01-desk.png"));
+  assert.ok(files.has("series/s00/c01/r25-office.png"));
+  assert.ok(files.has("series/s00/c01/teaser-home.png"));
+});
+
+test("hold reuses the previous scene's picture", async () => {
+  const p = pkgv.samplePackage();
+  p.chapters[0].scenes[2].panels[0].art = "hold";
+  const seen = [];
+  const { problems } = await build.buildChapter(p, 1, (n) => { seen.push(n); return panelArt(1200, 800); });
+  assert.deepEqual(problems, []);
+  assert.ok(!seen.includes("hold"));
+  assert.ok(!seen.includes("c01-s03.png"));
+});
+
+test("a picture smaller than its panel is refused", async () => {
+  const p = pkgv.samplePackage();
+  const { problems } = await build.buildChapter(p, 1, artSource(400, 200));
+  assert.ok(problems.some((x) => /chapter 1 scene 2: picture c01-s02.png is 400x200, smaller than the 776x346 panel/.test(x)));
+});
+
+test("an anchor cropped out of the panel is refused", async () => {
+  const p = pkgv.samplePackage();
+  // 3:2 picture in a wide panel loses top and bottom; y=5 is cut away
+  p.chapters[0].scenes[1].panels[0].balloons[0].anchor = [600, 5];
+  const { problems } = await build.buildChapter(p, 1, artSource(1920, 1280));
+  assert.ok(problems.some((x) => /chapter 1 scene 2: balloon 1 anchor \[600, 5\] is cropped out of the panel/.test(x)));
+});
+
+test("a nearly blank picture is refused", async () => {
+  const p = pkgv.samplePackage();
+  const { problems } = await build.buildChapter(p, 1, () => solid(1200, 800, [250, 250, 250]));
+  assert.ok(problems.some((x) => /picture c01-s02.png is nearly blank/.test(x)));
+});
