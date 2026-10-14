@@ -39,6 +39,8 @@ export interface Reading {
   windows: UsageWindow[];
   /** Estimated 30-day spend at list prices, in US dollars. */
   costUsd: number | null;
+  /** An allowance beyond the usage windows, such as extra tokens left once the week is spent. */
+  extra?: { value: string; usedPercent: number | null };
 }
 
 export interface StoredReading extends Reading {
@@ -87,7 +89,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 /** Capitals, digits and a little punctuation, at most `max` characters. */
 function labelOf(v: unknown, max: number): string {
   if (typeof v !== "string") return "";
-  return v.toUpperCase().replace(/\([^)]*\)/g, " ").replace(/[^A-Z0-9 .+\-]/g, "").replace(/\s+/g, " ").trim().slice(0, max).trim();
+  return v.toUpperCase().replace(/\([^)]*\)/g, " ").replace(/[^A-Z0-9 .+\-$]/g, "").replace(/\s+/g, " ").trim().slice(0, max).trim();
 }
 
 /** A provider or machine id: lower-case letters, digits and hyphens only. */
@@ -132,6 +134,34 @@ function readingOf(raw: unknown): { reading: Reading | null; id: string | null; 
   };
 }
 
+/**
+ * Extra allowances from CodexBar's fuller `usage` output, by provider id: the
+ * first detail row that carries a progress figure, such as "895M tokens left".
+ * That output includes unredacted account details, none of which is read.
+ */
+function extrasOf(usage: unknown): Record<string, { value: string; usedPercent: number | null }> {
+  const out: Record<string, { value: string; usedPercent: number | null }> = {};
+  for (const raw of (Array.isArray(usage) ? usage : []).slice(0, MAX_PROVIDERS)) {
+    const entry = obj(raw);
+    const id = entry ? idOf(entry.provider) : null;
+    const details = obj(entry?.usage)?.details;
+    if (!id || !Array.isArray(details)) continue;
+    for (const section of details.slice(0, 8)) {
+      const rows = obj(section)?.rows;
+      for (const r of (Array.isArray(rows) ? rows : []).slice(0, 8)) {
+        const row = obj(r);
+        const progress = obj(row?.progress);
+        const value = labelOf(row?.value, 18);
+        if (out[id] || !progress || !value) continue;
+        const used = finite(progress.used);
+        const total = finite(progress.total);
+        out[id] = { value, usedPercent: used === null || total === null || total <= 0 ? null : clamp(Math.round((used / total) * 100), 0, 100) };
+      }
+    }
+  }
+  return out;
+}
+
 /** A posted report, cleaned; null when it is not a report at all. */
 export function parseReport(body: unknown): ParsedReport | null {
   const m = obj(obj(body)?.machine);
@@ -146,9 +176,11 @@ export function parseReport(body: unknown): ParsedReport | null {
 
   const providers: Reading[] = [];
   const failed: { id: string; name: string }[] = [];
+  const extras = extrasOf(obj(body)?.usage);
   const list = obj(obj(body)?.codexbar)?.providers;
   for (const raw of (Array.isArray(list) ? list : []).slice(0, MAX_PROVIDERS)) {
     const r = readingOf(raw);
+    if (r.reading && extras[r.reading.id]) r.reading.extra = extras[r.reading.id];
     if (r.reading) providers.push(r.reading);
     else if (r.failed && r.id) failed.push({ id: r.id, name: r.name });
   }
@@ -259,6 +291,13 @@ const AWAKE_WITHIN_MS = 75 * MINUTE;
 /** A provider reading older than this is no longer shown as current. */
 const FRESH_WITHIN_MS = 3 * HOUR;
 const LOW_AT_PERCENT = 90;
+/** Extra tokens count as still available until this much of them is used. */
+const EXTRA_SPENT_AT_PERCENT = 98;
+/**
+ * Providers where one particular allowance is the one the owner watches, by the
+ * window kind CodexBar gives it. It takes the row in place of the plan's totals.
+ */
+const FEATURED_WINDOW: Readonly<Record<string, string>> = { cursor: "cursor-grok-bot" };
 const DISK_ALERT_PERCENT = 85;
 const MAX_ROWS = 5;
 const MAX_MACHINE_ROWS = 2;
@@ -341,8 +380,11 @@ export function tarsView(state: TarsState, now: number): TarsView {
   const nearly: string[] = [];
 
   const providers = readings.map((r): ProviderView => {
-    const weekly = r.windows.find((w) => w.kind === "weekly" || /WEEK/.test(w.label));
-    const session = r.windows.find((w) => w.kind === "session" && w !== weekly);
+    const featured = r.windows.find((w) => w.kind === FEATURED_WINDOW[r.id]);
+    const weekly = featured ?? r.windows.find((w) => w.kind === "weekly" || /WEEK/.test(w.label));
+    const session = featured ? undefined : r.windows.find((w) => w.kind === "session" && w !== weekly);
+    // tokens beyond the windows: while some are left, a spent window is not a problem
+    const spare = !!r.extra && (r.extra.usedPercent === null || r.extra.usedPercent < EXTRA_SPENT_AT_PERCENT);
     if (now - r.at >= FRESH_WITHIN_MS) {
       stale.push(r.name);
       alerts.push(`${r.name} NO DATA`);
@@ -355,9 +397,10 @@ export function tarsView(state: TarsState, now: number): TarsView {
     }
     const shown = [session, weekly].filter((w): w is UsageWindow => !!w);
     for (const w of shown) {
-      if (w.usedPercent >= LOW_AT_PERCENT) alerts.push(`${r.name} ${w === weekly ? "WEEK" : "SESSION"} ${w.usedPercent}%`);
+      if (w.usedPercent < LOW_AT_PERCENT || spare) continue;
+      alerts.push(w === featured ? `${w.label} ${w.usedPercent}%` : `${r.name} ${w === weekly ? "WEEK" : "SESSION"} ${w.usedPercent}%`);
     }
-    const worst = Math.max(0, ...shown.map((w) => w.usedPercent));
+    const worst = spare ? 0 : Math.max(0, ...shown.map((w) => w.usedPercent));
     const resets = shown.map((w) => w.resetAt).filter((t): t is number => t !== null && t > now).sort((a, b) => a - b);
     if (worst >= 100) spent.push({ name: r.name, until: resets[0] ?? null });
     else if (worst >= LOW_AT_PERCENT) nearly.push(r.name);
@@ -367,7 +410,11 @@ export function tarsView(state: TarsState, now: number): TarsView {
       id: r.id, name: r.name, plan: r.plan,
       session: session?.usedPercent, week: weekly?.usedPercent,
       reset: resets.length ? formatSpan(resets[0] - now) : "UNKNOWN",
-      note: session && weekReset !== null && weekReset > now && weekReset !== resets[0] ? `WEEK ${formatSpan(weekReset - now)}` : "",
+      note: featured
+        ? featured.label
+        : session && weekReset !== null && weekReset > now && weekReset !== resets[0]
+          ? `WEEK ${formatSpan(weekReset - now)}`
+          : r.extra?.value ?? "",
       low: worst >= LOW_AT_PERCENT,
     };
   });

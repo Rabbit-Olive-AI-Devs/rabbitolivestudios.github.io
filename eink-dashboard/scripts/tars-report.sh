@@ -30,16 +30,24 @@ BOOT="$(sysctl -n kern.boottime | sed -E 's/^\{ sec = ([0-9]+).*/\1/')"
 UPTIME=$(( $(date +%s) - BOOT ))
 
 # CodexBar, if present. Emails are redacted at the source and dropped again by the Worker.
+# The fuller `usage` output adds what the snapshot leaves out (extra tokens beyond a
+# spent week); it has no redaction option, so anything that looks like an email is
+# blanked here before it leaves the machine.
 SNAPSHOT="null"
+USAGE="null"
 if command -v codexbar >/dev/null 2>&1; then
-  OUT="$(codexbar dashboard --identity redacted --timeout 60 2>/dev/null)"
+  BLANK_EMAILS='s/"[^"]*@[^"]*"/"redacted"/g'
+  OUT="$(codexbar dashboard --identity redacted --timeout 60 2>/dev/null | sed -E "$BLANK_EMAILS")"
   case "$OUT" in "{"*) SNAPSHOT="$OUT" ;; esac
+  OUT="$(codexbar usage --format json 2>/dev/null | sed -E "$BLANK_EMAILS")"
+  # skipped when unexpectedly large, so it can never push the report over the size limit
+  case "$OUT" in "["*) [ "${#OUT}" -lt 30000 ] && USAGE="$OUT" ;; esac
 fi
 
 # The name is the only free text; strip anything that could break the JSON.
 SAFE_NAME="$(printf '%s' "$NAME" | tr -cd 'A-Za-z0-9 .-')"
 
-printf '{"machine":{"id":"%s","name":"%s","diskTotalGb":%s,"diskFreeGb":%s,"memUsedPct":%s,"uptimeSec":%s},"codexbar":%s}' \
-  "$ID" "$SAFE_NAME" "${DISK_TOTAL:-0}" "${DISK_FREE:-0}" "$MEM_USED" "$UPTIME" "$SNAPSHOT" |
+printf '{"machine":{"id":"%s","name":"%s","diskTotalGb":%s,"diskFreeGb":%s,"memUsedPct":%s,"uptimeSec":%s},"codexbar":%s,"usage":%s}' \
+  "$ID" "$SAFE_NAME" "${DISK_TOTAL:-0}" "${DISK_FREE:-0}" "$MEM_USED" "$UPTIME" "$SNAPSHOT" "$USAGE" |
   curl -sS -m 30 -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" --data-binary @- "$URL"
 echo

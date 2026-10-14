@@ -2926,3 +2926,26 @@ panel. Both machines now appear, and the MacBook supplies Claude, Cursor, MiniMa
 **Codex is still read only by the Mac mini**: the MacBook's reports carry no good Codex reading,
 though CodexBar read it there from a terminal the day before. Until that is understood, Codex
 will go to `NO DATA` three hours after the Mac mini falls asleep. Not yet diagnosed.
+
+### Follow-up (2026-10-13): the Grok Bot allowance, and tokens beyond a spent week
+
+Two corrections from the owner once the page was on the panel.
+
+- **Cursor's row shows the Grok Bot allowance.** Cursor's plan totals sit at 0% all month; the
+  figure the owner watches is the separate "Grok Bot" window (`kind: "cursor-grok-bot"`).
+  `FEATURED_WINDOW` in `src/tars.ts` names, per provider, a window that takes the row in place
+  of the totals; its label is shown beside it and its alert reads `GROK BOT 96%`.
+- **A spent week is not an alert while extra tokens remain.** Muse showed 100% used and raised an
+  alert, but the account holds a separate pool ("895M tokens left"). That pool is not in
+  `codexbar dashboard`; it is a detail row in `codexbar usage --format json`. The reporter now
+  sends that output too, and the Worker keeps, per provider, the first detail row with a progress
+  figure. The weekly bar still reads 100%, the note beside it shows what is left, and no alert is
+  raised until the pool is 98% used.
+
+`codexbar usage` has no redaction option, so the reporter blanks anything that looks like an
+email address in both outputs before sending; a captured report contained no `@` at all. The
+Worker reads only the provider id and the detail rows, and the usage output is skipped if it is
+ever larger than 30 KB so it cannot push a report past the size limit.
+
+Older reporters that send no `usage` keep working; they simply carry no extras. Tests: 199.
+

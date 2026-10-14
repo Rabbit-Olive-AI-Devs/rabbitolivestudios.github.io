@@ -267,3 +267,60 @@ test("a plan does not repeat the provider's name beneath it", () => {
   assert.equal(r.providers.find((p) => p.id === "museai").plan, "FREE");
   assert.equal(r.providers.find((p) => p.id === "codex").plan, "PRO 20X");
 });
+
+// --- Cursor's Grok Bot allowance, and extra tokens beyond a spent week ---------------
+
+function cursorWithGrok(grokUsed) {
+  const s = snapshot();
+  s.providers[2] = { id: "cursor", name: "Cursor", error: null, identity: { plan: "Cursor Pro+" }, windows: [
+    { kind: "session", label: "Total", usedPercent: 0, resetAt: iso(NOW + 29 * DAY) },
+    { kind: "weekly", label: "Cursor", usedPercent: 0, resetAt: iso(NOW + 29 * DAY) },
+    { kind: "tertiary", label: "Third Party", usedPercent: 0, resetAt: iso(NOW + 29 * DAY) },
+    { kind: "cursor-grok-bot", label: "Grok Bot", usedPercent: grokUsed, resetAt: iso(NOW + DAY + 19 * HOUR) },
+  ] };
+  return s;
+}
+
+test("Cursor's row shows the Grok Bot allowance, not the plan totals", () => {
+  const v = tars.tarsView(stateWith([report("mini", "Mac mini", { codexbar: cursorWithGrok(52.1) }), NOW - MIN]), NOW);
+  const cursor = v.providers.find((p) => p.id === "cursor");
+  assert.equal(cursor.session, undefined, "the plan's own totals are not what the owner watches");
+  assert.equal(cursor.week, 52);
+  assert.equal(cursor.reset, "1D 19H");
+  assert.equal(cursor.note, "GROK BOT");
+  assert.equal(cursor.low, false);
+  const low = tars.tarsView(stateWith([report("mini", "Mac mini", { codexbar: cursorWithGrok(96) }), NOW - MIN]), NOW);
+  assert.ok(low.alerts.includes("GROK BOT 96%"), "the alert names the allowance that is running out");
+  assert.equal(low.providers.find((p) => p.id === "cursor").low, true);
+});
+
+const usage = (over = {}) => [
+  { provider: "claude", usage: { identity: { accountEmail: "someone@example.com" }, details: [{ rows: [{ label: "Limit Reset Credits", value: "1 available" }, { label: "Cloud credits", value: "$101.24 of $250.00 remaining", progress: { total: 1, used: 0.595 } }] }] } },
+  { provider: "museai", usage: { details: [{ rows: [{ label: "Additional tokens", value: "895M tokens left", progress: { total: 1, used: 0.105, ...over } }] }] } },
+];
+
+test("extra tokens beyond the weekly allowance are read from the fuller usage output", () => {
+  const r = tars.parseReport({ ...report("mini", "Mac mini"), usage: usage() });
+  const muse = r.providers.find((p) => p.id === "museai");
+  assert.deepEqual(muse.extra, { value: "895M TOKENS LEFT", usedPercent: 11 });
+  assert.equal(JSON.stringify(r).includes("example.com"), false, "emails in the usage output are not kept");
+  assert.equal(tars.parseReport({ ...report("mini", "Mac mini"), usage: "garbage" }).providers.find((p) => p.id === "museai").extra, undefined);
+  assert.equal(tars.parseReport(report("mini", "Mac mini")).providers.find((p) => p.id === "museai").extra, undefined, "older reporters send no usage");
+});
+
+test("a spent week with extra tokens left is not an alert", () => {
+  const v = tars.tarsView(stateWith([{ ...report("mini", "Mac mini"), usage: usage() }, NOW - MIN]), NOW);
+  const muse = v.providers.find((p) => p.id === "museai");
+  assert.equal(muse.week, 100, "the weekly bar still tells the truth");
+  assert.equal(muse.note, "895M TOKENS LEFT");
+  assert.equal(muse.low, false);
+  assert.equal(v.alerts.some((a) => a.startsWith("MUSE")), false);
+  assert.doesNotMatch(v.quip.join(" "), /Muse is out/);
+  assert.equal(v.providers.find((p) => p.id === "claude").note, "WEEK 1D 02H", "a row that already has a note keeps it");
+});
+
+test("when the extra tokens are spent too, the alert comes back", () => {
+  const v = tars.tarsView(stateWith([{ ...report("mini", "Mac mini"), usage: usage({ used: 1 }) }, NOW - MIN]), NOW);
+  assert.equal(v.providers.find((p) => p.id === "museai").low, true);
+  assert.ok(v.alerts.includes("MUSE WEEK 100%"));
+});
