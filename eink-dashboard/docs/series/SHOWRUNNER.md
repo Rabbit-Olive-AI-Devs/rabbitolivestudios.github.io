@@ -2,7 +2,7 @@
 
 **For:** Jarvis (Hermes agent), showrunner of the series.
 **From:** Claude Code, the engineer on this repo, on behalf of the owner (Thiago).
-**Date:** 2026-10-14. **Status:** the design is agreed; the panel code and the import tool are **not built yet**. Items marked **(awaiting owner)** are proposals the owner has not confirmed; check them with the owner in Slack before acting on them.
+**Date:** 2026-10-14. **Status:** the design is agreed and the calendar decided; the panel code and the import tool are **not built yet**; they are planned for the Prologue's premiere on 26 October 2026. Items marked **(awaiting owner)** are proposals the owner has not confirmed; check them with the owner in Slack before acting on them.
 
 Read this file end to end, then `docs/series/SEASON-FORMAT.md` (what the writers deliver). The full design and its reasons: `docs/superpowers/specs/2026-10-14-series-design.md`. You do not need the rest of the repo.
 
@@ -22,7 +22,7 @@ Your job: keep the show coherent and on schedule. The writers' job: their season
 
 | Who | Responsible for |
 |---|---|
-| **Owner** | Executive producer. Approves the bible, the writer order and each season (or delegates the proof sheet to you, see section 8) |
+| **Owner** | Executive producer. Approves the bible and the writer order. Watches each season unspoiled: **you approve the proof sheets** |
 | **Jarvis** | Showrunner. The bible, the schedule, briefing writers, reviewing every script and picture, assembling and delivering the package, the continuity log |
 | **The season's writer** | Character and ship sheets, all 13 chapters (script and pictures), the handover note to the next writer |
 | **Claude Code** | The panel pages, the import and its checks, template guide images, the proof sheet, uploading, alerts when something is missing |
@@ -34,9 +34,9 @@ Coordination happens in the owner's Slack channel, where the agents already talk
 The bible is the one place every writer reads before writing a word. Keep it in Notion. It must contain:
 
 1. **Premise:** one paragraph. Who the crew are, what they want, what keeps them moving.
-2. **Setting (awaiting owner):** the Star Wars galaxy, Outer Rim, after the fall of the Empire. Canon places, species and ship classes are fine. **No canon characters** and no Jedi or Sith in the crew.
+2. **Setting (awaiting owner):** the Star Wars galaxy, Outer Rim, after the fall of the Empire. Canon places, species and ship classes are fine. **No canon characters.** Whether Jedi may appear (as guests, not crew) is the owner's call.
 3. **Tone:** family-friendly. Peril, humour, warmth; no gore, nothing a child at home should not read. Dry humour from the droid is a house trait.
-4. **The crew:** for each member, name, role, how they talk (three sample lines), what they want, what they will never do. **(Awaiting owner:** the first writer proposes title, crew and ship; you write them into the bible; the owner approves. The mockup names, Vess Oro, Bolt, Hallan Dree and the ship *Last Lantern*, are placeholders.)
+4. **The crew:** for each member, name, role, how they talk (three sample lines), what they want, what they will never do. The Prologue (Claude) introduces the title, crew and ship; you write them into the bible; the owner approves. The mockup names, Vess Oro, Bolt, Hallan Dree and the ship *Last Lantern*, are placeholders.
 5. **The ship:** name, layout, quirks, what breaks.
 6. **Running state:** credits, cargo, damage, who is owed what. Updated at the end of every season from the writer's handover note.
 7. **House rules for the page:** no words in pictures; flat colour and clear outlines; calm zones kept plain; plain ASCII text; the length guides. All are in `SEASON-FORMAT.md`; link it, do not copy it.
@@ -57,25 +57,32 @@ A suggested structure; adjust it if your tools prefer another:
 
 The Scenes database maps one-to-one onto `season.json`, so the export to the package can be mechanical.
 
-## 5. Calendar (awaiting owner)
+## 5. Calendar (decided by the owner, 2026-10-14)
 
-- A season premieres on the **first Monday of a quarter** and runs 13 weeks. Some quarters leave a one-week gap before the next premiere; the panels show a "returns on" card then.
-- **Season 1: Monday 4 January 2027.**
-- **Writer order:** Season 1 Claude, then OpenAI, Grok and Muse. Claude goes first because its season is drawn by code inside this repo, which lets the engineer test the whole route to the panels before the other writers depend on it.
-- **Muse:** confirm with the owner whether Muse can generate images. If not, its season pairs Muse's script with another writer's art, credited to both.
+| Season | Writer | Premiere (Monday) | Chapters |
+|---|---|---|---|
+| **Prologue** (season 0) | Claude | **26 October 2026** | 10, ending Friday 1 January 2027 |
+| Season 1 | OpenAI | 4 January 2027 | 13 |
+| Season 2 | Grok | 5 April 2027 | 13 |
+| Season 3 | Muse | 5 July 2027 | 13 |
+| Season 4 | Claude | 4 October 2027 | 13 |
 
-### Deadlines for each season, counted back from its premiere
+After the Prologue, a season premieres on the **first Monday of a quarter** and runs 13 weeks. Some quarters leave a one-week gap; the panels show a "returns on" card then. **Muse can generate images** and draws its own season like the others.
+
+**The Prologue is tight:** it premieres 12 days after this plan. Claude writes and draws it inside the engineer's repo, chapters 1 and 2 by Friday 23 October, then a chapter at least 7 days before it airs. Your first jobs: set up Notion, start the bible from what the Prologue establishes (crew, ship, premise), and brief OpenAI for Season 1.
+
+### Deadlines for each season after the Prologue, counted back from its premiere
 
 | When | What |
 |---|---|
 | 9 weeks before | Writer briefed: bible, previous handover note, format, template guides |
 | 8 weeks before | Character and ship sheets reviewed and approved |
 | 7 weeks before | Season outline (13 chapter titles, one paragraph each) approved |
-| 3 weeks before | All scripts and pictures done and reviewed |
-| **3 weeks before** | **Package delivered to the engineer** (the alert fires at 2 weeks) |
-| 2 weeks before | Import passes, proof sheet approved, season switched on |
+| 4 weeks before | Chapters 1–4 scripted, drawn and reviewed |
+| **3 weeks before** | **First delivery to the engineer:** at least chapters 1 and 2 |
+| Every week after | The next chapter, at least 7 days before it airs (an alert fires otherwise) |
 
-For Season 1 that means: brief by 2 November 2026, package by 14 December 2026.
+For Season 1: brief OpenAI by 2 November 2026; first delivery by 14 December 2026.
 
 ## 6. Briefing a writer
 
@@ -103,9 +110,9 @@ The import tool re-checks the mechanical rules and lists any failure by chapter 
 ## 8. Delivering a season
 
 1. Export the Scenes database to `season.json` exactly as in `SEASON-FORMAT.md`, with the art in `art/`, sheets in `sheets/`, and the writer's `handover.md`.
-2. Put the folder in the shared hand-off folder (**awaiting owner:** a Dropbox folder, *The Long Drift / packages / season-NN*), then tell the engineer in Slack.
+2. Put the folder in the shared Dropbox (**awaiting owner:** `00_SHARED_INBOX` for now, a dedicated *The Long Drift / packages / season-NN* folder once you create it), then tell the engineer in Slack. Seasons may be delivered in parts: see `SEASON-FORMAT.md` section 5.
 3. The engineer runs the import. If it fails, you get the full list of problems; fix them in Notion and re-export.
-4. When it passes, the engineer publishes a private **proof sheet** with every scene in order. **(Awaiting owner:** the owner approves it, or, if they prefer to watch unspoiled, you approve it.)
+4. When it passes, the engineer publishes a private **proof sheet** with every scene in order. **You approve it** (the owner has chosen to watch unspoiled, so do not send them the proof sheet or spoilers).
 5. On approval the season is uploaded and goes live on its premiere Monday at 08:00.
 
 ### Fixes after a season is live

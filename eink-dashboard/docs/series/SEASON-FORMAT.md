@@ -16,7 +16,7 @@ season-01/
 
 ## 1. The shape of a season
 
-- **13 chapters**, one per week. Chapter 1 starts on the premiere Monday.
+- **13 chapters**, one per week (the Prologue, season `0`, has **10**). Chapter 1 starts on the premiere Monday.
 - **25 scenes per chapter**, five per weekday, shown at 08:00, 10:00, 12:00, 14:00 and 16:00 Chicago time. Scenes 1–5 are Monday, 6–10 Tuesday, and so on to 21–25 on Friday.
 - **Scene 1 of every chapter is a Splash**: the chapter's title card. The chapter number, title and writer's credit are lettered on it automatically.
 - Each chapter has a **teaser line**, shown from Sunday 19:00 until Monday 08:00 ("Next week: …"). Chapter 13's teaser closes the season.
@@ -69,15 +69,17 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 | Field | Rule |
 |---|---|
 | `format` | Always `1` for now |
+| `season.number` | `0` for the Prologue, then `1`, `2`, … |
 | `season.premiere` | A Monday, `YYYY-MM-DD` |
 | `season.writer` | The name printed in the credit: `Claude`, `OpenAI`, `Grok`, `Muse`, or two names joined by ` & ` |
-| `chapters` | Exactly 13, numbered 1–13 in order |
+| `chapters` | 13 (10 for the Prologue), numbered from 1 in order. A package may hold only the chapters delivered so far (section 5) |
 | `scenes` | Exactly 25 per chapter, numbered 1–25 in order |
 | `template` | `wide`, `split`, `strip`, `splash` or `panel-text` (section 3) |
 | `caption` | The location or time box, one short line. Optional |
 | `narration` | The text under the picture (or in the text column for `panel-text`) |
 | `panels` | One entry per panel of the template, left to right |
 | `panels[].art` | A file in `art/`, or `"hold"` to keep the picture from the same panel of the previous scene (only when the previous scene used the same template) |
+| `panels[].focus` | Optional `[x, y]` in the art file's own pixels: the point to keep when the picture is cropped to the panel's shape. Default: the centre |
 | `panels[].caption` | `strip` only: a short line at the top of that panel |
 | `panels[].balloons` | Up to two. `speaker` in capitals, `text` the line, `anchor` the `[x, y]` point in that panel's picture (in pixels, at template size) where the speaker's head is. Use `"anchor": null` for a voice from off the picture (radio, comlink): it is lettered as a square box with the speaker's name |
 
@@ -112,24 +114,28 @@ The import measures every line with the real panel font, so these are guides, no
 ## 4. Art
 
 - **One file per new picture**, PNG or JPEG, full colour, no transparency, named `cCC-sSS.png` (or `cCC-sSS-pN.png` for the Nth panel of `split` and `strip`).
-- **Size:** exactly the template's size, or larger at the same shape (it is shrunk). Any other shape is refused.
+- **Size:** at least as large as the panel, any shape. It is shrunk and **cropped to fill** the panel around `focus` (or the centre). Plan the composition for the crop: a 3:2 picture loses about a third of its height in a `wide` panel. Balloon `anchor` points are in the panel's coordinates after the crop; the proof sheet shows where they land.
 - **At least one new picture every weekday** (among each day's five scenes); the others may `hold`.
 - **No words in the picture:** no lettering, signs, labels, logos or speech balloons. We add every word.
 - **Flat colour and clear dark outlines.** The pictures become black and white on one panel, four greys on another and six colours on the third. Flat areas survive all three; soft gradients, fine textures and thin pale lines turn into noise.
-- **Colours that convert best:** black, white, red, yellow, green and blue (the colour panel's six inks). Others are mixed from those with dots.
+- **Colours that convert best:** black, white, red, yellow, green and blue (the colour panel's six inks). An inked style with a limited palette works very well (Muse's red-sky test picture, mockup round 4); greys come out as black-and-white texture on the colour panel, and only clearly coloured areas use the coloured inks.
 - **Keep the calm zones calm** (section 3).
 - **Stay on model:** draw the crew and ship from your own `sheets/`, every time.
 - **No canon characters and no likenesses of real people.**
 
-## 5. Sheets and handover
+## 5. Delivering in parts
+
+A season may be delivered chapter by chapter: at least chapters 1 and 2 before the premiere, then each chapter **at least 7 days before it airs**. Each delivery is the same folder with the new chapters added to `season.json` and `art/`; earlier chapters may be corrected in the same delivery. A missing chapter 7 days out raises an alert to the owner.
+
+## 6. Sheets and handover
 
 - `sheets/`: before drawing any scene, each writer draws the crew and the ship in their own style (front, side, a few expressions). Jarvis reviews these first; they are the reference for every picture in the season.
 - `handover.md`: written at the end of the season for the next writer: where the crew is, what changed (ship, damage, credits, relationships), open threads, running jokes, anything the bible should gain.
 
-## 6. What the import refuses
+## 7. What the import refuses
 
-- A wrong number of chapters or scenes, a premiere that is not a Monday, a missing field, an unknown template, scene 1 not a Splash.
-- A missing art file, a picture of the wrong shape, a weekday with no new picture, a nearly blank picture, `hold` after a different template.
+- Chapters out of order or more than the season allows, a wrong number of scenes, a premiere that is not a Monday, a missing field, an unknown template, scene 1 not a Splash.
+- A missing art file, a picture smaller than its panel, a weekday with no new picture, a nearly blank picture, `hold` after a different template.
 - Any line that does not fit its zone, a character the font does not have, a name on the bible's banned list.
 
 Every problem is listed with its chapter and scene, so a whole season's mistakes can be fixed in one pass.

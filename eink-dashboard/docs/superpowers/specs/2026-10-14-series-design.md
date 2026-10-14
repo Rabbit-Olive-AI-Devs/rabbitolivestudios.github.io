@@ -1,8 +1,8 @@
 # The Series (fifth desk page) — Design
 
 **Date:** 2026-10-14
-**Status:** Sections 1–8 approved by the owner in conversation on 2026-10-14. **Section 9 holds proposals the owner has not yet confirmed** (writer order, premiere date, Notion layout, the shared folder, who approves the proof sheet). Not built. Next step after the owner reviews this file: an implementation plan.
-**Mockups:** private artifact <https://claude.ai/artifact/Rb2TKnk47BeUvKY8peHRFE> (round 3 is the approved direction). The scripts that drew them were throwaway and are not in the repo.
+**Status:** Sections 1–8 approved by the owner in conversation on 2026-10-14; section 9 records the calendar and roles the owner then decided, and the few points still open. Not built. Next step: an implementation plan.
+**Mockups:** private artifact <https://claude.ai/artifact/Rb2TKnk47BeUvKY8peHRFE> (round 3 is the approved direction; round 4 is a real picture from Muse through all three conversions). The scripts that drew them were throwaway and are not in the repo.
 **For the showrunner:** `docs/series/SHOWRUNNER.md` (the process) and `docs/series/SEASON-FORMAT.md` (the exact package the writers deliver).
 
 ## 1. What this is
@@ -30,6 +30,8 @@ Success means: a page worth glancing at during the working day, a story that rew
 | Pace | Weekdays only, working hours: 5 scenes a day at 08, 10, 12, 14, 16 Chicago | Owner: the story rolls while they are at the desk |
 | Weekends | Replay of the week, one scene an hour, then a "next week" teaser from Sunday 19:00 | Owner: catch up on missed scenes |
 | Source of truth | Notion, run by Jarvis; seasons copied into the project once, when finished (option A) | No runtime dependency on Notion; every season reviewed once before it goes live |
+| Calendar | **A 10-week Prologue by Claude premieres Monday 26 October 2026**; Season 1 follows on 4 January 2027 and later seasons start on the first Monday of each quarter | Owner's date and idea ("season 1 could be prologue") |
+| Proof sheet | Approved by Jarvis, so the owner watches unspoiled | Owner's choice |
 | Runtime | No AI, no KV; pages pre-built at import and stored in R2 | Free-tier CPU, KV and neuron budgets (DECISIONS #62, and the CPU lessons of the colour pipelines) |
 
 ### Rejected along the way
@@ -43,7 +45,7 @@ Success means: a page worth glancing at during the working day, a story that rew
 
 ## 3. The story clock
 
-All times are America/Chicago. A season has **13 chapters**; chapter *k* runs in week *k* counted from the season's premiere Monday. Each chapter has **25 scenes**, five per weekday.
+All times are America/Chicago. A season has **13 chapters** (the Prologue has 10); chapter *k* runs in week *k* counted from the season's premiere Monday. Each chapter has **25 scenes**, five per weekday.
 
 | When | Shown |
 |---|---|
@@ -84,11 +86,11 @@ The writer delivers each picture once, in full colour. At import it becomes thre
 
 | Panel | Route | Conversion |
 |---|---|---|
-| Desk E1001 | `/desk/series` | 1-bit: Bayer 8×8 ordered dither, as the desk pages' crests and planets |
+| Desk E1001 | `/desk/series` | 1-bit: Floyd–Steinberg error diffusion after a mild contrast boost |
 | Home E1001 | `/series` | 4-level grey, as Pipeline A (`/fact.png`) |
-| Office E1002 | `/color/series` | Spectra 6, Floyd–Steinberg, as Pipeline D (`/color/moment`) |
+| Office E1002 | `/color/series` | Spectra 6 Floyd–Steinberg, but **pixels with little colour may only use black and white**; only saturated pixels use red, yellow, green and blue |
 
-Round 3 showed flat-colour art converting cleanly to all three, and smooth gradients turning to dot patterns in 1-bit. The house style therefore asks for **flat colour areas and clear outlines**, and calm zones without gradients.
+Round 3 showed flat-colour art converting cleanly to all three, and smooth gradients turning to dot patterns in 1-bit. Round 4 put a real picture from Muse (inked, red sky, blue light) through the conversions: the grey version was clean as it was; Pipeline D's colour method turned every dark grey into coloured speckle, and the desk pages' Bayer dither turned fine ink detail to mush. The two changes in the table fixed both (compare round 4 in the mockups). The house style therefore asks for **flat colour or inked areas, clear outlines, and a limited palette** leaning on black, white, red, blue, yellow and green, with calm zones kept free of gradients.
 
 The new routes are a new pipeline. They share conversion functions with Pipelines A and D but must not change them.
 
@@ -97,17 +99,19 @@ The new routes are a new pipeline. They share conversion functions with Pipeline
 The full format is in `docs/series/SEASON-FORMAT.md`. In short, a folder with:
 
 - `season.json`: season number, title, writer, premiere Monday; 13 chapters, each with a title, a teaser line and 25 scenes; each scene with its template, location caption, narration, and per panel an art file (or `hold` to keep the previous picture) and up to two balloons (speaker, line, anchor point in the art).
-- `art/`: the pictures, full colour, no words, at the template's size or larger at the same shape.
+- `art/`: the pictures, full colour, no words. Image models give fixed shapes (Muse's test was 3:2), so any shape at least as large as the panel is accepted and **cropped to fill**, around an optional `focus` point the writer sets.
 - `sheets/`: the writer's character and ship sheets, for review only.
 
 `npm run series-import -- <folder>` runs on the Mac mini. It stops with a list of every problem if any check fails:
 
-1. **Structure:** 13 × 25 scenes, premiere on a Monday, required fields present, known template names, scene 1 of each chapter is a Splash.
+1. **Structure:** 13 chapters (10 for the Prologue) of 25 scenes, premiere on a Monday, required fields present, known template names, scene 1 of each chapter is a Splash.
 2. **Art:** every referenced file exists and has the template's shape; **at least one new picture per weekday**; no picture that is nearly blank.
 3. **Words:** every line **fits its zone, measured with the real fonts**; only characters the fonts have; none of the bible's banned names. Tone is the showrunner's review, not code's.
 4. **Build:** every page for every panel: 325 scenes, their 325 replay versions, 13 teasers, the between-seasons card (1,992 PNGs, about 200 MB).
 5. **Proof sheet:** every scene in order on one private page, for approval before anything goes live.
-6. **Upload** to R2, only after approval. Re-running replaces the season; `--chapter N` rebuilds one chapter for a fix found mid-season.
+6. **Upload** to R2, only after approval. Re-running replaces the season; `--chapter N` imports or rebuilds one chapter.
+
+**Delivery in parts.** A season may arrive chapter by chapter: at least the first two chapters before the premiere, then each chapter at least **7 days before it airs**. The checks run per chapter, plus the season-wide ones (numbering, at least one new picture per weekday) on what has arrived.
 
 ## 7. Runtime, storage and failure handling
 
@@ -116,7 +120,7 @@ The full format is in `docs/series/SEASON-FORMAT.md`. In short, a folder with:
 - **Missing page:** the nearest earlier scene that exists; if none, the plain text page (`src/pages/unavailable.ts`, DECISIONS #58). Never a broken image.
 - **Between seasons:** a card with the previous season's final picture and "Returns DD/MM" when the next season is imported, "Returns soon" when it is not. Importing a season rebuilds the previous season's between-seasons card.
 - **Preview:** `?at=YYYY-MM-DDTHH:MM` shows any moment, behind `TEST_AUTH_KEY`, because it reveals future scenes.
-- **Alerting (`src/alert.ts`, DECISIONS #60):** the six-hourly check gains two conditions: the page for the current slot is missing from R2, and the current season ends within 14 days with no next season in the schedule. Both are R2 reads, not KV.
+- **Alerting (`src/alert.ts`, DECISIONS #60):** the six-hourly check gains three conditions: the page for the current slot is missing from R2; next week's chapter is not imported 7 days before it airs; the current season ends within 14 days with no next season in the schedule. All are R2 reads, not KV.
 - **Spoilers:** the repo is public and holds no scripts or art. The R2 bucket is private. Test previews need the key.
 
 ## 8. Roles
@@ -128,26 +132,31 @@ The full format is in `docs/series/SEASON-FORMAT.md`. In short, a folder with:
 | The season's writer (an AI) | Writes the chapters and scenes, draws its character and ship sheets first, then every picture, and leaves a handover note for the next writer |
 | Claude Code (this repo) | Engineer: the panel pages, the import and its checks, template guides, proof sheets, uploads, alerting |
 
-## 9. Proposals awaiting the owner
+## 9. Calendar and roles (decided 2026-10-14) and what is still open
 
-These were not yet discussed when the owner asked for everything to be written down. Each is a recommendation.
+**Decided by the owner:**
 
-1. **Writer order:** Season 1 Claude, then OpenAI, Grok and Muse. Claude first, because its season is drawn by code and can be produced and imported in this same repo, which tests the whole pipeline end to end before the other writers depend on it.
-2. **Muse:** confirm whether Muse can generate images. If it cannot, its season pairs Muse's script with another writer's art, credited to both.
-3. **Premiere:** Season 1 on **Monday 4 January 2027**, the first Monday of Q1. Working back: bible approved by 1 November; package delivered by 14 December (the alert threshold); proof sheet approved and imported by 21 December. The code is built and tested before then with a small pilot package.
-4. **Notion layout:** one teamspace page for the show, holding the **Bible** (crew, ship, world, house style, banned names), a **Seasons** database, a **Chapters** database and a **Scenes** database (one row per scene, with the template, words, balloons and art files), and one **continuity log** per season. Details in `docs/series/SHOWRUNNER.md`.
-5. **Hand-off folder:** Jarvis exports each finished season to a shared **Dropbox** folder (a Dropbox connector is already available to Claude Code); Google Drive would also work.
-6. **Proof sheet approval:** the owner may prefer not to read a season ahead. Then Jarvis approves the proof sheet and the owner watches it fresh.
-7. **Setting:** the Star Wars galaxy, Outer Rim, after the fall of the Empire; canon places, species and ship classes allowed; **no canon characters**, no Jedi or Sith as crew. Family-friendly: peril and humour, no gore.
-8. **Title and crew:** the first writer proposes the show's title, the crew (a pilot, a droid, a third member) and the ship; Jarvis puts them in the bible; the owner approves. The mockups' names are only placeholders.
+1. **Writer order:** Claude first, then OpenAI, Grok and Muse, in rotation.
+2. **The Prologue:** Claude's first run is a **10-week Prologue** (season number 0), Monday 26 October 2026 to Friday 1 January 2027. The date is the owner's choice. Season 1 (OpenAI) premieres Monday 4 January 2027; Season 2 (Grok) 5 April; Season 3 (Muse) 5 July; then Claude again on 4 October 2027.
+3. **Muse can generate images** (the owner shared a test picture; round 4 of the mockups).
+4. **Proof sheets are approved by Jarvis**, so the owner watches each season unspoiled. The owner still approves the bible and the writer order.
+
+**Consequences of the 26 October date:** 12 days from this decision. The panel routes, the importer and Claude's first two chapters must be ready by about Friday 23 October; the Prologue is delivered in parts (section 6). The bible can be short for the Prologue and grow before Season 1.
+
+**Still proposals (my defaults unless the owner objects):**
+
+- **Notion layout:** a Bible page and Seasons, Chapters and Scenes databases (`docs/series/SHOWRUNNER.md`).
+- **Hand-off folder:** Dropbox, `00_SHARED_INBOX` today; a dedicated *The Long Drift / packages* folder once Jarvis sets it up.
+- **Setting:** after the fall of the Empire; canon places, species and ship classes allowed; no canon characters. Muse's test picture shows a hooded figure with a lightsaber, so whether Jedi may appear (as guests, not crew) is for the owner to decide in the bible.
+- **Title and crew:** the Prologue (Claude) introduces them; the owner approves.
 
 ## 10. Build outline (for the implementation plan)
 
-1. **Story clock** (`src/series.ts`): slot from time, pure and fully tested, including the weekend and DST cases.
+1. **Story clock** (`src/series.ts`): slot from time, pure and fully tested, including the weekend, DST, the 10-chapter Prologue and the gap between seasons.
 2. **Pages and storage:** R2 bucket and binding, the three routes, fallback and between-seasons logic, preview behind the key.
 3. **Templates and lettering:** zone geometry, caption and balloon drawing, the narration strip, template guide PNGs.
 4. **Import:** validation, the three conversions, page building, proof sheet, upload, single-chapter rebuild.
-5. **Pilot package:** a short test season (one chapter) drawn by code, imported end to end and checked on all three panels.
+5. **The Prologue's first chapters** (Claude, drawn by code) are the pilot: imported end to end and checked on all three panels before 26 October.
 6. **Alerting** additions and `/health-detailed` fields.
 7. **Docs:** DECISIONS record, README endpoints, HANDOVER, CLAUDE.md file map; the panels' pagelists updated by the owner in SenseCraft.
 
