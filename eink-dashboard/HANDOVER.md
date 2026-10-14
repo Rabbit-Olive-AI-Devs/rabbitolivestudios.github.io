@@ -23,13 +23,15 @@ When documents disagree about **current behaviour**, the source code and the liv
 
 A single Cloudflare Worker (TypeScript, no framework, zero runtime dependencies) that renders content for three e-ink panels owned by one person. It is a personal project on Cloudflare's **free tier**, and staying on the free tier is a deliberate choice that shapes most of the engineering.
 
+Since 2026-10-14 the panels also carry **The Long Drift**, a Star Wars graphic-novel series written and drawn ahead of time by AI writers, one season per quarter, coordinated by the owner's agent Jarvis and shown a scene at a time (#71, #72).
+
 The headline feature is **"Moment Before"**: every day the Worker picks a famous historical event that happened on this date, has an image model illustrate it in a rotating art style, and converts the result to something an e-ink panel can show well. Alongside it the panels show a weather dashboard, a daily AI city skyline, and steel/trade headlines.
 
 - **Live URL:** `https://eink-dashboard.thiago-oliveira77.workers.dev`
 - **Repo:** `Rabbit-Olive-AI-Devs/rabbitolivestudios.github.io` (public; moved from `rabbitolivestudios/…` on 2026-09-10, old URL redirects). The project lives in the `eink-dashboard/` subdirectory; the repo root holds an unrelated website.
 - **Branch:** `main`. Deploys are done from a local machine with `wrangler`, not by CI.
 
-## 2. The two panels, and how pixels reach them
+## 2. The panels, and how pixels reach them
 
 | | E1001 | E1002 |
 |---|---|---|
@@ -37,11 +39,11 @@ The headline feature is **"Moment Before"**: every day the Worker picks a famous
 | Resolution | 800x480 | 800x480 |
 | Location | Home, Naperville IL (zip 60540) | Office, Chicago IL (zip 60606) |
 | SenseCraft device ID | `20225290` | `20225358` |
-| Routes it uses | `/fact.png`, `/weather`, `/skyline-bw` | `/color/moment`, `/color/weather`, `/skyline`, `/color/headlines` |
+| Routes it uses | `/fact.png`, `/weather`, `/skyline-bw`, `/series` (added 2026-10-14) | `/color/moment`, `/color/weather`, `/skyline`, `/color/headlines`, `/color/series` (added 2026-10-14) |
 
 The exact pagelists live in the SenseCraft HMI web app, not in this repo. (Since SenseCraft HMI v1.3.2, February 2026, there is no separate "Web Function" page type: a URL is shown through the **HTML widget** in the Canvas Editor, sized 800x480 at position 0,0. Older notes in this repo still say "Web Function"; they mean the same mechanism.) The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel.
 
-A **third panel**, a second E1001 (mono), sits on the owner's home-office desk and shows the `/desk/*` pages. It was paired in SenseCraft HMI on 2026-10-12; its device ID is not recorded here and no telemetry is fetched for it.
+A **third panel**, a second E1001 (mono), sits on the owner's home-office desk and shows the `/desk/*` pages. It was paired in SenseCraft HMI on 2026-10-12; its device ID is not recorded here and no telemetry is fetched for it. The owner added `/desk/series` to it on 2026-10-14.
 
 **The mental model that explains most of this project's rules:** the panel never fetches anything itself. SenseCraft HMI's "Web Function" loads each URL in a **headless Chromium in Seeed's cloud**, screenshots it, quantises the screenshot to the panel's palette, and pushes a finished image to the device. Every page of a pagelist is rendered in one burst about every 15 minutes. Consequences:
 
@@ -71,7 +73,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/desk/series` | Desk E1001 | The series, black and white: current scene from R2 `eink-series`, pre-built offline (#71) |
 | `/series` | Home E1001 | The series, four greys (#71) |
 | `/color/series` | Office E1002 | The series, six colours (#71) |
-| `/series/proof` | Showrunner | A chapter's scenes for approval; needs `SERIES_KEY` (#71) |
+| `/series/proof` | Showrunner | A chapter's scenes and teaser for approval, images from `/series/proof/img`; needs `SERIES_KEY` (#71) |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
 | `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
@@ -90,9 +92,11 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `env.IMAGES` | Cloudflare Images | JPEG to PNG, centre-crop and resize to 800x480 |
 | `env.CACHE` | KV namespace `de97776d35af4df08b13fd2158acebdc` | Every cache in the project |
 | `env.PHOTOS` | R2 bucket `eink-birthday-photos` | `portraits/` (birthday references), `skylines/` (city references) |
+| `env.SERIES` | R2 bucket `eink-series` (private) | The series: every finished page (`series/sNN/cNN/…png`) and `series/schedule.json` (#71) |
 | `env.SEND_EMAIL` | Email Routing | Failure-alert email |
 | `TEST_AUTH_KEY`, `ALERT_TO`, `ALERT_FROM` | Secrets | Test-route auth; alert addresses (secrets because the repo is public) |
 | `TARS_KEY` | Secret | Lets the owner's Macs post to `/desk/tars` and unlocks that page |
+| `SERIES_KEY` | Secret | Unlocks series previews (`?at=`) and the proof page; they reveal unreleased chapters. The owner sets it with `scripts/series-set-key.sh`; a copy lives in `~/.config/eink/series-key` on the Mac mini (not the Keychain, which locks in remote sessions) |
 | `FOOTBALL_DATA_KEY` | Secret | Only for the retired World Cup code |
 
 **Cron triggers** (`wrangler.toml`), all in UTC:
@@ -101,6 +105,8 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 - `5 0,6,12,18 * * *` — refreshes headlines, both weather locations and both devices' telemetry, warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check.
 
 The daily warm runs its pipelines **sequentially in priority order** (Pipeline A or birthday, Pipeline B, colour moment, skyline, skyline BW), skips any key that already exists, and stops at the first neuron-budget error.
+
+**Off-Worker jobs on the Mac mini** (LaunchAgents, logs in `~/Library/Logs/eink-series/` and `/tmp`): `com.eink.tars-report` (TARS, every 30 min, #69); `com.eink.series-mailbox` (handles Jarvis's mailbox within minutes of a file arriving, #72); `com.eink.series-weekly` (Wednesdays 09:05: writes Claude's next due chapter, #72). The series jobs need the external SSD mounted, because Dropbox syncs to `/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox`.
 
 **External data sources:** NASA Exoplanet Archive (desk planet, no key), Wikipedia "On This Day", Open-Meteo (weather, primary), NWS `api.weather.gov` (alerts, and keyless weather fallback), SenseCraft HMI API (battery, indoor temperature and humidity), Steel Industry News / SteelOrbis / Google News RSS (headlines).
 
@@ -123,6 +129,7 @@ Facts that have each cost real debugging time:
 - **One FLUX attempt, then fall back. No retry loops.** When changing a retry or budget pattern, grep every call site; a past fix missed four of five (#38).
 - Floyd–Steinberg is right for the colour panel and wrong for the mono panel, where Bayer 8x8 or a histogram threshold is used (#4, #14).
 - Captions are drawn **after** dithering, or mapped by nearest colour, so diffused error cannot corrupt them (#64).
+- **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped, converted (desk 1-bit Floyd–Steinberg with contrast; home Pipeline A's 4-level; office Spectra 6 where greyish pixels may only be black or white and pass on only their brightness error) and lettered by `scripts/series-import.mjs` on the Mac mini, then uploaded to R2. The Worker only reads one finished PNG per request. Never move that work onto the request path.
 - Workers cannot run native image libraries; the PNG encoder and decoder are hand-written (`png.ts`, `png-decode.ts`) and the caption font is an 8x8 bitmap.
 
 ## 6. Caching
@@ -155,6 +162,7 @@ Everything here runs inside hard free-tier limits. Cost any change against them 
 | Workers AI neurons | 10,000/day, resets 00:00 UTC | ~5,500 | FLUX.2 klein-9b costs ~1,364 per image and is essentially the whole bill. Both panels share one account-wide pool: either can blank the other. |
 | KV writes | 1,000/day | ~590, plus ~96 once both Macs report to TARS, plus 4 to 12 for the Flamengo board | The tightest budget. Mostly weather/alerts/device caches refreshed by two panels polling every 15 minutes. About 400 spare (#62). |
 | KV lists | 1,000/day | 0 on a healthy day | Only the stale fallback lists, and its listings are memoised for 6h. |
+| R2 (series) | 10 GB stored, 10 M reads and 1 M writes a month | ~2 reads per panel poll; ~160 writes per chapter upload | Far inside the free tier (#71). |
 | Cron triggers | 5 per account, shared by six Workers | 2 used here | A deploy that exceeds it fails with `code: 10072` but **still uploads the Worker** on the old schedule. |
 
 A fifth budget is time: about one second for sub-resources and 8–10 seconds for the document (section 2).
@@ -179,6 +187,8 @@ Supporting mechanisms:
 - **Weather** uses stale-while-revalidate, a 4-second Open-Meteo timeout, an NWS fallback, and a 5-second cap on the cold path (`with-budget.ts`, #42, #43).
 - **All external fetches** go through `fetchWithTimeout()`; failures return `null` or `[]` and never crash a page.
 
+**The series** degrades on its own path: an unapproved or missing chapter shows the last approved scene; a missing page or broken `schedule.json` gives the text page; between seasons a "coming soon" or "returns soon" card shows. The alert check also emails when a chapter airing within 7 days is not approved, when a season ends within 14 days with nothing after it, or when the page for now is missing (#71).
+
 **Alerting** (`src/alert.ts`, #60): graceful degradation hides failures, and two multi-day outages were found only by looking at a panel. The 6-hourly cron now checks whether the day's five images are in KV and whether the budget block is armed, and emails on a *change* of state through Cloudflare Email Routing. A KV fingerprint limits it to one email per distinct problem, one reminder per 24h, and one recovery notice. It skips Chicago hours before 3 so it cannot race the warm. When you add a failure mode, ask whether this check would catch it.
 
 ## 9. Non-negotiable rules
@@ -194,6 +204,7 @@ Supporting mechanisms:
 - Font weight at most 700, body 500. Size rows to content with fixed spacing so baselines land on whole pixels. Never put text rows in a shrinkable flex container with `overflow: hidden` (#46, #48).
 - `/weather` and `/color/weather` have only **5–7px of vertical slack**, and `.hourly` absorbs every deficit while `overflow: hidden` hides the clipping. `body.scrollHeight` reports 480 even when cards are cut. Measure the deepest rendered element instead, and test with a banner (`?test-alert=tornado`) (#63).
 - An HTML page whose body is an image needs a text fallback.
+- **The series** (#71, #72): never commit season scripts, pictures, packages or build output (public repo, spoilers); never show the owner an unaired scene, proof page or plot (he watches unspoiled), so write chapters through a background helper or the weekly unattended run, never in the main conversation; a chapter airs only after the showrunner's `APPROVE`.
 - **Desk panel pages (`/desk/*`)** are drawn by the Worker as 1-bit images with `src/hud/`, never as live HTML text. Type is real fonts only, from the generated glyph faces, and never smaller than `plex11m` (11px medium), the owner's minimum on the panel. Show the owner a mockup before building a new page (#66, #67).
 
 **For code:**
@@ -245,7 +256,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 225 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 283 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -263,6 +274,16 @@ curl -s https://eink-dashboard.thiago-oliveira77.workers.dev/health-detailed
 npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "fact4:"
 npx wrangler kv key get "ai-budget:v1:block" --remote --namespace-id de97776d35af4df08b13fd2158acebdc
 npx wrangler tail eink-dashboard --format json     # can go silent while alive; re-attach
+
+# The series (offline, on the Mac mini; packages and output stay in ~/series-work, never the repo)
+npm run series -- build <package.zip|dir> [--chapter N] --out ~/series-work/out-…
+CLOUDFLARE_ACCOUNT_ID=f22a506dedde3bb3837157cd47d5fe5c npm run series -- upload ~/series-work/out-…   # pending until approved
+CLOUDFLARE_ACCOUNT_ID=f22a506dedde3bb3837157cd47d5fe5c npm run series -- approve --season S --chapter C
+npm run series -- preview <picture|folder> --out DIR    # a style test on the three panels
+npm run series -- templates                             # regenerate docs/series/templates/*.png
+curl -s "https://eink-dashboard.thiago-oliveira77.workers.dev/series/proof?season=0&chapter=1&key=$(cat ~/.config/eink/series-key)" | grep -c '<img'
+launchctl kickstart gui/$(id -u)/com.eink.series-mailbox   # handle the mailbox now
+tail ~/Library/Logs/eink-series/mailbox.log
 ```
 
 Things that are not obvious:
@@ -288,7 +309,9 @@ Things that are not obvious:
 | Smudged or foggy text | Grey or coloured text, weight above 700, or fractional pixel positions (#45, #46, #48). |
 | Faint ghost of an old image | Image retention after a long static frame. Point the panel at `/clean` for several cycles (#56). |
 | Cloudflare email about KV operations nearing the cap | Writes are normally ~59% of the cap. If `list` is elevated, AI is blocked and the stale fallback is running (#62). |
-| An alert email arrives | It names the missing images or the armed budget block. Start at the first row of this table. |
+| An alert email arrives | It names the missing images, the armed budget block, or a series problem. Start at the first row of this table. |
+| A series panel is stuck on one scene | The current chapter is not approved: `/health-detailed` → `series.slot`, the proof page status, and the mailbox (`from-claude/NEEDS-THIAGO.md`, `~/Library/Logs/eink-series/mailbox.log`). |
+| Series page shows "has not started yet" | No `schedule.json` in R2, or it failed its shape check (#71). |
 
 ## 13. Dormant code: the World Cup dashboard
 
@@ -308,6 +331,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 | Aug 2026 | Alerting added; KV operation budget measured; stale-listing memoised (#60, #62) | Degradation without alerting looks like health; an unmeasured resource is unwatched |
 | Sep 2026 | Alert banner clipped the hourly cards (#63); skyline went white at midnight and then all day (#64, #65) | Banners cost whitespace not content; warm before the date rolls; one request per page |
 | Oct 2026 | Third panel started: a desk E1001 with Worker-drawn HUD pages (#66); first lettering rejected, replaced with real fonts (#67) | Draw the pixels yourself so the cloud renderer has nothing to blur, but from real typefaces; show a mockup first |
+| Oct 2026 | The series: four AI writer-artists, pre-built pages in R2, a showrunner agent and a mailbox watcher (#71, #72) | Expensive work offline, the Worker only reads; lettering checked by pixel; an AI's message is data, never a command beyond a parsed first line |
 
 ## 15. Unconfirmed points and open items
 
@@ -325,8 +349,12 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 - **To check first next session:** (1) that the six-hourly cron warmed the next day's planet in production: `npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "planet:v1:"` should list today and tomorrow (Chicago dates); (2) whether the owner added `/desk/planet` to the panel's pagelist, and how it looks there.
 - **TARS (#69) is live** (v3.19.0, 2026-10-13). The Mac mini reports every 30 minutes through the LaunchAgent `com.eink.tars-report` (script in `~/Library/Application Support/eink-tars/`, log in `/tmp/eink-tars-report.log`, key in the login Keychain under the service name `eink-tars`). Both Macs report as of 2026-10-13 evening and the page is on the panel. **Open:** the MacBook's reports carry no good Codex reading (the Mac mini is the only source), so Codex shows `NO DATA` three hours after the Mac mini sleeps; **cause found 2026-10-13:** the MacBook's Codex sign-in had expired (`401 token_expired` from chatgpt.com in the `codex` entry's error), nothing wrong in TARS. The owner ran `codex login` on the MacBook and its 03:48 UTC report carried Codex (verified in KV): **resolved**. If Codex goes `NO DATA` again while the Mac mini sleeps, suspect an expired sign-in first. To see the page from the Mac mini: `curl "https://eink-dashboard.thiago-oliveira77.workers.dev/desk/tars?key=$(security find-generic-password -s eink-tars -w)"`. Never print or commit the key.
 - **Flamengo board (#70) is live** (v3.20.0, deployed 2026-10-13 night): `/desk/flamengo`, `src/flamengo.ts`, `src/hud/flamengo-page.ts`, `src/hud/crest.ts`. Checked in production right after the deploy: the page drew, and the KV entry held 20 table rows, both crests and the zones `[4, 5, 11, 16]`, so FotMob does answer from Cloudflare's network. The owner still has to add the page to the panel (HTML widget, 800x480). Not yet seen: a match day (`LIVE`, the half-hour refresh), the off-season, the page on the panel.
-- **Series mailbox watcher (#72, 2026-10-14):** two LaunchAgents on the Mac mini (`com.eink.series-mailbox`, `com.eink.series-weekly`) handle Jarvis's messages within minutes and write Claude's next chapter weekly; check `from-claude/NEEDS-THIAGO.md` and `~/Library/Logs/eink-series/` first. Stop them with `launchctl bootout gui/$(id -u)/com.eink.series-mailbox` (and `-weekly`).
-- **Fifth page deployed as v3.21.0 (2026-10-14): the series (#71).** Code in `src/series/`, `src/pages/series.ts`, `scripts/series-import.mjs`; 273 tests. R2 bucket `eink-series` created. Next: Claude's Prologue chapters 1–2 (built outside the repo in `~/series-work/s00/`), upload, Jarvis's approval, and the three routes on the panels before Monday 26 October 08:00. Dropbox on the Mac mini syncs to `/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox`. Original design note: The saved "self-playing adventure" idea became a Star Wars graphic-novel series for all three panels (`/desk/series`, `/series`, `/color/series`): four AI writers, one per three-month season, each writing and drawing in their own style; scenes on weekdays 08:00–16:00 Chicago, weekend replays; pages pre-built at import and served from a private R2 bucket, no AI and no KV at run time. The owner's agent Jarvis is showrunner. Design: `docs/superpowers/specs/2026-10-14-series-design.md` (section 9 holds proposals the owner has not confirmed). Showrunner handover and package format: `docs/series/SHOWRUNNER.md`, `docs/series/SEASON-FORMAT.md`. Mockups: private artifact <https://claude.ai/artifact/Rb2TKnk47BeUvKY8peHRFE>. Decided 2026-10-14: a 10-week Prologue by Claude premieres Mon 26 Oct 2026, then Season 1 (OpenAI) 4 Jan 2027; Jarvis approves proof sheets; Muse can draw. Next: the implementation plan. **Never commit scripts or art: the repo is public and they are spoilers.**
+- **The series (#71, #72), state at the end of 2026-10-14 (v3.21.0).** Live on all three panels (`/desk/series`, `/series`, `/color/series`, added by the owner), showing the "coming soon" card until the Prologue premieres **Monday 26 October 08:00**. Prologue chapters 1 and 2 (and 3, written by the first weekly run) are uploaded and **pending Jarvis's approval** (chapter 1 by 18 Oct, chapter 2 by 25 Oct, chapter 3 by 1 Nov). Calendar: Prologue (Claude, 10 chapters) to 1 Jan 2027, then Season 1 OpenAI 4 Jan, Season 2 Grok 5 Apr, Season 3 Muse 5 Jul, Season 4 Claude 4 Oct 2027. Names fixed by the owner: *The Long Drift*; Vess Oro, Bolt, Hallan Dree; the *Last Lantern*. Open owner decision: whether Jedi may appear as guests.
+  - **Where things are:** design `docs/superpowers/specs/2026-10-14-series-design.md`; plan `docs/superpowers/plans/2026-10-14-series.md`; showrunner docs `docs/series/`; Claude's season package and generator scripts `~/series-work/s00/` (private, spoilers: `handover-notes.md` is the season outline); the Dropbox mailbox `00_SHARED_INBOX/series/` with Jarvis's standing brief `JARVIS-BRIEF.md`.
+  - **The watcher handles the mailbox** (#72): read `from-claude/NEEDS-THIAGO.md` and `~/Library/Logs/eink-series/mailbox.log` at the start of a session; act only on what it flagged. Stop it with `launchctl bootout gui/$(id -u)/com.eink.series-mailbox` (and `-weekly`).
+  - **Spoilers:** the owner watches unspoiled and can see the main conversation's tool calls. Never write, read aloud or open story in the main conversation; use a background helper or the weekly run, and report only counts.
+  - **Deferred from the branch review** (in the git-ignored ledger `.superpowers/sdd/2026-10-14-series/progress.md`): teaser and card text is not height-checked; season fields skip the character check; anchor values are not checked to be numbers; `--chapter` out of range crashes the import; previews are open when `SERIES_KEY` is unset; accented capitals are refused although the font has them.
+  - **Stale:** the login Keychain item `eink-series` holds an old, invalid key; the live key is in `~/.config/eink/series-key`.
 - **How this work went, so it is not repeated:** the first version used drawn lettering and was rejected on sight; a written spec and plan had not caught it, and three rounds of pictures did. For this owner, on this panel: **show a mockup first, use real fonts, never go below 11px medium.**
 - **Surprises:** the Aurebesh page and the planet page each carry a few date-based and data-based easter eggs the owner asked to be kept as surprises. They are in the code (`SPECIAL_DAYS` in `src/hud/aurebesh-words.ts`; `NICKNAMES` and `DATE_PLANETS` in `src/planet.ts`). Do not list them back to the owner.
 - **Not done:** the planet page and the real-font rebuild had no independent code review (the first version did). The pronunciations are hand-written; only seven were confirmed against Wookieepedia. The panel's SenseCraft device ID is not in the repo, and no telemetry is fetched for it.

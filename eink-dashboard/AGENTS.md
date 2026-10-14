@@ -6,12 +6,12 @@ Entry point for agents that load this file automatically. It is deliberately sho
 
 1. **`HANDOVER.md`** — the whole project in one file: how the panels get their pixels, routes, pipelines, caches, free-tier budgets, how the system degrades, the rules, the process, commands and a runbook.
 2. **`CLAUDE.md`** — session checklist and the obligations table (what to do in each situation). Written for Claude Code, but the rules apply to any agent.
-3. **`DECISIONS.md`** — 65 numbered records of why things are the way they are, including every rejected approach. Search it before proposing something; it has probably been tried.
+3. **`DECISIONS.md`** — 72 numbered records of why things are the way they are, including every rejected approach. Search it before proposing something; it has probably been tried.
 4. **`README.md`** — endpoints, setup, troubleshooting table.
 
 ## What this is
 
-"Moment Before" — one Cloudflare Worker (TypeScript, plain `switch` router, no framework, zero runtime dependencies) on the **free tier**, serving two 800x480 e-ink panels: a reTerminal E1001 (mono, home, Naperville IL) and a reTerminal E1002 (Spectra 6 colour, office, Chicago IL). Daily AI illustration of a historical event, weather dashboards, a daily city skyline, and steel/trade headlines.
+"Moment Before" — one Cloudflare Worker (TypeScript, plain `switch` router, no framework, zero runtime dependencies) on the **free tier**, serving three 800x480 e-ink panels: a reTerminal E1001 (mono, home, Naperville IL), a reTerminal E1002 (Spectra 6 colour, office, Chicago IL) and a second E1001 on the owner's desk. Daily AI illustration of a historical event, weather dashboards, a daily city skyline, steel/trade headlines, Worker-drawn desk pages, and *The Long Drift*, a pre-made graphic-novel series.
 
 The panels never fetch anything. SenseCraft HMI renders each URL in a cloud headless Chromium, screenshots it about one second after the document arrives, and pushes the image to the device.
 
@@ -24,6 +24,7 @@ The panels never fetch anything. SenseCraft HMI renders each URL in a cloud head
 - Bump the cache-key version after any pipeline change. Every KV `put` carries an `expirationTtl` far larger than the soft TTL.
 - Do not cross-contaminate the image pipelines. Do not delete the retired World Cup code (kept for 2030).
 - Never write a credential to any file. This repository is public.
+- The series (DECISIONS #71, #72): never commit its scripts, pictures or packages, and never show the owner an unaired scene. Expensive image work stays offline; the Worker only reads finished pages from R2.
 
 ## Before you commit
 

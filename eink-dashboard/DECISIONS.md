@@ -3230,3 +3230,8 @@ logs and skips.
 A malformed APPROVE was refused and approved nothing; a style test produced the three previews;
 two old FYIs got sensible replies (and one flagged a stale doc, since fixed); a QUESTION started by
 launchd itself (not from a session) was answered, so the unattended login works in the background.
+
+The first weekly run (started early with `SERIES_TODAY=2026-10-21`) wrote, drew, built and
+uploaded Prologue chapter 3 unattended in about 17 minutes, with the repo left clean. It also
+showed that one shared lock made the mailbox skip messages while a chapter was being written; each
+job now has its own lock (`.mailbox-run.lock`, `.mailbox-weekly.lock` in `~/series-work/`).

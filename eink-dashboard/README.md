@@ -4,7 +4,7 @@ A Cloudflare Workers backend for the **reTerminal E1001** (ESP32-S3, 7.5" ePaper
 
 Every day it generates an AI illustration depicting a famous historical event at its most iconic, dramatic moment — the viewer sees the scene, the location, and the date.
 
-Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67).
+Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67).
 
 ## The Concept
 
@@ -338,6 +338,17 @@ The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `
 
 > **Setup (for a future tournament):** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive; without it the page runs on the openfootball fallback). The B&W image needs **Cloudflare Browser Rendering** enabled on the account. The `[browser]` binding was **removed** at retirement and must be restored in `wrangler.toml`, and `@cloudflare/puppeteer` moved back to `dependencies` (it is currently a devDependency so the preserved source still typechecks without shipping). `nodejs_compat` was deliberately left in place. Then add the two routes to the device pagelists. Full checklist: DECISIONS.md #61; background: #44/#47/#48.
 
+## The Series
+
+*The Long Drift* is a Star Wars graphic novel told one scene at a time on all three panels (DECISIONS #71, #72):
+
+- **Clock:** weekdays at 08, 10, 12, 14 and 16 Chicago (25 scenes a week, one chapter); weekends replay the week; Sunday 19:00 to Monday 08:00 shows a "next week" teaser.
+- **Writers:** one AI per three-month season, writing and drawing in its own style (Prologue: Claude, from 26 October 2026; then OpenAI, Grok, Muse). The owner's agent **Jarvis** is showrunner and approves every chapter; the owner watches unspoiled.
+- **Pipeline:** writers deliver pictures without words; `scripts/series-import.mjs` on the Mac mini validates the package, crops, converts for each panel, letters every caption and balloon (sized, placed and checked by pixel), and uploads finished PNGs to the private R2 bucket `eink-series`. The Worker reads one PNG per request: no AI, no KV.
+- **Mailbox:** Jarvis and the engineer talk through Dropbox `00_SHARED_INBOX/series/`; a LaunchAgent handles `APPROVE`, `DELIVERY` and `STYLE TEST` by script within minutes and hands other messages to a read-only unattended Claude.
+- **Docs:** `docs/series/SHOWRUNNER.md`, `docs/series/SEASON-FORMAT.md`, template guides in `docs/series/templates/`.
+- **Never commit** scripts, pictures, packages or build output: the repo is public and they are spoilers.
+
 ## Architecture
 
 ```
@@ -414,6 +425,8 @@ The reTerminal's SenseCraft HMI has a "Web Function" that screenshots a URL onto
 1. Click **Add Page** → choose **Web Function**
 2. URL: `https://YOUR-URL.workers.dev/fact`
 3. Click **Save**
+
+**The series** (any panel, added 2026-10-14): use the plain addresses, **never with `?key=`** (a key would show unapproved chapters): `https://YOUR-URL.workers.dev/desk/series` (desk E1001), `/series` (home E1001), `/color/series` (E1002).
 
 **Page 2: Weather Dashboard**
 1. Click **Add Page** → choose **Web Function**

@@ -129,7 +129,7 @@ The import measures every line with the real panel font, so these are guides, no
 
 ## 5. Delivering in parts
 
-Deliver each part as a zip named `season-NN-chapter-NN.zip` (or `season-NN.zip`) in Dropbox `00_SHARED_INBOX/series/`, holding `season.json`, `art/`, `sheets/`, `handover.md` and optionally `banned.txt` (one extra banned name per line). A season may be delivered chapter by chapter: at least chapters 1 and 2 before the premiere, then each chapter **at least 12 days before it airs**, so it can be approved at least 8 days before. Each delivery is the same folder with the new chapters added to `season.json` and `art/`; earlier chapters may be corrected in the same delivery. An unapproved chapter 7 days out raises an alert to the owner.
+Deliver each part as a zip named `season-NN-chapter-NN.zip` (or `season-NN.zip`) in Dropbox `00_SHARED_INBOX/series/packages/`, announced by a message in `to-claude/` whose first line is `DELIVERY package=season-NN-chapter-NN.zip`, holding `season.json`, `art/`, `sheets/`, `handover.md` and optionally `banned.txt` (one extra banned name per line). A season may be delivered chapter by chapter: at least chapters 1 and 2 before the premiere, then each chapter **at least 12 days before it airs**, so it can be approved at least 8 days before. Each delivery is the same folder with the new chapters added to `season.json` and `art/`; earlier chapters may be corrected in the same delivery. An unapproved chapter 7 days out raises an alert to the owner.
 
 ## 6. Sheets and handover
 
@@ -144,3 +144,7 @@ Deliver each part as a zip named `season-NN-chapter-NN.zip` (or `season-NN.zip`)
 - A character the font does not have, a name on the bible's banned list.
 
 Every problem is listed with its chapter and scene, so a whole season's mistakes can be fixed in one pass.
+
+## 8. Style tests
+
+Before drawing a season, put three to five sample pictures in a folder under `00_SHARED_INBOX/series/style-tests/` and send a message whose first line is `STYLE TEST folder=<that folder>`. Within minutes, `from-claude/style-tests/<folder>/` holds each picture cropped into a Wide panel and converted as the three panels show it: `-desk` (black and white), `-home` (four greys), `-office` (six colours). The same conversion is available to the engineer as `npm run series -- preview <picture|folder> --out DIR`.
