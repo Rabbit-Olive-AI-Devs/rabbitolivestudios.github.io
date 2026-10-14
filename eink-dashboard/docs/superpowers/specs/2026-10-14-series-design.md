@@ -80,6 +80,14 @@ The exact zone rectangles are fixed in code during the build and exported as **t
 
 **Lettering rules:** all words in IBM Plex Mono from `src/hud/fonts-data.ts`, never below `plex11m` (DECISIONS #67); caption boxes are white with a black rule; balloons are white ellipses with a tail aimed at the speaker's anchor point (a voice from off the picture gets a square box with the speaker's name); at most two balloons per panel. Words are drawn **after** each conversion, as solid black and white, so dithering never touches them (the CLAUDE.md rule for bars and text on dithered images).
 
+**Lettering is checked, never trusted** (owner's request after round 4, where fixed-size balloons let text spill over their edges; round 5 shows the fix):
+
+1. **Sized from the text.** Each line is wrapped at several widths (at most four lines); the most balloon-shaped block wins, and the balloon is built around it with a margin. Nothing has a fixed size.
+2. **Placed by search.** The importer searches the panel for a spot near the speaker (preferring above them and the template's calm zone) that stays inside the panel and clear of the caption, other balloons, **every character's anchor** and any **keep-clear boxes** the writer marks in the scene (`clear`). The tail runs from the balloon's edge to just short of the speaker's head.
+3. **Checked by pixels.** Each balloon's words are first drawn on a scratch canvas; every text pixel must lie at least 4px inside its balloon or box. The same check covers caption boxes, the narration strip and the teaser card.
+4. **Refused, not squeezed.** If a line cannot be wrapped into four lines, no spot is free, or any pixel falls outside, the scene is refused with the reason ("FIGURE: line too long for any balloon (178 chars)", "no room for the balloon in this panel"). Text is never shrunk below the house size or cut off to make it fit.
+5. **Seen once by a person.** The proof sheet is still reviewed by Jarvis for what code cannot judge: a balloon over an important detail the writer forgot to mark.
+
 ## 5. One picture, three panels
 
 The writer delivers each picture once, in full colour. At import it becomes three pages:
@@ -106,7 +114,7 @@ The full format is in `docs/series/SEASON-FORMAT.md`. In short, a folder with:
 
 1. **Structure:** 13 chapters (10 for the Prologue) of 25 scenes, premiere on a Monday, required fields present, known template names, scene 1 of each chapter is a Splash.
 2. **Art:** every referenced file exists and has the template's shape; **at least one new picture per weekday**; no picture that is nearly blank.
-3. **Words:** every line **fits its zone, measured with the real fonts**; only characters the fonts have; none of the bible's banned names. Tone is the showrunner's review, not code's.
+3. **Words:** every balloon, box and strip is sized, placed and **checked pixel by pixel** as in section 4; only characters the fonts have; none of the bible's banned names. Tone is the showrunner's review, not code's.
 4. **Build:** every page for every panel: 325 scenes, their 325 replay versions, 13 teasers, the between-seasons card (1,992 PNGs, about 200 MB).
 5. **Proof sheet:** every scene in order on one private page, for approval before anything goes live.
 6. **Upload** to R2, only after approval. Re-running replaces the season; `--chapter N` imports or rebuilds one chapter.

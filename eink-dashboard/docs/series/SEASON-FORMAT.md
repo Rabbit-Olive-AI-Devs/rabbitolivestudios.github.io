@@ -81,7 +81,8 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 | `panels[].art` | A file in `art/`, or `"hold"` to keep the picture from the same panel of the previous scene (only when the previous scene used the same template) |
 | `panels[].focus` | Optional `[x, y]` in the art file's own pixels: the point to keep when the picture is cropped to the panel's shape. Default: the centre |
 | `panels[].caption` | `strip` only: a short line at the top of that panel |
-| `panels[].balloons` | Up to two. `speaker` in capitals, `text` the line, `anchor` the `[x, y]` point in that panel's picture (in pixels, at template size) where the speaker's head is. Use `"anchor": null` for a voice from off the picture (radio, comlink): it is lettered as a square box with the speaker's name |
+| `panels[].balloons` | Up to two. `speaker` in capitals, `text` the line, `anchor` the `[x, y]` point **in the art file's own pixels** where the speaker's head is. Use `"anchor": null` for a voice from off the picture (radio, comlink): it is lettered as a square box with the speaker's name |
+| `panels[].clear` | Optional list of `[x, y, w, h]` boxes, in the art file's own pixels, that no balloon may cover: each character's body, a key object. Every balloon `anchor` is kept clear automatically; mark the rest |
 
 ## 3. Templates
 
@@ -114,7 +115,7 @@ The import measures every line with the real panel font, so these are guides, no
 ## 4. Art
 
 - **One file per new picture**, PNG or JPEG, full colour, no transparency, named `cCC-sSS.png` (or `cCC-sSS-pN.png` for the Nth panel of `split` and `strip`).
-- **Size:** at least as large as the panel, any shape. It is shrunk and **cropped to fill** the panel around `focus` (or the centre). Plan the composition for the crop: a 3:2 picture loses about a third of its height in a `wide` panel. Balloon `anchor` points are in the panel's coordinates after the crop; the proof sheet shows where they land.
+- **Size:** at least as large as the panel, any shape. It is shrunk and **cropped to fill** the panel around `focus` (or the centre). Plan the composition for the crop: a 3:2 picture loses about a third of its height in a `wide` panel. Give `anchor`, `clear` and `focus` in the art file's own pixels; the importer maps them through the crop, and refuses a scene whose anchor ends up cropped away.
 - **At least one new picture every weekday** (among each day's five scenes); the others may `hold`.
 - **No words in the picture:** no lettering, signs, labels, logos or speech balloons. We add every word.
 - **Flat colour and clear dark outlines.** The pictures become black and white on one panel, four greys on another and six colours on the third. Flat areas survive all three; soft gradients, fine textures and thin pale lines turn into noise.
@@ -136,6 +137,7 @@ A season may be delivered chapter by chapter: at least chapters 1 and 2 before t
 
 - Chapters out of order or more than the season allows, a wrong number of scenes, a premiere that is not a Monday, a missing field, an unknown template, scene 1 not a Splash.
 - A missing art file, a picture smaller than its panel, a weekday with no new picture, a nearly blank picture, `hold` after a different template.
-- Any line that does not fit its zone, a character the font does not have, a name on the bible's banned list.
+- Any balloon, box or strip whose words do not fit: a line that needs more than four lines in a balloon, no free spot for the balloon clear of the characters and `clear` boxes, or any letter pixel closer than 4px to its balloon's edge. Text is never shrunk or cut to fit; shorten the line or split it across two balloons or scenes.
+- A character the font does not have, a name on the bible's banned list.
 
 Every problem is listed with its chapter and scene, so a whole season's mistakes can be fixed in one pass.
