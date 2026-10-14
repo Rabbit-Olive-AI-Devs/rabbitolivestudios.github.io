@@ -28,7 +28,6 @@ const INBOX = path.join(MAILBOX, "to-claude");
 const OUTBOX = path.join(MAILBOX, "from-claude");
 const WORK = path.join(HOME, "series-work");
 const LOGS = path.join(HOME, "Library", "Logs", "eink-series");
-const LOCK = path.join(WORK, ".mailbox.lock");
 const ATTEMPTS = path.join(WORK, ".mailbox-attempts.json");
 const SITE = "https://eink-dashboard.thiago-oliveira77.workers.dev";
 const MAX_ATTEMPTS = 3;
@@ -51,13 +50,14 @@ function reply(slug, body) {
   return name;
 }
 
-function lock() {
+/** One lock per job: a chapter being written must not hold up approvals. */
+function lock(lockFile) {
   try {
-    const age = Date.now() - fs.statSync(LOCK).mtimeMs;
+    const age = Date.now() - fs.statSync(lockFile).mtimeMs;
     if (age < 3 * 3600 * 1000) return false; // another run is working (a chapter can take ~20 min)
   } catch { /* no lock */ }
   fs.mkdirSync(WORK, { recursive: true });
-  fs.writeFileSync(LOCK, String(process.pid));
+  fs.writeFileSync(lockFile, String(process.pid));
   return true;
 }
 
@@ -217,7 +217,8 @@ function cmdWeekly() {
 
 const cmd = process.argv[2];
 if (!["run", "weekly"].includes(cmd)) { console.error("usage: series-mailbox.mjs run|weekly"); process.exit(2); }
-if (!lock()) { log(`${cmd}: another run holds the lock; skipped`); process.exit(0); }
+const LOCK = path.join(WORK, `.mailbox-${cmd}.lock`);
+if (!lock(LOCK)) { log(`${cmd}: another run holds the lock; skipped`); process.exit(0); }
 try {
   cmd === "run" ? cmdRun() : cmdWeekly();
 } catch (err) {
