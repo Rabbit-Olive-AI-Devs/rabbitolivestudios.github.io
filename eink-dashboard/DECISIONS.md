@@ -2829,7 +2829,7 @@ Not seen on the panel. The cron warm has not run in production yet.
 
 ---
 
-## 69. TARS: The Macs Report In, the Worker Only Listens (2026-10-13)
+## 69. TARS: The Macs Report In, the Worker Only Listens (v3.19.0, 2026-10-13)
 
 ### What it is
 
