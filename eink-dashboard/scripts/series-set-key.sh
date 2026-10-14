@@ -14,10 +14,10 @@ KEYFILE="$HOME/.config/eink/series-key"
 URL="https://eink-dashboard.thiago-oliveira77.workers.dev/series/proof?season=0&chapter=1"
 export CLOUDFLARE_ACCOUNT_ID=f22a506dedde3bb3837157cd47d5fe5c
 
-read -rsp "New series key (24+ characters; letters, digits, . _ ~ -): " key; echo
+read -rsp "New series key (8+ characters; letters, digits, . _ ~ -): " key; echo
 read -rsp "Type it again: " again; echo
 [ "$key" = "$again" ] || { echo "The two entries differ. Nothing changed."; exit 1; }
-[ "${#key}" -ge 24 ] || { echo "Too short: use at least 24 characters. Nothing changed."; exit 1; }
+[ "${#key}" -ge 8 ] || { echo "Too short: use at least 8 characters. Nothing changed."; exit 1; }
 case "$key" in
   *[!A-Za-z0-9._~-]*) echo "Use only letters, digits and . _ ~ - (the key goes in a web address). Nothing changed."; exit 1 ;;
 esac
