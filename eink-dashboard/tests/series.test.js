@@ -250,3 +250,72 @@ test("caption boxes and text blocks refuse what does not fit", () => {
   assert.equal(letter.textBlock(c, "plex15m", 16, 420, "Short narration.", 548, 2, 21, "narration"), null);
   assert.match(letter.textBlock(c, "plex15m", 16, 420, "word ".repeat(60), 548, 2, 21, "narration"), /^narration: needs \d+ lines, room for 2/);
 });
+
+const pkgv = fromBuild("src/series/package.js");
+
+const artFor = (p) => new Set(p.chapters.flatMap((c) => c.scenes.flatMap((s) => s.panels.map((x) => x.art))).filter((a) => a !== "hold"));
+
+test("the sample package is valid", () => {
+  const p = pkgv.samplePackage();
+  const { pkg, problems } = pkgv.validatePackage(p, artFor(p), []);
+  assert.deepEqual(problems, []);
+  assert.equal(pkg.chapters[0].scenes.length, 25);
+});
+
+test("structure problems are listed by chapter and scene", () => {
+  const p = pkgv.samplePackage();
+  p.season.premiere = "2026-10-27"; // a Tuesday
+  p.chapters[0].scenes[0].template = "wide"; // scene 1 must be a splash
+  p.chapters[0].scenes[3].template = "comic";
+  p.chapters[0].scenes.pop(); // 24 scenes
+  const { problems } = pkgv.validatePackage(p, artFor(p), []);
+  assert.ok(problems.some((x) => /premiere 2026-10-27 is not a Monday/.test(x)));
+  assert.ok(problems.some((x) => /chapter 1: 24 scenes, needs 25/.test(x)));
+  assert.ok(problems.some((x) => /chapter 1 scene 1: must be a splash/.test(x)));
+  assert.ok(problems.some((x) => /chapter 1 scene 4: unknown template "comic"/.test(x)));
+});
+
+test("typographic characters are named with their place", () => {
+  const p = pkgv.samplePackage();
+  p.chapters[0].scenes[1].narration = "She said “hello” — then left…";
+  const { problems } = pkgv.validatePackage(p, artFor(p), []);
+  const hit = problems.find((x) => x.startsWith("chapter 1 scene 2 narration"));
+  assert.ok(hit, problems.join("\n"));
+  assert.match(hit, /U\+201C/);
+  assert.match(hit, /U\+2014/);
+  assert.match(hit, /U\+2026/);
+});
+
+test("banned names are refused, built-in and extra", () => {
+  const p = pkgv.samplePackage();
+  p.chapters[0].scenes[2].panels[0].balloons = [{ speaker: "VESS", text: "That ship belongs to Han Solo.", anchor: [100, 100] }];
+  p.chapters[0].scenes[3].narration = "Grogu was not there.";
+  p.chapters[0].scenes[4].caption = "SECRET BASE";
+  const { problems } = pkgv.validatePackage(p, artFor(p), ["secret base"]);
+  assert.ok(problems.some((x) => /scene 3 .*"Han Solo"/.test(x)));
+  assert.ok(problems.some((x) => /scene 4 .*"Grogu"/.test(x)));
+  assert.ok(problems.some((x) => /scene 5 .*"secret base"/.test(x)));
+});
+
+test("art: missing files, hold after another template, and a weekday with no new picture", () => {
+  const p = pkgv.samplePackage();
+  for (let s = 6; s <= 10; s++) p.chapters[0].scenes[s - 1].panels[0].art = "hold"; // Tuesday all held
+  p.chapters[0].scenes[1].panels[0].art = "hold"; // scene 2 cannot hold the splash
+  p.chapters[0].scenes[2].panels[0].art = "missing.png";
+  const files = artFor(pkgv.samplePackage());
+  const { problems } = pkgv.validatePackage(p, files, []);
+  assert.ok(problems.some((x) => /chapter 1 scene 3: art file "missing.png" not in art\//.test(x)));
+  assert.ok(problems.some((x) => /chapter 1 TUE: no new picture/.test(x)));
+  assert.ok(problems.some((x) => /chapter 1 scene 2: "hold" after a splash/.test(x)));
+});
+
+test("too many balloons and chapters past the season's length are refused", () => {
+  const p = pkgv.samplePackage();
+  const b = { speaker: "A", text: "Hi.", anchor: [1, 1] };
+  p.chapters[0].scenes[1].panels[0].balloons = [b, b, b];
+  p.season.number = 0;
+  p.chapters = Array.from({ length: 11 }, (_, i) => ({ ...p.chapters[0], number: i + 1 }));
+  const { problems } = pkgv.validatePackage(p, artFor(p), []);
+  assert.ok(problems.some((x) => /scene 2: 3 balloons in panel 1, room for 2/.test(x)));
+  assert.ok(problems.some((x) => /11 chapters, season 0 has 10/.test(x)));
+});
