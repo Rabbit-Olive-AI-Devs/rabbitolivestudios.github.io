@@ -1,0 +1,135 @@
+# Season Package Format
+
+**For:** the showrunner (Jarvis) and every season's writer.
+**Version:** format 1, 2026-10-14. Design: `docs/superpowers/specs/2026-10-14-series-design.md`.
+**Status:** agreed in principle with the owner; exact text zones and character limits are fixed when the import tool is built, and this file will be updated then. Template guide images will be added under `docs/series/templates/`.
+
+A season reaches the panels as one **season package**: a folder (or a zip of it) that the import tool checks, converts and uploads. Anything the tool cannot read or fit is refused with a list of problems; nothing is half-imported.
+
+```
+season-01/
+  season.json        the script: every chapter, scene, word and picture reference
+  art/               the pictures, full colour, no words
+  sheets/            character and ship sheets (reviewed, never shown on a panel)
+  handover.md        the writer's note for the next season's writer
+```
+
+## 1. The shape of a season
+
+- **13 chapters**, one per week. Chapter 1 starts on the premiere Monday.
+- **25 scenes per chapter**, five per weekday, shown at 08:00, 10:00, 12:00, 14:00 and 16:00 Chicago time. Scenes 1–5 are Monday, 6–10 Tuesday, and so on to 21–25 on Friday.
+- **Scene 1 of every chapter is a Splash**: the chapter's title card. The chapter number, title and writer's credit are lettered on it automatically.
+- Each chapter has a **teaser line**, shown from Sunday 19:00 until Monday 08:00 ("Next week: …"). Chapter 13's teaser closes the season.
+- Weekends replay the week automatically; nothing extra to write.
+
+Think of a chapter as one episode: a mission with a setup on Monday, trouble mid-week and a resolution, or a cliffhanger, on Friday afternoon. The 16:00 scene stays up overnight, so it is a good place for a hook.
+
+## 2. `season.json`
+
+```json
+{
+  "format": 1,
+  "season": {
+    "number": 1,
+    "title": "The Salt Road",
+    "writer": "Claude",
+    "premiere": "2027-01-04"
+  },
+  "chapters": [
+    {
+      "number": 1,
+      "title": "The Salt Market",
+      "teaser": "Next week: the crate starts talking.",
+      "scenes": [
+        {
+          "number": 1,
+          "template": "splash",
+          "panels": [{ "art": "c01-s01.png" }]
+        },
+        {
+          "number": 2,
+          "template": "wide",
+          "caption": "Merrek Prime. The salt docks. Dusk.",
+          "narration": "Vess talks the harbour master down to half the docking fee.",
+          "panels": [
+            {
+              "art": "c01-s02.png",
+              "balloons": [
+                { "speaker": "BOLT", "text": "I have calculated our odds. I will not be sharing them.", "anchor": [596, 172] }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+| Field | Rule |
+|---|---|
+| `format` | Always `1` for now |
+| `season.premiere` | A Monday, `YYYY-MM-DD` |
+| `season.writer` | The name printed in the credit: `Claude`, `OpenAI`, `Grok`, `Muse`, or two names joined by ` & ` |
+| `chapters` | Exactly 13, numbered 1–13 in order |
+| `scenes` | Exactly 25 per chapter, numbered 1–25 in order |
+| `template` | `wide`, `split`, `strip`, `splash` or `panel-text` (section 3) |
+| `caption` | The location or time box, one short line. Optional |
+| `narration` | The text under the picture (or in the text column for `panel-text`) |
+| `panels` | One entry per panel of the template, left to right |
+| `panels[].art` | A file in `art/`, or `"hold"` to keep the picture from the same panel of the previous scene (only when the previous scene used the same template) |
+| `panels[].caption` | `strip` only: a short line at the top of that panel |
+| `panels[].balloons` | Up to two. `speaker` in capitals, `text` the line, `anchor` the `[x, y]` point in that panel's picture (in pixels, at template size) where the speaker's head is. Use `"anchor": null` for a voice from off the picture (radio, comlink): it is lettered as a square box with the speaker's name |
+
+## 3. Templates
+
+| Template | Panels | Art size (px) | Words allowed |
+|---|---|---|---|
+| `wide` | 1 | 776 × 346 | caption, narration, up to 2 balloons |
+| `split` | 2 | 382 × 346 each | narration, up to 2 balloons per panel |
+| `strip` | 3 | 252 × 346 each | narration, a short caption per panel, 1 balloon per panel |
+| `splash` | 1 | 800 × 444 | caption only (scene 1: lettered automatically) |
+| `panel-text` | 1 | 476 × 426 | caption, long narration in the right-hand column, 1 balloon |
+
+Every template has **calm zones** where the words will sit: the top third for balloons and captions on `wide`, `split` and `strip`; the bottom-left corner on `splash`. Keep those areas plain (sky, wall, floor, shadow) with no faces, hands or key details. The template guide images will show the exact zones.
+
+### How much text fits
+
+The import measures every line with the real panel font, so these are guides, not promises:
+
+| Text | About |
+|---|---|
+| Location `caption` | 40 characters |
+| `narration` (`wide`, `split`, `strip`) | 120 characters (2 lines) |
+| `narration` (`panel-text`) | 600 characters |
+| Balloon `text` | 70 characters (3 short lines) |
+| `strip` panel caption | 40 characters |
+| Chapter `title` | 22 characters |
+| `teaser` | 110 characters |
+
+**Characters:** plain ASCII only, as on a keyboard. Straight quotes `"` and `'`, three dots `...` for an ellipsis, a hyphen for dashes. No emoji, no curly quotes, no accented lowercase letters.
+
+## 4. Art
+
+- **One file per new picture**, PNG or JPEG, full colour, no transparency, named `cCC-sSS.png` (or `cCC-sSS-pN.png` for the Nth panel of `split` and `strip`).
+- **Size:** exactly the template's size, or larger at the same shape (it is shrunk). Any other shape is refused.
+- **At least one new picture every weekday** (among each day's five scenes); the others may `hold`.
+- **No words in the picture:** no lettering, signs, labels, logos or speech balloons. We add every word.
+- **Flat colour and clear dark outlines.** The pictures become black and white on one panel, four greys on another and six colours on the third. Flat areas survive all three; soft gradients, fine textures and thin pale lines turn into noise.
+- **Colours that convert best:** black, white, red, yellow, green and blue (the colour panel's six inks). Others are mixed from those with dots.
+- **Keep the calm zones calm** (section 3).
+- **Stay on model:** draw the crew and ship from your own `sheets/`, every time.
+- **No canon characters and no likenesses of real people.**
+
+## 5. Sheets and handover
+
+- `sheets/`: before drawing any scene, each writer draws the crew and the ship in their own style (front, side, a few expressions). Jarvis reviews these first; they are the reference for every picture in the season.
+- `handover.md`: written at the end of the season for the next writer: where the crew is, what changed (ship, damage, credits, relationships), open threads, running jokes, anything the bible should gain.
+
+## 6. What the import refuses
+
+- A wrong number of chapters or scenes, a premiere that is not a Monday, a missing field, an unknown template, scene 1 not a Splash.
+- A missing art file, a picture of the wrong shape, a weekday with no new picture, a nearly blank picture, `hold` after a different template.
+- Any line that does not fit its zone, a character the font does not have, a name on the bible's banned list.
+
+Every problem is listed with its chapter and scene, so a whole season's mistakes can be fixed in one pass.
