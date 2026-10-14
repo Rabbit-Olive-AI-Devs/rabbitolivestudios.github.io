@@ -319,3 +319,62 @@ test("too many balloons and chapters past the season's length are refused", () =
   assert.ok(problems.some((x) => /scene 2: 3 balloons in panel 1, room for 2/.test(x)));
   assert.ok(problems.some((x) => /11 chapters, season 0 has 10/.test(x)));
 });
+
+const render = fromBuild("src/series/render.js");
+const { decodePNG } = fromBuild("src/png-decode.js");
+
+/** Width and height from a PNG's IHDR chunk; works for every bit depth (decodePNG reads no 1-bit). */
+function pngSize(bytes) {
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  assert.equal(String.fromCharCode(...bytes.slice(12, 16)), "IHDR");
+  return { width: v.getUint32(16), height: v.getUint32(20) };
+}
+
+function panelArt(w, h) {
+  const img = solid(w, h, [40, 40, 40]);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if ((x >> 4) % 2) img.rgb.fill(178, (y * w + x) * 3, (y * w + x) * 3 + 1);
+  return img;
+}
+
+test("a wide scene renders six 800x480 pages: three panels, live and replay", async () => {
+  const p = pkgv.samplePackage();
+  const sc = p.chapters[0].scenes[1];
+  const { pages, problems } = await render.renderScene(p.season, p.chapters[0], sc,
+    [{ image: panelArt(776, 346), anchors: [[612, 246]], clear: [] }]);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(Object.keys(pages).sort(), ["r-desk", "r-home", "r-office", "s-desk", "s-home", "s-office"]);
+  for (const bytes of Object.values(pages)) {
+    const d = pngSize(bytes);
+    assert.equal(d.width, 800);
+    assert.equal(d.height, 480);
+  }
+  assert.notDeepEqual(pages["s-desk"], pages["r-desk"], "replay page must differ (REPLAY mark)");
+});
+
+test("lettering problems surface from renderScene instead of a page", async () => {
+  const p = pkgv.samplePackage();
+  const sc = { ...p.chapters[0].scenes[1], narration: "word ".repeat(60) };
+  const { pages, problems } = await render.renderScene(p.season, p.chapters[0], sc,
+    [{ image: panelArt(776, 346), anchors: [[612, 246]], clear: [] }]);
+  assert.ok(problems.some((x) => /narration: needs \d+ lines/.test(x)));
+  assert.deepEqual(pages, {});
+});
+
+test("the splash title card letters the chapter automatically", async () => {
+  const p = pkgv.samplePackage();
+  const { pages, problems } = await render.renderScene(p.season, p.chapters[0], p.chapters[0].scenes[0],
+    [{ image: panelArt(800, 443), anchors: [], clear: [] }]);
+  assert.deepEqual(problems, []);
+  assert.ok(pages["s-office"].length > 1000);
+});
+
+test("teaser and cards are 800x480 PNGs; pills name the prologue", async () => {
+  const p = pkgv.samplePackage();
+  for (const bytes of [await render.renderTeaser(p.season, p.chapters[0], false), await render.renderCard(p.season, "before"), await render.renderCard(p.season, "after")]) {
+    const d = pngSize(bytes);
+    assert.equal(d.width, 800);
+    assert.equal(d.height, 480);
+  }
+  assert.equal(render.pillFor(p.season, 3), "P / CH 03");
+  assert.equal(render.pillFor({ ...p.season, number: 2 }, 11), "S2 / CH 11");
+});
