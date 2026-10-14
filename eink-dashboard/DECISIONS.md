@@ -2921,3 +2921,8 @@ panels' routes were unaffected.
 Still open: the MacBook's reporter (the owner installs it), the page on the panel, and whether a
 locked Mac keeps reporting.
 
+Later the same day the owner installed the reporter on the MacBook and added the page to the
+panel. Both machines now appear, and the MacBook supplies Claude, Cursor, MiniMax and Muse.
+**Codex is still read only by the Mac mini**: the MacBook's reports carry no good Codex reading,
+though CodexBar read it there from a terminal the day before. Until that is understood, Codex
+will go to `NO DATA` three hours after the Mac mini falls asleep. Not yet diagnosed.
