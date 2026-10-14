@@ -96,6 +96,8 @@ const idOf = (v: unknown): string | null => (typeof v === "string" && /^[a-z0-9-
 /** Names shown for providers whose own name does not fit or reads badly. */
 const PROVIDER_NAMES: Readonly<Record<string, string>> = { museai: "MUSE", minimax: "MINIMAX" };
 
+const stripPrefix = (s: string, prefix: string) => (s.startsWith(`${prefix} `) ? s.slice(prefix.length + 1) : s);
+
 function readingOf(raw: unknown): { reading: Reading | null; id: string | null; name: string; failed: boolean } {
   const p = obj(raw);
   const id = p ? idOf(p.id) : null;
@@ -122,7 +124,8 @@ function readingOf(raw: unknown): { reading: Reading | null; id: string | null; 
     reading: {
       id,
       name,
-      plan: labelOf(obj(p.identity)?.plan, 12).replace(/^MUSE /, ""),
+      // "Cursor Pro+" under the name CURSOR says it twice; keep what follows the name
+      plan: stripPrefix(labelOf(obj(p.identity)?.plan, 20), name).slice(0, 12).trim(),
       windows,
       costUsd: cost === null ? null : clamp(cost, 0, 1_000_000),
     },

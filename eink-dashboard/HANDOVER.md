@@ -239,7 +239,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 194 tests at v3.19.0
+npm run test:utils        # compiles to /tmp, runs node --test; 195 tests at v3.19.0
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -317,7 +317,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 - **Built and deployed:** the drawing kit in `src/hud/` (#66), real fonts pre-rendered to 1-bit glyphs (#67), the Aurebesh word of the day with pronunciation, numerals, birthdays and special days (#67 and its follow-ups), and the planet of the day from NASA's Exoplanet Archive (#68).
 - **To check first next session:** (1) that the six-hourly cron warmed the next day's planet in production: `npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "planet:v1:"` should list today and tomorrow (Chicago dates); (2) whether the owner added `/desk/planet` to the panel's pagelist, and how it looks there.
-- **TARS (#69) is built** (2026-10-13): the Worker side, the page, and `scripts/tars-report.sh` for the Macs. Check `/health` and DECISIONS #69's "Not yet verified" for whether it is deployed and whether both Macs are reporting.
+- **TARS (#69) is live** (v3.19.0, 2026-10-13). The Mac mini reports every 30 minutes through the LaunchAgent `com.eink.tars-report` (script in `~/Library/Application Support/eink-tars/`, log in `/tmp/eink-tars-report.log`, key in the login Keychain under the service name `eink-tars`). **Check next session:** whether the MacBook is reporting too (the owner installs it; the page shows one machine block per reporter), and whether the owner added `/desk/tars?key=…` to the panel. To see the page from the Mac mini: `curl "https://eink-dashboard.thiago-oliveira77.workers.dev/desk/tars?key=$(security find-generic-password -s eink-tars -w)"`. Never print or commit the key.
 - **Still to build, with a mockup shown to the owner before any code:** a Flamengo board. A self-playing adventure page was also saved as an idea for later. What is already known about their data sources is in section 4 and section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`.
 - **How this work went, so it is not repeated:** the first version used drawn lettering and was rejected on sight; a written spec and plan had not caught it, and three rounds of pictures did. For this owner, on this panel: **show a mockup first, use real fonts, never go below 11px medium.**
 - **Surprises:** the Aurebesh page and the planet page each carry a few date-based and data-based easter eggs the owner asked to be kept as surprises. They are in the code (`SPECIAL_DAYS` in `src/hud/aurebesh-words.ts`; `NICKNAMES` and `DATE_PLANETS` in `src/planet.ts`). Do not list them back to the owner.

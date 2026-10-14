@@ -258,3 +258,12 @@ test("the reporter script reads the boot time, not its microseconds", () => {
   const out = execFileSync("sed", ["-E", sed[1]], { input: "{ sec = 1791850000, usec = 123456 } Mon Oct 12 18:35:00 2026\n" }).toString().trim();
   assert.equal(out, "1791850000");
 });
+
+test("a plan does not repeat the provider's name beneath it", () => {
+  const s = snapshot();
+  s.providers[2] = { id: "cursor", name: "Cursor", error: null, identity: { plan: "Cursor Pro+" }, windows: [] };
+  const r = tars.parseReport(report("mini", "Mac mini", { codexbar: s }));
+  assert.equal(r.providers.find((p) => p.id === "cursor").plan, "PRO+");
+  assert.equal(r.providers.find((p) => p.id === "museai").plan, "FREE");
+  assert.equal(r.providers.find((p) => p.id === "codex").plan, "PRO 20X");
+});

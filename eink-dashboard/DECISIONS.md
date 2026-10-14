@@ -2905,3 +2905,19 @@ going to `NO DATA`; an email would add little for a desk display.
 
 Not deployed. The reporter has not run under launchd, and nothing has come from the MacBook.
 Whether a locked (not sleeping) Mac still reports is still to be observed.
+
+### Follow-up (2026-10-13): deployed, and the Mac mini is reporting
+
+Deployed as v3.19.0. `TARS_KEY` was generated on the Mac mini, written to its login Keychain and
+set as a Worker secret without being displayed. The reporter is installed there as the
+LaunchAgent `com.eink.tars-report`.
+
+Verified in production: without the key, and with a wrong one, both the page and a POST answer
+404; with it the page answers in a quarter of a second. The first run **under launchd** exited 0
+and logged `stored`, which settles two open questions: a LaunchAgent can read the Keychain item,
+and CodexBar works from one. `tars:v1:state` exists in KV. The other desk pages and the older
+panels' routes were unaffected.
+
+Still open: the MacBook's reporter (the owner installs it), the page on the panel, and whether a
+locked Mac keeps reporting.
+
