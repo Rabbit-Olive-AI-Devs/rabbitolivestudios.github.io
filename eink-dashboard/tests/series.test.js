@@ -111,3 +111,77 @@ test("R2 keys", () => {
   assert.equal(keys.slotKey({ kind: "between", next: null, prev: 0 }, "home"), "series/s00/after-home.png");
   assert.equal(keys.slotKey({ kind: "between", next: null, prev: null }, "home"), null);
 });
+
+const tpl = fromBuild("src/series/templates.js");
+const art = fromBuild("src/series/art.js");
+const conv = fromBuild("src/series/convert.js");
+
+function solid(w, h, [r, g, b]) {
+  const rgb = new Uint8Array(w * h * 3);
+  for (let i = 0; i < w * h; i++) { rgb[i * 3] = r; rgb[i * 3 + 1] = g; rgb[i * 3 + 2] = b; }
+  return { w, h, rgb };
+}
+
+test("every template panel lies inside the page and below the top bar", () => {
+  for (const t of Object.values(tpl.TEMPLATES)) {
+    for (const p of t.panels) {
+      assert.ok(p.x >= 0 && p.y >= 37 && p.x + p.w <= 800 && p.y + p.h <= 480, `${t.id} panel out of page`);
+      if (t.strip) assert.ok(p.y + p.h <= tpl.STRIP_TOP, `${t.id} panel runs into the strip`);
+    }
+  }
+  assert.deepEqual(tpl.TEMPLATES.wide.panels, [{ x: 12, y: 46, w: 776, h: 346 }]);
+  assert.equal(tpl.TEMPLATES.split.panels.length, 2);
+  assert.equal(tpl.TEMPLATES.strip.panels.length, 3);
+});
+
+test("transparent pixels become white paper", () => {
+  const rgb = new Uint8Array([0, 0, 0, 0, 0, 0]);
+  const alpha = new Uint8Array([0, 255]);
+  assert.deepEqual([...art.flattenAlpha(rgb, alpha)], [255, 255, 255, 0, 0, 0]);
+  assert.deepEqual([...art.flattenAlpha(rgb, undefined)], [0, 0, 0, 0, 0, 0]);
+});
+
+test("cropToFill keeps the focus point and maps points into the panel", () => {
+  // 300x100 image: left half black, right half white; crop to a 100x100 panel around x=250.
+  const img = solid(300, 100, [0, 0, 0]);
+  for (let y = 0; y < 100; y++) for (let x = 150; x < 300; x++) img.rgb.fill(255, (y * 300 + x) * 3, (y * 300 + x) * 3 + 3);
+  const { image, map } = art.cropToFill(img, 100, 100, [250, 50]);
+  assert.equal(image.w, 100);
+  assert.equal(image.h, 100);
+  assert.equal(image.rgb[(50 * 100 + 50) * 3], 255); // centre is white: the focus was kept
+  assert.deepEqual(map([250, 50]), [50, 50]);
+  assert.deepEqual(map([150, 0]), [-50, 0]); // left of the crop: outside the panel
+});
+
+test("cropToFill shrinks a larger picture to cover the panel", () => {
+  const { image, map } = art.cropToFill(solid(1920, 1280, [200, 10, 10]), 776, 346);
+  assert.equal(image.w, 776);
+  assert.equal(image.h, 346);
+  assert.equal(image.rgb[0], 200);
+  const [x, y] = map([960, 640]);
+  assert.ok(Math.abs(x - 388) <= 1 && Math.abs(y - 173) <= 1);
+});
+
+test("a nearly blank picture is detected", () => {
+  assert.equal(art.isNearlyBlank(solid(50, 50, [250, 250, 250])), true);
+  const busy = solid(50, 50, [0, 0, 0]);
+  for (let i = 0; i < busy.rgb.length; i += 6) busy.rgb[i] = busy.rgb[i + 1] = busy.rgb[i + 2] = 255;
+  assert.equal(art.isNearlyBlank(busy), false);
+});
+
+test("desk conversion is pure black and white; home has four greys", () => {
+  const gray = new Uint8Array(64 * 64).map((_, i) => i % 256);
+  const bits = conv.toDeskBits(gray, 64, 64);
+  assert.ok([...bits].every((b) => b === 0 || b === 1));
+  const g4 = conv.toHomeGray(gray);
+  assert.deepEqual([...new Set(g4)].sort((a, b) => a - b), [0, 85, 170, 255]);
+});
+
+test("office conversion keeps greys black-and-white and saturated red red", () => {
+  const grey = solid(32, 32, [90, 90, 90]);
+  const idx = conv.toOfficeIndices(grey.rgb, 32, 32);
+  assert.ok([...idx].every((k) => k === 0 || k === 1), "a grey used a coloured ink");
+  const red = solid(32, 32, [178, 19, 24]);
+  const ridx = conv.toOfficeIndices(red.rgb, 32, 32);
+  assert.ok([...ridx].every((k) => k === 2));
+});
