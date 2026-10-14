@@ -2949,3 +2949,90 @@ ever larger than 30 KB so it cannot push a report past the size limit.
 
 Older reporters that send no `usage` keep working; they simply carry no extras. Tests: 199.
 
+
+---
+
+## 70. Flamengo Board: ESPN's Public Feeds, One KV Entry, Crests Fetched Not Stored (built 2026-10-13, not yet deployed)
+
+### What it is
+
+The fourth desk panel page, `/desk/flamengo`: the whole Serie A table down the left (all twenty
+clubs: played, won, drawn, lost, goal difference, points, Flamengo's row inverted, a dashed line
+above the relegation zone), the next match on the right with both clubs' crests, names and league
+positions, kickoff in Chicago time, stadium and competition, and three cards: the last result, the
+last five with the unbeaten run, and the countdown to kickoff with the match after it.
+
+The owner shaped it over five mockups: no Aurebesh on this page, real crests for the two clubs of
+the next match, each club's league position under its name, the time of the following match, a
+full table "like Google's", no crests in the table, and all twenty clubs.
+
+### Where the data comes from
+
+ESPN's public site API, which needs no key (Flamengo is team `819`):
+
+- `site.api.espn.com/apis/site/v2/sports/soccer/all/teams/819/schedule` for results, and the same
+  with `?fixture=true` for fixtures. The `all` league slug returns every competition in one
+  answer, so Serie A, Libertadores and the cups need no list of leagues to maintain.
+- `site.api.espn.com/apis/v2/sports/soccer/bra.1/standings` for the table.
+- `.../soccer/all/teams/{id}` for an opponent's `standingSummary`, only when the opponent is not in
+  the Serie A table (a Libertadores opponent, say).
+- `a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/{id}.png&w=96&h=96` for a crest.
+
+Five to seven requests per refresh, three on most days because crests are kept.
+
+### Decisions
+
+- **One KV entry, `flamengo:v1:state`, refreshed by age** (#62). Six hours on a quiet day; thirty
+  minutes from kickoff until four hours after, so a result lands soon after the whistle. That is
+  about four writes on a quiet day and up to about twelve on a match day. The page always draws
+  from the entry and refreshes behind the response (`ctx.waitUntil`), as #64 asks; the six-hour
+  cron calls the same function, which does nothing if the entry is fresh. This is more than the
+  "one write a day" the planet page set as the norm for desk pages, because a result that shows up
+  the next morning would defeat the page.
+- **The countdown is computed at draw time**, from the stored kickoff, so it moves on every poll
+  without any fetch or write. A match whose kickoff has passed shows `LIVE`; four hours after
+  kickoff the page moves on to the following match even if the entry was never refreshed.
+- **A feed that fails keeps what the entry had for it.** Only when all three fail is there no
+  refresh, and the old entry stays. With nothing cached and ESPN silent the page still draws, with
+  `NO TABLE YET` and `NO MATCH SCHEDULED`. Data a day or more old says so in the top bar
+  (`DATA 2D OLD`) in place of the clock.
+- **Crests are fetched at run time and never committed.** The repository is public and crests are
+  the clubs' marks. Each is turned once into a 96x96 1-bit bitmap (ordered dither, transparency as
+  paper, a little extra contrast) and kept in the same KV entry, only for the two clubs of the next
+  match. `decodePNG` gained an optional `alpha` output for this; nothing else reads it. If a crest
+  cannot be had, the club's short code is drawn large in its place.
+- **A result is a match ESPN marks completed with both scores.** A postponed match is also "post"
+  in ESPN's terms and must not count. Win, draw or loss is judged from the score of that match, so
+  a tie decided on penalties reads as a draw.
+- **Names keep their accents.** The text faces gained sixteen accented capitals (`npm run
+  desk-fonts`); a letter the faces lack falls back to its plain form instead of vanishing, which is
+  what `drawType` would otherwise do with it. Text too long for its place is cut back to whole
+  words ("1ST IN ARGENTINE LIGA PROFESIONAL DE FÚTBOL" becomes "1ST IN ARGENTINE LIGA").
+- **Nothing from ESPN is trusted to be well formed.** Every parser returns an empty result for a
+  malformed answer; none throws.
+
+### Not covered by the alert check (#60)
+
+A dead ESPN raises no email. The page itself says how old its data is, and a desk page that is a
+day stale is an inconvenience, not an outage.
+
+### Rejected
+
+- **FotMob's calendar feed, Sportmonks, globo.com** (the sources the owner's other agents use).
+  The calendar has no table; Sportmonks needs a key and the owner's is a trial; scraping a news
+  page is brittle. ESPN alone covers everything on the page.
+- **Small crests in the table.** Drawn in the fourth mockup; at 22px they are smudges on a mono
+  panel, and the owner dropped them.
+- **Storing crests in the repository or R2.** See above.
+- **A live score.** The thirty-minute refresh could carry one, but a score that is up to half an
+  hour behind is worse than `LIVE`.
+
+### Verified
+
+Run locally against the live feeds on 2026-10-13: table, fixtures, result, form, crests and
+accents all drew correctly (Estudiantes v Flamengo, Libertadores semifinal). Tests: 224.
+
+### Not yet verified
+
+The page on the panel; a match day (the `LIVE` state and the half-hour refresh); the off-season,
+when there may be no fixtures and the table resets; a cup opponent ESPN has no crest for.

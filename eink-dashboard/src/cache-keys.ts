@@ -54,6 +54,13 @@ export function planetCacheKey(dateStr: string): string {
   return `planet:${PLANET_CACHE_VERSION}:${dateStr}`;
 }
 
+export const FLAMENGO_CACHE_VERSION = "v1";
+
+/** Desk panel Flamengo board: one entry, rewritten as matches are played (DECISIONS #70). */
+export function flamengoCacheKey(): string {
+  return `flamengo:${FLAMENGO_CACHE_VERSION}:state`;
+}
+
 export function generationLockKey(cacheKey: string): string {
   return `gen-lock:v1:${cacheKey}`;
 }

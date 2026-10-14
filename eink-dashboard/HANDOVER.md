@@ -67,6 +67,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
 | `/desk/planet` | Desk E1001 | Planet of the day from NASA's Exoplanet Archive, drawn from its data; `?date=` (#68) |
 | `/desk/tars` | Desk E1001 | TARS: the owner's Macs and AI allowances. `GET ?key=` shows the page, `POST` with a bearer key takes a report from a Mac (#69) |
+| `/desk/flamengo` | Desk E1001 | Flamengo board: Serie A table, next match with crests, last result, form, countdown; ESPN's public feeds (#70). Built 2026-10-13, **not yet deployed** |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
 | `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
@@ -93,7 +94,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 **Cron triggers** (`wrangler.toml`), all in UTC:
 
 - `35 4,5 * * *` — the daily image warm. It fires *before* Chicago midnight and fills the keys for the date the panels are **about to** ask for (`dailyWarmTargetDate()`), so a panel poll is never the thing that triggers generation (#64). It is one expression with two fire times because the account is at the free plan's cap of 5 cron triggers.
-- `5 0,6,12,18 * * *` — refreshes headlines, both weather locations and both devices' telemetry, warms the desk panel's planet for today and tomorrow, then runs the failure-alert check.
+- `5 0,6,12,18 * * *` — refreshes headlines, both weather locations and both devices' telemetry, warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check.
 
 The daily warm runs its pipelines **sequentially in priority order** (Pipeline A or birthday, Pipeline B, colour moment, skyline, skyline BW), skips any key that already exists, and stops at the first neuron-budget error.
 
@@ -131,6 +132,7 @@ Dates in cache keys are **America/Chicago** dates. Cache versions live in `src/c
 | Alerts, device telemetry | `alerts:{zip}:v1`, `device:{id}:v1` | 5 min | 86400 |
 | Desk planet | `planet:v1:DATE` | 24h | 604800 (7 days) |
 | Desk TARS | `tars:v1:state` (one document, rewritten by each Mac's report) | 75 min per machine, 3 h per provider | 604800 (7 days) |
+| Desk Flamengo | `flamengo:v1:state` (one document: table, results, fixtures, two crests) | 6 h; 30 min from kickoff to four hours after | 604800 (7 days) |
 | Guards and bookkeeping | `ai-budget:v1:block`, `gen-lock:v1:*`, `stale-idx:v1:<prefix>`, `alert:v1:last`, `nws-points:{zip}` | — | varies |
 
 Rules:
@@ -147,7 +149,7 @@ Everything here runs inside hard free-tier limits. Cost any change against them 
 | Budget | Limit | Normal use | Notes |
 |---|---|---|---|
 | Workers AI neurons | 10,000/day, resets 00:00 UTC | ~5,500 | FLUX.2 klein-9b costs ~1,364 per image and is essentially the whole bill. Both panels share one account-wide pool: either can blank the other. |
-| KV writes | 1,000/day | ~590, plus ~96 once both Macs report to TARS | The tightest budget. Mostly weather/alerts/device caches refreshed by two panels polling every 15 minutes. About 400 spare (#62). |
+| KV writes | 1,000/day | ~590, plus ~96 once both Macs report to TARS, plus 4 to 12 for the Flamengo board | The tightest budget. Mostly weather/alerts/device caches refreshed by two panels polling every 15 minutes. About 400 spare (#62). |
 | KV lists | 1,000/day | 0 on a healthy day | Only the stale fallback lists, and its listings are memoised for 6h. |
 | Cron triggers | 5 per account, shared by six Workers | 2 used here | A deploy that exceeds it fails with `code: 10072` but **still uploads the Worker** on the old schedule. |
 
@@ -239,7 +241,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 199 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 224 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -318,7 +320,8 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 - **Built and deployed:** the drawing kit in `src/hud/` (#66), real fonts pre-rendered to 1-bit glyphs (#67), the Aurebesh word of the day with pronunciation, numerals, birthdays and special days (#67 and its follow-ups), and the planet of the day from NASA's Exoplanet Archive (#68).
 - **To check first next session:** (1) that the six-hourly cron warmed the next day's planet in production: `npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "planet:v1:"` should list today and tomorrow (Chicago dates); (2) whether the owner added `/desk/planet` to the panel's pagelist, and how it looks there.
 - **TARS (#69) is live** (v3.19.0, 2026-10-13). The Mac mini reports every 30 minutes through the LaunchAgent `com.eink.tars-report` (script in `~/Library/Application Support/eink-tars/`, log in `/tmp/eink-tars-report.log`, key in the login Keychain under the service name `eink-tars`). Both Macs report as of 2026-10-13 evening and the page is on the panel. **Open:** the MacBook's reports carry no good Codex reading (the Mac mini is the only source), so Codex shows `NO DATA` three hours after the Mac mini sleeps; ask the owner to run `codexbar dashboard --identity redacted --pretty` on the MacBook and look at the `codex` entry's `error`. To see the page from the Mac mini: `curl "https://eink-dashboard.thiago-oliveira77.workers.dev/desk/tars?key=$(security find-generic-password -s eink-tars -w)"`. Never print or commit the key.
-- **Still to build, with a mockup shown to the owner before any code:** a Flamengo board. A self-playing adventure page was also saved as an idea for later. What is already known about their data sources is in section 4 and section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`.
+- **Flamengo board (#70) is built and tested but not deployed** (2026-10-13): `/desk/flamengo`, `src/flamengo.ts`, `src/hud/flamengo-page.ts`, `src/hud/crest.ts`. The owner shaped the layout over five mockups; the last change (all twenty clubs) had not been confirmed when the code was written. Deploying and the version bump wait for the owner's go-ahead. Not yet seen: a match day, the off-season, the page on the panel.
+- **Idea saved for later:** a self-playing adventure page. What is already known about their data sources is in section 4 and section 9 of `docs/superpowers/specs/2026-10-12-desk-panel-design.md`.
 - **How this work went, so it is not repeated:** the first version used drawn lettering and was rejected on sight; a written spec and plan had not caught it, and three rounds of pictures did. For this owner, on this panel: **show a mockup first, use real fonts, never go below 11px medium.**
 - **Surprises:** the Aurebesh page and the planet page each carry a few date-based and data-based easter eggs the owner asked to be kept as surprises. They are in the code (`SPECIAL_DAYS` in `src/hud/aurebesh-words.ts`; `NICKNAMES` and `DATE_PLANETS` in `src/planet.ts`). Do not list them back to the owner.
 - **Not done:** the planet page and the real-font rebuild had no independent code review (the first version did). The pronunciations are hand-written; only seven were confirmed against Wookieepedia. The panel's SenseCraft device ID is not in the repo, and no telemetry is fetched for it.

@@ -7,15 +7,20 @@
  *                  ?word=HELLO, ?sheet for the check sheet
  * /desk/planet   — a real exoplanet each day from NASA's archive; ?date=YYYY-MM-DD
  * /desk/tars     — the owner's Macs and AI allowances; GET ?key= to view, POST to report
+ * /desk/flamengo — the league table, the next match, the last result and recent form
  *
  * Every page here is a Worker-drawn 1-bit PNG inlined in one HTML document, with
  * no AI. The Aurebesh pages are pure functions of the date; the planet page reads
- * one small KV entry a day; TARS shows what the Macs last reported (DECISIONS #66–#69).
+ * one small KV entry a day; TARS shows what the Macs last reported; the Flamengo board
+ * keeps ESPN's public feeds in one KV entry (DECISIONS #66–#70).
  */
 
 import type { Env } from "../types";
 import { getPlanetOfDay } from "../planet";
 import { ingestReport, readState, tarsView } from "../tars";
+import { flamengoView, getFlamengo } from "../flamengo";
+import type { FlaSources } from "../flamengo";
+import { drawFlamengoPage } from "../hud/flamengo-page";
 import { drawTarsPage } from "../hud/tars-page";
 import type { ArchiveQuery } from "../planet";
 import { drawPlanetPage } from "../hud/planet-page";
@@ -111,4 +116,15 @@ export async function handleDeskTarsReport(request: Request, env: Env): Promise<
   }
   const result = await ingestReport(env, body, Date.now());
   return new Response(result, { status: result === "invalid" ? 400 : 200 });
+}
+
+/**
+ * /desk/flamengo — the Flamengo board. Draws from the cached entry and lets a
+ * refresh finish in the background; with nothing cached and ESPN silent it
+ * still draws, with its empty states. `sources` replaces ESPN in tests.
+ */
+export async function handleDeskFlamengo(env: Env, ctx?: ExecutionContext, sources?: FlaSources): Promise<Response> {
+  const now = new Date();
+  const view = flamengoView(await getFlamengo(env, { ctx, sources }), now.getTime());
+  return hudPageResponse("Flamengo", () => drawFlamengoPage(view, now));
 }

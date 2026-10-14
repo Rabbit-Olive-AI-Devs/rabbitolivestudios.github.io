@@ -9,8 +9,9 @@ import { handleColorWeatherPage } from "./pages/color-weather";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
-import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport } from "./pages/desk";
+import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo } from "./pages/desk";
 import { getPlanetOfDay } from "./planet";
+import { getFlamengo } from "./flamengo";
 import { getBirthdayToday, getBirthdayByKey } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
 import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID } from "./device";
@@ -819,8 +820,10 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       // the date rolls. A warm key costs one read and no write (DECISIONS #68).
       getPlanetOfDay(env, dateStr, { budgetMs: 40_000 }),
       getPlanetOfDay(env, shiftDateStr(dateStr, 1), { budgetMs: 40_000 }),
+      // Desk panel Flamengo board: refreshed only if its entry has aged (DECISIONS #70).
+      getFlamengo(env, { budgetMs: 40_000 }),
     ]);
-    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002", "planet-today", "planet-tomorrow"] as const;
+    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002", "planet-today", "planet-tomorrow", "flamengo"] as const;
     for (let i = 0; i < sixHourResults.length; i++) {
       if (sixHourResults[i].status === "rejected") {
         console.error(`Cron: ${labels[i]} warm failed:`, (sixHourResults[i] as PromiseRejectedResult).reason);
@@ -1286,6 +1289,8 @@ export default {
         return handleDeskPlanet(env, url, ctx);
       case "/desk/tars":
         return request.method === "POST" ? handleDeskTarsReport(request, env) : handleDeskTars(env, url);
+      case "/desk/flamengo":
+        return handleDeskFlamengo(env, ctx);
       case "/health":
         return handleHealth();
       case "/health-detailed":
@@ -1297,7 +1302,7 @@ export default {
             endpoints: [
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
-              "/skyline", "/skyline-bw", "/skyline.png", "/desk/test", "/desk/aurebesh", "/desk/planet",
+              "/skyline", "/skyline-bw", "/skyline.png", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo",
               "/test-birthday.png", "/health", "/health-detailed",
             ],
           },

@@ -24,6 +24,9 @@ const ASCII = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).
 const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const DIGITS = "0123456789";
 const BIG = " " + UPPER + DIGITS + "/.:-%";
+/** Accented capitals for names from outside (football clubs, stadiums). Pages print capitals, so no lower case. */
+const ACCENTED = "ÁÀÂÃÄÉÊÍÓÔÕÖÚÜÇÑ";
+const TEXT = ASCII + ACCENTED;
 
 const PLEX = { family: "IBM Plex Mono", files: ["IBMPlexMono-Regular.ttf", "IBMPlexMono-Medium.ttf", "IBMPlexMono-SemiBold.ttf"] };
 const AF = { family: "Aurebesh AF", files: ["AurebeshAF-Canon.otf"] };
@@ -33,13 +36,13 @@ const AF = { family: "Aurebesh AF", files: ["AurebeshAF-Canon.otf"] };
  * Text never goes below 11px medium: the owner's minimum for the panel (DECISIONS #67).
  */
 const FACES = {
-  plex11m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 11, chars: ASCII },
-  plex12m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 12, chars: ASCII },
-  plex12s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 12, chars: ASCII },
-  plex13r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 13, chars: ASCII },
-  plex13s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 13, chars: ASCII },
-  plex15m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 15, chars: ASCII },
-  plex15s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 15, chars: ASCII },
+  plex11m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 11, chars: TEXT },
+  plex12m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 12, chars: TEXT },
+  plex12s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 12, chars: TEXT },
+  plex13r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 13, chars: TEXT },
+  plex13s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 13, chars: TEXT },
+  plex15m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 15, chars: TEXT },
+  plex15s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 15, chars: TEXT },
   plex28r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 28, chars: BIG },
   plex36r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 36, chars: BIG },
   plex50r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 50, chars: BIG },

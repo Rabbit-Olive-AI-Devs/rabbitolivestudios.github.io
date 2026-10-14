@@ -14,6 +14,8 @@ export interface DecodedImage {
   gray: Uint8Array;
   /** RGB 0-255, row-major: rgb[(y * width + x) * 3 + channel]. Only for color types 2/6. */
   rgb?: Uint8Array;
+  /** Opacity 0-255, row-major. Only for the color types that carry it (4/6). */
+  alpha?: Uint8Array;
 }
 
 // --- PNG chunk parsing ---
@@ -223,5 +225,11 @@ export async function decodePNG(png: Uint8Array): Promise<DecodedImage> {
     gray = toGrayscale(pixels, width, height, channels);
   }
 
-  return { width, height, gray, rgb };
+  let alpha: Uint8Array | undefined;
+  if (channels === 2 || channels === 4) {
+    alpha = new Uint8Array(width * height);
+    for (let i = 0; i < width * height; i++) alpha[i] = pixels[i * channels + channels - 1];
+  }
+
+  return { width, height, gray, rgb, alpha };
 }
