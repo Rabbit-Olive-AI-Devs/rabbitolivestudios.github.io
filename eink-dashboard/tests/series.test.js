@@ -495,3 +495,16 @@ test("a season ending within 14 days with no next season is a problem", () => {
 test("no schedule at all is not an alert before anything was ever imported", () => {
   assert.deepEqual(watch.scheduleProblems(null, new Date()), []);
 });
+
+test("end to end: PNG pictures decode, build and give valid pages", async () => {
+  const { encodePNGIndexed } = fromBuild("src/png.js");
+  const { SPECTRA6_PALETTE } = fromBuild("src/spectra6.js");
+  const idx = new Uint8Array(1200 * 800).map((_, i) => ((i % 1200) >> 5) % 6);
+  const png = await encodePNGIndexed(idx, 1200, 800, SPECTRA6_PALETTE);
+  const d = await decodePNG(png);
+  const pic = { w: d.width, h: d.height, rgb: art.flattenAlpha(d.rgb, d.alpha) };
+  const { files, problems } = await build.buildChapter(pkgv.samplePackage(), 1, () => pic);
+  assert.deepEqual(problems, []);
+  const page = await decodePNG(files.get("series/s00/c01/s02-home.png"));
+  assert.equal(page.width, 800);
+});

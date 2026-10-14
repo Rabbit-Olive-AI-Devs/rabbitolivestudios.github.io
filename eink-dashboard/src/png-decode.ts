@@ -176,6 +176,7 @@ export async function decodePNG(png: Uint8Array): Promise<DecodedImage> {
   else if (colorType === 6) channels = 4;  // RGBA
   else if (colorType === 0) channels = 1;  // Grayscale
   else if (colorType === 4) channels = 2;  // Grayscale + Alpha
+  else if (colorType === 3) channels = 1;  // Palette: one index per pixel, expanded below
   else throw new Error(`PNG: unsupported color type ${colorType}`);
 
   // Concatenate all IDAT data
@@ -195,6 +196,23 @@ export async function decodePNG(png: Uint8Array): Promise<DecodedImage> {
 
   // Unfilter
   const pixels = unfilterScanlines(rawScanlines, width, height, channels);
+
+  // Palette images (the series import may receive them from a writer's tool):
+  // expand indices to RGB, with tRNS alpha when present.
+  if (colorType === 3) {
+    const plte = chunks.find((c) => c.type === "PLTE");
+    if (!plte) throw new Error("PNG: palette image without PLTE");
+    const trns = chunks.find((c) => c.type === "tRNS");
+    const n = width * height;
+    const rgb = new Uint8Array(n * 3);
+    const alpha = trns ? new Uint8Array(n) : undefined;
+    for (let i = 0; i < n; i++) {
+      const k = pixels[i];
+      rgb[i * 3] = plte.data[k * 3]; rgb[i * 3 + 1] = plte.data[k * 3 + 1]; rgb[i * 3 + 2] = plte.data[k * 3 + 2];
+      if (alpha) alpha[i] = k < trns!.data.length ? trns!.data[k] : 255;
+    }
+    return { width, height, gray: toGrayscale(rgb, width, height, 3), rgb, alpha };
+  }
 
   // Extract RGB for color types (before grayscale conversion)
   let rgb: Uint8Array | undefined;
