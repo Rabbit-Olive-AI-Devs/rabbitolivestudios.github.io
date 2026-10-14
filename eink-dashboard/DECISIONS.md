@@ -2952,7 +2952,7 @@ Older reporters that send no `usage` keep working; they simply carry no extras. 
 
 ---
 
-## 70. Flamengo Board: ESPN's Public Feeds, One KV Entry, Crests Fetched Not Stored (built 2026-10-13, not yet deployed)
+## 70. Flamengo Board: ESPN's Public Feeds, One KV Entry, Crests Fetched Not Stored (v3.20.0, 2026-10-13)
 
 ### What it is
 
@@ -3069,3 +3069,11 @@ first local run drew no lines for that reason. Requests now name the client, and
 answers with an error status is logged. Verified locally: the entry stored `[4, 5, 11, 16]` and
 the lines drew. **Not yet verified:** that FotMob also answers a request coming from Cloudflare's
 network; if it does not, the page simply has no lines. Tests: 225.
+
+### Follow-up (2026-10-13, night): deployed as v3.20.0
+
+The owner said "go live". Checked in production straight after: `/health` reports 3.20.0, the page
+drew in under a second, and `flamengo:v1:state` held 20 table rows, 12 results, 4 fixtures, both
+crests and zones `[4, 5, 11, 16]`. So **FotMob does answer a request from Cloudflare's network**,
+which was the one thing a local run could not show. Still not seen: a match day, the off-season,
+and the page on the panel.
