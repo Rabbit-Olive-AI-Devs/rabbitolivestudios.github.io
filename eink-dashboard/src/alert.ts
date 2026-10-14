@@ -12,6 +12,7 @@
  */
 import type { Env } from "./types";
 import { getAiBudgetBlock } from "./cache-guard";
+import { seriesProblems } from "./series/watch";
 
 const ALERT_STATE_KEY = "alert:v1:last";
 
@@ -37,6 +38,8 @@ export interface AlertState {
   missingImages: string[];
   aiBlocked: boolean;
   aiBlockSource?: string;
+  /** Series problems from src/series/watch.ts (DECISIONS #71). */
+  series?: string[];
 }
 
 export interface AlertRecord {
@@ -63,6 +66,7 @@ export function describeProblems(state: AlertState): string[] {
     const src = state.aiBlockSource ? ` (set by ${state.aiBlockSource})` : "";
     problems.push(`AI generation is blocked by the neuron budget guard${src}`);
   }
+  problems.push(...(state.series ?? []));
   return problems;
 }
 
@@ -79,6 +83,7 @@ export function alertFingerprint(state: AlertState): string {
     parts.push(`missing:${[...state.missingImages].sort().join(",")}`);
   }
   if (state.aiBlocked) parts.push("ai:blocked");
+  if (state.series && state.series.length > 0) parts.push(`series:${[...state.series].sort().join(";")}`);
   return parts.length === 0 ? OK_FINGERPRINT : parts.join("|");
 }
 
@@ -207,9 +212,10 @@ export async function runAlertCheck(
     }
 
     const labels = Object.keys(opts.imageKeys);
-    const [present, block] = await Promise.all([
+    const [present, block, series] = await Promise.all([
       Promise.all(labels.map((l) => env.CACHE.get(opts.imageKeys[l], "stream"))),
       getAiBudgetBlock(env),
+      seriesProblems(env, new Date(now)),
     ]);
 
     const state: AlertState = {
@@ -217,6 +223,7 @@ export async function runAlertCheck(
       missingImages: labels.filter((_, i) => present[i] === null),
       aiBlocked: block !== null,
       aiBlockSource: block?.source,
+      series,
     };
 
     const problems = describeProblems(state);

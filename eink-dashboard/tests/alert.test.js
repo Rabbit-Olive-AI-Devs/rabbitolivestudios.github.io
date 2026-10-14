@@ -185,3 +185,9 @@ test("buildAlertEmail keeps the subject on one line", () => {
   assert.equal(subject.includes("\n"), false);
   assert.equal(subject.includes("\r"), false);
 });
+
+test("series problems are part of the message and the fingerprint", () => {
+  const state = { dateStr: "2026-11-03", missingImages: [], aiBlocked: false, series: ["The series: chapter 3 of the Prologue airs 09/11 and is waiting for approval"] };
+  assert.deepEqual(describeProblems(state), state.series);
+  assert.match(alertFingerprint(state), /^series:/);
+});

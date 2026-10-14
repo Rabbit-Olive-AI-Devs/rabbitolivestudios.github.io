@@ -11,6 +11,7 @@ import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo } from "./pages/desk";
 import { handleSeries, handleSeriesProof } from "./pages/series";
+import { seriesHealth } from "./series/watch";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
 import { getBirthdayToday, getBirthdayByKey } from "./birthday";
@@ -762,8 +763,10 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         device_home:    ephemeralStatus(parseEphemeral(deviceHomeRaw),     5),
         device_office:  ephemeralStatus(parseEphemeral(deviceOfficeRaw),   5),
       },
+      series: await seriesHealth(env, new Date()),
       config: {
         test_auth_key: env.TEST_AUTH_KEY ? "configured" : "missing",
+        series_key: env.SERIES_KEY ? "configured" : "missing",
         alerting: alertingConfigured(env) ? "configured" : "missing",
         ai_budget: aiBudgetBlock
           ? {

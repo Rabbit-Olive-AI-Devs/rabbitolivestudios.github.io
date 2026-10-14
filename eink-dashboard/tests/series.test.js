@@ -475,3 +475,23 @@ test("the proof page needs the key and lists every scene of a chapter", async ()
   assert.equal((html.match(/<img /g) || []).length, 25);
   assert.match(html, /PENDING/);
 });
+
+const watch = fromBuild("src/series/watch.js");
+
+test("an unapproved chapter airing within 7 days is a problem; further out is not", () => {
+  // Chapter 3 of the prologue airs Mon 9 Nov; it is only pending.
+  assert.deepEqual(watch.scheduleProblems(SCHEDULE, chi("2026-11-01T12:00:00", CST)), []);
+  const p = watch.scheduleProblems(SCHEDULE, chi("2026-11-03T12:00:00", CST));
+  assert.equal(p.length, 1);
+  assert.match(p[0], /chapter 3 of the Prologue airs 09\/11 and is waiting for approval/);
+});
+
+test("a season ending within 14 days with no next season is a problem", () => {
+  const only = { seasons: [{ ...SCHEDULE.seasons[0], approved: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], pending: [] }] };
+  assert.deepEqual(watch.scheduleProblems(only, chi("2026-12-10T12:00:00", CST)), []);
+  assert.match(watch.scheduleProblems(only, chi("2026-12-22T12:00:00", CST))[0], /the Prologue ends 01\/01 and no next season is imported/);
+});
+
+test("no schedule at all is not an alert before anything was ever imported", () => {
+  assert.deepEqual(watch.scheduleProblems(null, new Date()), []);
+});
