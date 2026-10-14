@@ -22,13 +22,6 @@ const ROW_PITCH = 19;
 /** Rows the table has room for: a whole 20-club league. */
 const MAX_ROWS = 20;
 const COL = { pos: 30, name: 42, p: 196, w: 222, d: 248, l: 274, gd: 302, pts: 330 };
-/**
- * Places after which a dashed line is drawn in a full table, as the 2026 season
- * has them: 1-4 Libertadores group stage, 5 Libertadores qualifiers, 6-11
- * Sudamericana, 17-20 relegated. The continental cut-offs move with who wins
- * the cups, so check them each season; ESPN's feed does not carry them.
- */
-export const ZONE_ENDS: readonly number[] = [4, 5, 11, 16];
 const OUTCOME_WORD = { W: "WIN", D: "DRAW", L: "LOSS" } as const;
 
 const label = (c: Canvas, x: number, y: number, s: string) => drawType(c, "plex11m", x, y, s, { spacing: 1 });
@@ -88,7 +81,6 @@ function drawTable(c: Canvas, v: FlaView): void {
     label(c, COL.name, 110, "NO TABLE YET");
     return;
   }
-  const zoned = rows.length === MAX_ROWS;
   rows.forEach((r, i) => {
     const y = 103 + i * ROW_PITCH;
     const us = r.id === FLAMENGO_ID;
@@ -100,7 +92,8 @@ function drawTable(c: Canvas, v: FlaView): void {
       drawType(c, "plex12m", x, y, String(n), { align: "right", white: us });
     }
     drawType(c, "plex12s", COL.pts, y, String(r.pts), { align: "right", white: us });
-    if (zoned && ZONE_ENDS.includes(i + 1)) for (let x = 12; x < SPLIT - 10; x += 6) hline(c, x, y + 5, 3);
+    // A dashed line where one zone ends: Libertadores, its qualifiers, Sudamericana, relegation.
+    if (v.zones.includes(r.pos) && i < rows.length - 1) for (let x = 12; x < SPLIT - 10; x += 6) hline(c, x, y + 5, 3);
   });
 }
 

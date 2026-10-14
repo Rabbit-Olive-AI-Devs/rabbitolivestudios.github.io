@@ -67,7 +67,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
 | `/desk/planet` | Desk E1001 | Planet of the day from NASA's Exoplanet Archive, drawn from its data; `?date=` (#68) |
 | `/desk/tars` | Desk E1001 | TARS: the owner's Macs and AI allowances. `GET ?key=` shows the page, `POST` with a bearer key takes a report from a Mac (#69) |
-| `/desk/flamengo` | Desk E1001 | Flamengo board: Serie A table, next match with crests, last result, form, countdown; ESPN's public feeds (#70). Built 2026-10-13, **not yet deployed** |
+| `/desk/flamengo` | Desk E1001 | Flamengo board: Serie A table, next match with crests, last result, form, countdown; ESPN's public feeds, zone lines from FotMob's table legend (#70). Built 2026-10-13, **not yet deployed** |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
 | `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
@@ -241,7 +241,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 224 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 225 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 

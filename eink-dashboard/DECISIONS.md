@@ -3045,3 +3045,27 @@ close four zones: after 4th (Libertadores group stage), after 5th (Libertadores 
 `src/hud/flamengo-page.ts`, taken from the 2026 table: ESPN's standings carry no zone notes, and
 the continental cut-offs move with who wins the cups, so **check them each season**. The lines are
 unlabelled; there is no room for a legend beside twenty rows.
+
+### Follow-up (2026-10-13, later): the zone lines are read, not fixed
+
+The owner asked that the cut-offs come from data. What was tried:
+
+| Source | Zones? | Verdict |
+|---|---|---|
+| ESPN standings (`site`, `site.web`, `core`) | No. Entries carry a `note` for the Premier League but none for `bra.1` | Cannot be used |
+| TheSportsDB free table | Yes, as text, but the free key returns only the top five rows | Cannot be used |
+| Sofascore | 403 to a plain request | Cannot be used |
+| Globo (`api.globoesporte.globo.com/tabela/…/classificacao/`) | Yes, a colour per club and a list of zone names | Works, but the address holds a season slug that changes every year |
+| **FotMob** (`fotmob.com/api/data/tltable?leagueId=268`) | Yes: a `legend` listing the row indices of each zone | **Chosen**: one stable keyless address, clean shape |
+
+`parseZones` turns the legend into the places where a zone ends (`[4, 5, 11, 16]` today) and the
+entry stores them as `zones`. The constant `ZONE_ENDS` is gone. If FotMob cannot be read the last
+zones read are kept; if they have never been read **no lines are drawn**, because a guessed line is
+worse than none. FotMob's feed is unofficial and has in the past asked for a signed header; if it
+closes, Globo's is the fallback to wire in. One more request per refresh; no extra KV write.
+
+FotMob answers 403 to a request with no `User-Agent`, which is what a Worker sends by default; the
+first local run drew no lines for that reason. Requests now name the client, and a feed that
+answers with an error status is logged. Verified locally: the entry stored `[4, 5, 11, 16]` and
+the lines drew. **Not yet verified:** that FotMob also answers a request coming from Cloudflare's
+network; if it does not, the page simply has no lines. Tests: 225.

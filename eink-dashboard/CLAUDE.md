@@ -322,7 +322,7 @@ eink-dashboard/
     styles-1bit.ts        — Pipeline B style table, picker, hash
     birthday.ts           — Birthday data + detection
     tars.ts               — Desk panel TARS: cleans and merges the Macs' reports into KV `tars:v1:state`, builds the page's view (DECISIONS #69)
-    flamengo.ts           — Desk panel Flamengo board: ESPN's public feeds (table, results, fixtures, crests) in KV `flamengo:v1:state`, refreshed by age; builds the page's view (DECISIONS #70)
+    flamengo.ts           — Desk panel Flamengo board: ESPN's public feeds (table, results, fixtures, crests) + FotMob's legend for the zone lines, in KV `flamengo:v1:state`, refreshed by age; builds the page's view (DECISIONS #70)
     planet.ts             — Desk panel planet of the day: NASA Exoplanet Archive queries + daily KV cache `planet:v1:DATE` (DECISIONS #68)
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
     images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)

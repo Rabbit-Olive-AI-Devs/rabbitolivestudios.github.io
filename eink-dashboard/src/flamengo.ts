@@ -8,6 +8,9 @@
  * until four hours after, so a result lands soon after the whistle. That is at
  * most about a dozen writes a day (DECISIONS #62).
  *
+ * ESPN's table does not say which places qualify for what, so the zone lines
+ * come from FotMob's table legend, the one feed here that is not ESPN's.
+ *
  * Club crests are fetched at refresh time and kept in the same entry as 1-bit
  * bitmaps. They are never committed to the repository.
  */
@@ -24,10 +27,13 @@ const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 const RESULTS_URL = `${ESPN}/all/teams/${FLAMENGO_ID}/schedule`;
 const FIXTURES_URL = `${RESULTS_URL}?fixture=true`;
 const TABLE_URL = "https://site.api.espn.com/apis/v2/sports/soccer/bra.1/standings";
+/** FotMob's Serie A table; only its legend (which places lead where) is used. */
+const ZONES_URL = "https://www.fotmob.com/api/data/tltable?leagueId=268";
 const teamUrl = (id: string) => `${ESPN}/all/teams/${encodeURIComponent(id)}`;
 const crestUrl = (id: string) =>
   `https://a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/${encodeURIComponent(id)}.png&w=96&h=96`;
 
+const USER_AGENT = "eink-dashboard (personal project)";
 const KV_TTL_SECONDS = 604800;
 const HOUR = 3_600_000;
 /** How old the entry may get on a quiet day. */
@@ -70,6 +76,8 @@ export interface FlaState {
   results: FlaMatch[];
   /** Matches still to come, soonest first. */
   fixtures: FlaMatch[];
+  /** Places after which one zone of the table ends and another begins, e.g. [4, 5, 11, 16]. */
+  zones: number[];
   /** A club's place in its own league, as ESPN words it, by team id. */
   standing: Record<string, string>;
   /** 96x96 1-bit crests by team id (see hud/crest.ts). */
@@ -156,6 +164,26 @@ export function parseStanding(json: unknown): string | null {
   return str(obj(obj(json).team).standingSummary) || null;
 }
 
+/**
+ * Where the table's zones change, from FotMob's legend: each entry lists the
+ * row indices that share a fate (Libertadores, relegation and so on). Returns
+ * the places a zone ends at, or null when the legend is missing or malformed.
+ */
+export function parseZones(json: unknown, clubs: number): number[] | null {
+  const legend = list(obj(obj(list(json)[0]).data).legend);
+  if (legend.length === 0 || clubs < 2) return null;
+  const zoneOf = new Array<number>(clubs).fill(-1);
+  for (let z = 0; z < legend.length; z++) {
+    for (const i of list(obj(legend[z]).indices)) {
+      if (typeof i !== "number" || !Number.isInteger(i) || i < 0 || i >= clubs) return null;
+      zoneOf[i] = z;
+    }
+  }
+  const ends: number[] = [];
+  for (let i = 0; i < clubs - 1; i++) if (zoneOf[i] !== zoneOf[i + 1]) ends.push(i + 1);
+  return ends.length ? ends : null;
+}
+
 // --- Loading ------------------------------------------------------------------
 
 export interface FlaSources {
@@ -168,7 +196,9 @@ export interface FlaSources {
 const live: FlaSources = {
   async json(url) {
     try {
-      const res = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, 8000);
+      // FotMob answers 403 to a request that names no client at all.
+      const res = await fetchWithTimeout(url, { headers: { Accept: "application/json", "User-Agent": USER_AGENT } }, 8000);
+      if (!res.ok) console.error(`Flamengo: ${url} answered ${res.status}`);
       return res.ok ? await res.json() : null;
     } catch (err) {
       console.error(`Flamengo: ${url} failed:`, err);
@@ -194,8 +224,8 @@ export async function loadFlamengo(
   now: number, previous: FlaState | null, src: FlaSources = live,
 ): Promise<FlaState | null> {
   try {
-    const [resultsJson, fixturesJson, tableJson] = await Promise.all([
-      src.json(RESULTS_URL), src.json(FIXTURES_URL), src.json(TABLE_URL),
+    const [resultsJson, fixturesJson, tableJson, zonesJson] = await Promise.all([
+      src.json(RESULTS_URL), src.json(FIXTURES_URL), src.json(TABLE_URL), src.json(ZONES_URL),
     ]);
     if (!resultsJson && !fixturesJson && !tableJson) return null;
 
@@ -212,6 +242,8 @@ export async function loadFlamengo(
 
     const parsedTable = tableJson ? parseTable(tableJson) : [];
     const table = parsedTable.length ? parsedTable : previous?.table ?? [];
+    // Unknown zones draw no lines; they are never guessed.
+    const zones = parseZones(zonesJson, table.length) ?? previous?.zones ?? [];
 
     // Only the two clubs of the next match need a crest and a league position.
     const next = fixtures[0];
@@ -226,7 +258,7 @@ export async function loadFlamengo(
         if (summary) standing[t.id] = summary;
       }));
     }
-    return { fetchedAt: now, table, results, fixtures, standing, crests };
+    return { fetchedAt: now, table, zones, results, fixtures, standing, crests };
   } catch (err) {
     console.error("Flamengo: load failed:", err);
     return null;
@@ -240,7 +272,7 @@ async function readCached(env: Env): Promise<FlaState | null> {
     const raw = await env.CACHE.get(flamengoCacheKey());
     if (!raw) return null;
     const s = JSON.parse(raw) as FlaState;
-    const ok = Number.isFinite(s?.fetchedAt) && [s.table, s.results, s.fixtures].every(Array.isArray)
+    const ok = Number.isFinite(s?.fetchedAt) && [s.table, s.zones, s.results, s.fixtures].every(Array.isArray)
       && s.standing && s.crests;
     return ok ? s : null;
   } catch {
@@ -304,6 +336,8 @@ export interface FlaView {
   /** Flamengo's league place and points, for the top bar. */
   pill: string;
   table: FlaRow[];
+  /** Places with a zone line under them. */
+  zones: number[];
   /** League matches played and in a season. */
   played: { done: number; of: number } | null;
   next: {
@@ -378,6 +412,7 @@ export function flamengoView(s: FlaState | null, now: number): FlaView {
   return {
     pill: us ? `${ordinal(us.pos)}  /  ${us.pts} PTS` : "FLAMENGO",
     table,
+    zones: s?.zones ?? [],
     played: us ? { done: us.p, of: Math.max(us.p, (table.length - 1) * 2) } : null,
     next: nextMatch ? {
       home: side(nextMatch.home), away: side(nextMatch.away), at: nextMatch.at, venue: nextMatch.venue ?? "",

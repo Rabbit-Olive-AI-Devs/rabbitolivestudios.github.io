@@ -77,6 +77,14 @@ const TWENTY = [["819", "Flamengo"], ["2029", "Palmeiras"], ["3458", "Athletico-
   ...Array.from({ length: 13 }, (_, i) => [`9${i}`, `Club ${i}`])];
 const TABLE = tableOf(TWENTY);
 
+/** FotMob's legend, in its real shape: row indices that share a fate. */
+const ZONES = [{ data: { legend: [
+  { title: "Copa Libertadores", indices: [0, 1, 2, 3] },
+  { title: "Copa Libertadores qualification", indices: [4] },
+  { title: "Copa Sudamericana", indices: [5, 6, 7, 8, 9, 10] },
+  { title: "Relegation", indices: [16, 17, 18, 19] },
+] } }];
+
 /** Stand-ins for ESPN that count what was asked for. */
 function sources(over = {}) {
   const asked = [];
@@ -85,6 +93,7 @@ function sources(over = {}) {
     async json(url) {
       asked.push(url);
       if (/standings/.test(url)) return "table" in over ? over.table : TABLE;
+      if (/fotmob/.test(url)) return "zones" in over ? over.zones : ZONES;
       if (/fixture=true/.test(url)) return "fixtures" in over ? over.fixtures : FIXTURES;
       if (/schedule/.test(url)) return "results" in over ? over.results : RESULTS;
       if (/teams\/8$/.test(url)) return { team: { standingSummary: "1st in Argentine Liga Profesional de Fútbol" } };
@@ -162,6 +171,17 @@ test("the table comes out top to bottom with a signed goal difference", () => {
   assert.equal(fla.parseTable(level)[0].gd, "0");
 });
 
+test("zone lines come from the legend, wherever it puts them, and a bad legend gives none", () => {
+  assert.deepEqual(fla.parseZones(ZONES, 20), [4, 5, 11, 16]);
+  const shifted = [{ data: { legend: [{ indices: [0, 1, 2, 3, 4, 5] }, { indices: [6, 7] }, { indices: [17, 18, 19] }] } }];
+  assert.deepEqual(fla.parseZones(shifted, 20), [6, 8, 17], "a cup winner moving the cut-offs is followed");
+  for (const junk of [null, {}, [], [{}], [{ data: { legend: [] } }], [{ data: { legend: [{ indices: [0, 25] }] } }],
+    [{ data: { legend: [{ indices: ["0"] }] } }], [{ data: { legend: [{ indices: [] }] } }]]) {
+    assert.equal(fla.parseZones(junk, 20), null);
+  }
+  assert.equal(fla.parseZones(ZONES, 0), null, "no table, no zones");
+});
+
 // --- Loading and the cache ------------------------------------------------------
 
 test("a load gathers the table, results, fixtures, and crest and league place for the next match only", async () => {
@@ -169,6 +189,7 @@ test("a load gathers the table, results, fixtures, and crest and league place fo
   const s = await fla.loadFlamengo(NOW, null, src);
   assert.equal(s.fetchedAt, NOW);
   assert.equal(s.table.length, 20);
+  assert.deepEqual(s.zones, [4, 5, 11, 16]);
   assert.deepEqual(s.results.map((m) => m.id), ["r0", "r1", "r2", "r3", "r4", "r5"]);
   assert.deepEqual(s.fixtures.map((m) => m.id), ["f1", "f2"]);
   assert.deepEqual(s.crests, { 8: "bits-8", 819: "bits-819" });
@@ -186,8 +207,10 @@ test("a later load reuses crests it already has", async () => {
 
 test("a feed that fails keeps what was known; all three failing gives null", async () => {
   const first = await fla.loadFlamengo(NOW, null, sources());
-  const s = await fla.loadFlamengo(NOW + HOUR, first, sources({ table: null, results: null }));
+  const s = await fla.loadFlamengo(NOW + HOUR, first, sources({ table: null, results: null, zones: null }));
   assert.equal(s.table.length, 20);
+  assert.deepEqual(s.zones, [4, 5, 11, 16], "the zones last read are kept");
+  assert.deepEqual((await fla.loadFlamengo(NOW, null, sources({ zones: null }))).zones, [], "never read means no lines, not a guess");
   assert.equal(s.results.length, 6);
   assert.equal(await fla.loadFlamengo(NOW, first, sources({ table: null, results: null, fixtures: null })), null);
   const thrower = { json: async () => { throw new Error("boom"); }, crest: async () => null };
@@ -389,9 +412,10 @@ test("the page draws all twenty clubs and both crests, and survives having nothi
   assert.ok(last < 478, `the table ends inside the panel (deepest ink at ${last})`);
 
   // Dashed lines close the Libertadores, qualifier and Sudamericana zones and open the relegation one.
-  const lineUnder = (pos) => full.px[(103 + (pos - 1) * 19 + 5) * full.w + 13] === 0;
-  assert.deepEqual([...page.ZONE_ENDS], [4, 5, 11, 16]);
-  for (let pos = 1; pos < 20; pos++) assert.equal(lineUnder(pos), page.ZONE_ENDS.includes(pos), `line under place ${pos}`);
+  const lineUnder = (canvas, pos) => canvas.px[(103 + (pos - 1) * 19 + 5) * canvas.w + 13] === 0;
+  for (let pos = 1; pos < 20; pos++) assert.equal(lineUnder(full, pos), [4, 5, 11, 16].includes(pos), `line under place ${pos}`);
+  const unzoned = page.drawFlamengoPage(fla.flamengoView({ ...state, zones: [] }, NOW), new Date(NOW));
+  for (let pos = 1; pos < 20; pos++) assert.equal(lineUnder(unzoned, pos), false, "unknown zones draw no lines");
 
   const empty = page.drawFlamengoPage(fla.flamengoView(null, NOW), new Date(NOW));
   assert.ok(cv.countBlack(empty) > 500);
