@@ -3121,7 +3121,7 @@ Pipeline D's Floyd–Steinberg turned every dark grey into coloured speckle, and
 dither turned fine ink detail to mush. The series therefore uses its own two (`src/series/convert.ts`):
 on the E1002, **pixels with little colour may only become black or white**, so only clearly coloured
 areas use the coloured inks; on the desk panel, **Floyd–Steinberg 1-bit after a mild contrast boost**.
-The home panel uses Pipeline A's 4-level quantizer unchanged. No other pipeline was modified.
+The home panel uses Pipeline A's 4-level quantizer unchanged. No other pipeline was modified. Later the same day, drawing the Prologue showed a flaw in the colour rule: a tinted grey printed in black and white still passed its tint on as dithering error, which surfaced as speckle in a later coloured area (faces, yellows). Grey pixels now pass on only their brightness error; a test pins it (128 dots shifted before, under 40 after).
 
 ### Lettering is checked, never trusted
 

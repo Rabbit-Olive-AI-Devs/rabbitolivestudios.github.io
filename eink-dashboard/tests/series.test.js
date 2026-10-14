@@ -572,3 +572,20 @@ test("review: uploading does not replace approved chapters unless asked", () => 
   const fresh = sched.mergeUpload({ seasons: [] }, { ...info, number: 2, premiere: "2027-04-05" }, [1], false);
   assert.deepEqual(fresh.schedule.seasons[0], { ...info, number: 2, premiere: "2027-04-05", chapters: 13, approved: [], pending: [1] });
 });
+
+test("office conversion: a tinted grey field barely changes the area after it", () => {
+  // The same cream area dithered on its own and right after a bluish near-grey field (which is
+  // printed in black and white only). Carrying the grey's tint forward used to shift ~128 dots.
+  const w = 200, h = 60;
+  const field = (before) => {
+    const rgb = new Uint8Array(w * h * 3);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) rgb.set(x < 140 ? before : [235, 215, 170], (y * w + x) * 3);
+    const idx = conv.toOfficeIndices(rgb, w, h);
+    const counts = [0, 0, 0, 0, 0, 0];
+    for (let y = 0; y < h; y++) for (let x = 144; x < w; x++) counts[idx[y * w + x]]++;
+    return counts;
+  };
+  const after = field([60, 70, 110]), alone = field([235, 215, 170]);
+  const shifted = after.reduce((sum, v, k) => sum + Math.abs(v - alone[k]), 0);
+  assert.ok(shifted < 40, `${shifted} dots shifted in the cream area by the grey before it`);
+});

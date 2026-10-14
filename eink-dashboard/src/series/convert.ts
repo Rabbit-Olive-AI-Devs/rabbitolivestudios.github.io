@@ -62,8 +62,13 @@ export function toOfficeIndices(rgb: Uint8Array, w: number, h: number): Uint8Arr
         if (d < bd) { bd = d; best = k; }
       }
       out[i] = best;
+      // A grey pixel passes on only its brightness error: its tint was never printable in
+      // black and white, and carried forward it surfaces as colour speckle somewhere else.
+      const lumErr = last === 1
+        ? 0.299 * (f[i * 3] - P[best][0]) + 0.587 * (f[i * 3 + 1] - P[best][1]) + 0.114 * (f[i * 3 + 2] - P[best][2])
+        : 0;
       for (let c = 0; c < 3; c++) {
-        const e = f[i * 3 + c] - P[best][c];
+        const e = last === 1 ? lumErr : f[i * 3 + c] - P[best][c];
         if (x + 1 < w) f[(i + 1) * 3 + c] += (e * 7) / 16;
         if (y + 1 < h) {
           if (x > 0) f[(i + w - 1) * 3 + c] += (e * 3) / 16;
