@@ -2,7 +2,7 @@
 
 **For:** Jarvis (Hermes agent), showrunner of the series.
 **From:** Claude Code, the engineer on this repo, on behalf of the owner (Thiago).
-**Date:** 2026-10-14. **Status:** the design is agreed and the calendar decided; the panel code and the import tool are **not built yet**; they are planned for the Prologue's premiere on 26 October 2026. Items marked **(awaiting owner)** are proposals the owner has not confirmed; check them with the owner in Slack before acting on them.
+**Date:** 2026-10-14. **Status:** the design is agreed, the calendar decided, and the panel code and import tool are **built** (DECISIONS #71) for the Prologue's premiere on 26 October 2026. Items marked **(awaiting owner)** are proposals the owner has not confirmed; check them with the owner in Slack before acting on them.
 
 Read this file end to end, then `docs/series/SEASON-FORMAT.md` (what the writers deliver). The full design and its reasons: `docs/superpowers/specs/2026-10-14-series-design.md`. You do not need the rest of the repo.
 
@@ -110,10 +110,10 @@ The import tool re-checks the mechanical rules and lists any failure by chapter 
 ## 8. Delivering a season
 
 1. Export the Scenes database to `season.json` exactly as in `SEASON-FORMAT.md`, with the art in `art/`, sheets in `sheets/`, and the writer's `handover.md`.
-2. Put the folder in the shared Dropbox (**awaiting owner:** `00_SHARED_INBOX` for now, a dedicated *The Long Drift / packages / season-NN* folder once you create it), then tell the engineer in Slack. Seasons may be delivered in parts: see `SEASON-FORMAT.md` section 5.
+2. Zip the folder as `season-NN-chapter-NN.zip` and put it in Dropbox `00_SHARED_INBOX/series/`, then tell the engineer in Slack. Seasons may be delivered in parts: see `SEASON-FORMAT.md` section 5.
 3. The engineer runs the import. If it fails, you get the full list of problems; fix them in Notion and re-export.
-4. When it passes, the engineer publishes a private **proof sheet** with every scene in order. **You approve it** (the owner has chosen to watch unspoiled, so do not send them the proof sheet or spoilers).
-5. On approval the season is uploaded and goes live on its premiere Monday at 08:00.
+4. When it passes, the engineer uploads the chapter as *pending* and sends you its **proof page**: `https://eink-dashboard.thiago-oliveira77.workers.dev/series/proof?season=S&chapter=C&key=KEY`, every scene in order. The owner gives you the key privately; never post it in Slack or Notion. You can also preview any moment on the panels' own addresses with `?at=YYYY-MM-DDTHH:MM&key=KEY`. **You approve it** (the owner has chosen to watch unspoiled, so do not send them the proof sheet or spoilers).
+5. Approve it in Slack; the engineer runs the approve step and the chapter airs on its Monday at 08:00. A chapter that is not approved never airs: the panels keep showing the last approved scene, and the owner gets an alert seven days before.
 
 ### Fixes after a season is live
 

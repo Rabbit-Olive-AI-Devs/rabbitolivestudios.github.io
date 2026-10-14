@@ -3077,3 +3077,94 @@ drew in under a second, and `flamengo:v1:state` held 20 table rows, 12 results, 
 crests and zones `[4, 5, 11, 16]`. So **FotMob does answer a request from Cloudflare's network**,
 which was the one thing a local run could not show. Still not seen: a match day, the off-season,
 and the page on the panel.
+
+## 71. The Series: A Graphic Novel Made Ahead of Time, Shown From R2 (built 2026-10-14, for v3.21.0)
+
+### What it is
+
+A Star Wars graphic-novel series, *The Long Drift* (working title), shown on **all three panels**:
+`/desk/series` (desk E1001, black and white), `/series` (home E1001, four greys) and
+`/color/series` (office E1002, six colours). Four AI writers take turns, one season per quarter,
+each writing **and drawing in their own style**: a 10-week Prologue by Claude from Monday
+26 October 2026, then OpenAI, Grok and Muse. The owner's agent Jarvis is showrunner (Notion, Slack)
+and approves every chapter, so the owner watches unspoiled. Design and the owner's decisions:
+`docs/superpowers/specs/2026-10-14-series-design.md`; process: `docs/series/SHOWRUNNER.md`;
+the package writers deliver: `docs/series/SEASON-FORMAT.md`.
+
+### The story clock
+
+A pure function of the Chicago time and the schedule (`src/series/clock.ts`), so every panel shows
+the same page and nothing is stored. Weekdays: five scenes at 08, 10, 12, 14 and 16 (25 per chapter,
+one chapter a week); the 16:00 scene holds overnight. Saturday 08–21 replays scenes 1–14 hourly,
+Sunday 08–18 replays 15–25, and Sunday 19:00 until Monday 08:00 shows the chapter's "next week"
+teaser. Monday before 08:00 counts as Sunday night, which also keeps every scene boundary away from
+the 02:00 Sunday clock changes. Only chapters marked **approved** in the schedule air; an unapproved
+chapter shows the last approved chapter's final scene (`resolveSlot`).
+
+### Everything is built offline, nothing at request time
+
+`scripts/series-import.mjs` runs on the Mac mini: it unpacks a season package (from Dropbox, which
+syncs to `/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox`), normalises pictures with `sips`, and calls
+pure TypeScript in `src/series/` to validate, crop, convert, letter and encode **every page for every
+panel**, then uploads them to the private R2 bucket `eink-series` with `series/schedule.json`. A
+chapter is about 153 PNGs (25 scenes × 3 panels × live and replay, plus three teasers).
+
+At run time the Worker reads the schedule and **one PNG** from R2 and inlines it (DECISIONS #65).
+**No KV, no AI, no image work** on the request path: colour dithering a full page is far beyond the
+free plan's CPU per request (the lesson of the colour and APOD pipelines), and every KV write is
+budgeted (#62). R2 reads are free at this volume.
+
+### Two new conversions, decided on a real picture
+
+Muse's first test picture (inked, red sky, blue light) went through the existing methods first:
+Pipeline D's Floyd–Steinberg turned every dark grey into coloured speckle, and the desk pages' Bayer
+dither turned fine ink detail to mush. The series therefore uses its own two (`src/series/convert.ts`):
+on the E1002, **pixels with little colour may only become black or white**, so only clearly coloured
+areas use the coloured inks; on the desk panel, **Floyd–Steinberg 1-bit after a mild contrast boost**.
+The home panel uses Pipeline A's 4-level quantizer unchanged. No other pipeline was modified.
+
+### Lettering is checked, never trusted
+
+Writers deliver pictures **without words**; our code letters everything after conversion, as solid
+black and white, in the panel fonts (never below `plex11m`, #67). After a fixed-size balloon spilled
+text in a mockup, the owner asked for guarantees: each balloon is **sized from its text** (up to
+four lines), **placed by search** inside the panel clear of every speaker's anchor, the caption,
+other balloons and the writer's keep-clear boxes, and **checked pixel by pixel** (every letter at least
+4px inside). Anything that does not fit is **refused with its chapter and scene**, never shrunk or cut.
+Voices from off the picture get a square comlink box.
+
+### What the import refuses
+
+Wrong structure (13 chapters, 10 for the Prologue; 25 scenes; scene 1 a splash; premiere a Monday),
+missing or too-small pictures, a nearly blank picture, a weekday without a new picture, `hold` after a
+different template, a balloon anchor the crop cuts away, any character outside printable ASCII (curly
+quotes and dashes from LLM writers are named by code point), and banned canon names
+(`src/series/banned.ts` plus a package's `banned.txt`). The shared PNG decoder gained 8-bit palette
+support for this, since a writer's tool may save palette PNGs; other colour types decode as before.
+
+### Previews, proof and alerts
+
+`?at=YYYY-MM-DDTHH:MM` previews any moment and `/series/proof?season=S&chapter=C` lists a chapter's
+scenes for the showrunner; both reveal unreleased chapters, so both need the **`SERIES_KEY`** secret
+(open when it is unset, in local dev). The six-hourly alert check (#60) adds three conditions, all R2
+reads: a chapter airing within 7 days that is not approved, a season ending within 14 days with no
+next season, and the page for "now" missing. `/health-detailed` gains `series`.
+
+### Rejected
+
+- A story kit combined from the date, and a small Workers AI model writing each week: game-like, or
+  AI on a panel page.
+- Reading Notion live from the Worker: a key on the Worker, KV writes, and unreviewed edits on air.
+- A code-drawn library of scene "shots": consistent but the owner wanted each writer's own art.
+- Writers lettering their own pictures: garbled, and illegible after conversion.
+- Scenes every 6 hours around the clock: replaced by working hours and weekend replays.
+
+### Simplification against the spec
+
+The between-seasons card is text only ("returns soon" / "premieres DD/MM/YYYY"), not the previous
+season's final picture: the import of a new season does not have the previous season's art at hand.
+
+### Never commit
+
+Season scripts, pictures, packages and build output are **spoilers in a public repo**. They live in
+Dropbox, `~/series-work/` and R2 only. The repo holds code, the format, and the template guides.

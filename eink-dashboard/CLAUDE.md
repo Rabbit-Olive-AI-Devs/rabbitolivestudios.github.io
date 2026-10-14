@@ -42,6 +42,7 @@ Every session must begin with these steps:
 | Any image pipeline change | Never pass raw bytes to `env.IMAGES.input()` — it throws `undefined (reading 'font')` and burns the AI call before failing (DECISIONS #59) |
 | An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list --remote …`) before assuming reads are racing (DECISIONS #59). Without `--remote`, wrangler 4 reports the empty local store |
 | Diagnosing what a panel actually received | `wrangler tail --format json` shows the renderer's requests (UA `HeadlessChrome`, from Azure US West via Cloudflare SJC). An `outcome: canceled` with no log line is the client hanging up — on SenseCraft that is a white frame. The tail can go silent while alive; `/health-detailed` cache ages are ground truth (DECISIONS #65) |
+| Touching the series (`src/series/`, `/series` routes) | **Never commit season scripts, pictures, packages or build output**: the repo is public and they are spoilers; they live in Dropbox, `~/series-work/` and R2. Pages are built offline by `npm run series -- build`; never convert images at request time. A chapter airs only after `npm run series -- approve` (Jarvis approves; the owner watches unspoiled, so never show them a scene). DECISIONS #71 |
 | Touching World Cup code | It is **retired but preserved** for 2030 — unwired, not deleted. Keep the files and their tests green; see DECISIONS #61 before removing anything |
 | Adding any per-request KV write or `list` | Cost it against the free tier's **1,000 writes/day** — a normal day already uses ~590 (DECISIONS #62). Reads are effectively free; writes and lists are not |
 | Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
@@ -119,6 +120,8 @@ curl "http://localhost:8790/desk/aurebesh?word=JEDI&date=2026-10-12"
 curl "http://localhost:8790/desk/aurebesh?sheet"
 curl "http://localhost:8790/desk/planet?date=2026-10-20"   # live NASA lookup, no cache write
 curl http://localhost:8790/desk/flamengo                    # live ESPN lookup; writes the local KV entry
+curl "http://localhost:8790/desk/series?at=2026-10-26T10:30" # series preview (needs the local R2 to hold pages)
+npm run series -- build ~/series-work/<package> --out ~/series-work/out   # offline import; see docs/series/
 # TARS locally: start dev with a throwaway key, then run the real reporter against it
 #   npx wrangler dev --port 8790 --var TARS_KEY:localtestkey
 #   TARS_URL=http://localhost:8790/desk/tars TARS_KEY=localtestkey ./scripts/tars-report.sh mini "Mac mini"
@@ -323,6 +326,19 @@ eink-dashboard/
     birthday.ts           — Birthday data + detection
     tars.ts               — Desk panel TARS: cleans and merges the Macs' reports into KV `tars:v1:state`, builds the page's view (DECISIONS #69)
     flamengo.ts           — Desk panel Flamengo board: ESPN's public feeds (table, results, fixtures, crests) + FotMob's legend for the zone lines, in KV `flamengo:v1:state`, refreshed by age; builds the page's view (DECISIONS #70)
+    series/               — The series (DECISIONS #71): pure TS used by the offline import and the routes
+      types.ts            — package, schedule and slot types; plannedChapters()
+      clock.ts            — Chicago story clock → slot; resolveSlot() for unapproved chapters; scene time labels
+      keys.ts             — R2 key of every page and card; slotKey()
+      templates.ts        — the five page templates and the strip
+      art.ts              — flatten alpha, crop-to-fill around a focus point, blank check
+      convert.ts          — desk 1-bit (FS + contrast), home 4-grey, office Spectra 6 (greys stay black/white)
+      letter.ts           — captions and balloons: sized from text, placed by search, checked by pixel
+      package.ts          — validatePackage(): structure, ASCII, banned names, a new picture each weekday
+      banned.ts           — canon names the series must never print
+      render.ts           — compose scene pages (+ replay), teasers, before/after cards; encode PNGs
+      build.ts            — one chapter: hold, crop, map anchors, render → R2 key → PNG
+      watch.ts            — alert problems and /health-detailed snapshot for the series
     planet.ts             — Desk panel planet of the day: NASA Exoplanet Archive queries + daily KV cache `planet:v1:DATE` (DECISIONS #68)
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
     images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)
@@ -385,6 +401,7 @@ eink-dashboard/
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
       desk.ts             — /desk/test, /desk/aurebesh, /desk/planet, /desk/tars (view + report), /desk/flamengo handlers (DECISIONS #66–#70)
+      series.ts           — /desk/series, /series, /color/series (one R2 page inlined) and /series/proof (DECISIONS #71)
   photos/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)
@@ -394,6 +411,7 @@ eink-dashboard/
     upload-skyline-photos.sh   — Upload skyline photos to R2
     tars-report.sh             — Runs on each Mac every 30 min (launchd): posts disk/memory/uptime + CodexBar snapshot to /desk/tars; key from the Keychain (DECISIONS #69)
     tars-launchd.plist.example — launchd template for the reporter
+    series-import.mjs          — Offline series import: build | upload | approve | templates (`npm run series --`, DECISIONS #71)
     generate-desk-fonts.mjs    — Offline: rasterise fonts/desk/ into src/hud/fonts-data.ts (`npm run desk-fonts`, DECISIONS #67)
   fonts/
     desk/                 — Source fonts for the desk panel + licences (IBM Plex Mono OFL, Aurebesh AF CC0); not shipped

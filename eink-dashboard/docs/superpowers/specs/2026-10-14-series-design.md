@@ -1,7 +1,7 @@
 # The Series (fifth desk page) — Design
 
 **Date:** 2026-10-14
-**Status:** Sections 1–8 approved by the owner in conversation on 2026-10-14; section 9 records the calendar and roles the owner then decided, and the few points still open. Not built. Next step: an implementation plan.
+**Status:** Sections 1–8 approved by the owner in conversation on 2026-10-14; section 9 records the calendar and roles the owner then decided, and the few points still open. **Built** on branch `series` from `docs/superpowers/plans/2026-10-14-series.md` (DECISIONS #71); one simplification: the between-seasons card is text only.
 **Mockups:** private artifact <https://claude.ai/artifact/Rb2TKnk47BeUvKY8peHRFE> (round 3 is the approved direction; round 4 is a real picture from Muse through all three conversions). The scripts that drew them were throwaway and are not in the repo.
 **For the showrunner:** `docs/series/SHOWRUNNER.md` (the process) and `docs/series/SEASON-FORMAT.md` (the exact package the writers deliver).
 

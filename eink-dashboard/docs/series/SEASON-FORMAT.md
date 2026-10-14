@@ -2,7 +2,7 @@
 
 **For:** the showrunner (Jarvis) and every season's writer.
 **Version:** format 1, 2026-10-14. Design: `docs/superpowers/specs/2026-10-14-series-design.md`.
-**Status:** agreed in principle with the owner; exact text zones and character limits are fixed when the import tool is built, and this file will be updated then. Template guide images will be added under `docs/series/templates/`.
+**Status:** built (DECISIONS #71). The import measures every line with the real fonts, so the limits below are guides. **Template guide images:** `docs/series/templates/*.png`, one per template at true size, with the calm zones hatched.
 
 A season reaches the panels as one **season package**: a folder (or a zip of it) that the import tool checks, converts and uploads. Anything the tool cannot read or fit is refused with a list of problems; nothing is half-imported.
 
@@ -32,6 +32,7 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
   "season": {
     "number": 1,
     "title": "The Salt Road",
+    "show": "THE LONG DRIFT",
     "writer": "Claude",
     "premiere": "2027-01-04"
   },
@@ -70,6 +71,7 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 |---|---|
 | `format` | Always `1` for now |
 | `season.number` | `0` for the Prologue, then `1`, `2`, … |
+| `season.show` | The show's title as printed in the top bar, the same every season |
 | `season.premiere` | A Monday, `YYYY-MM-DD` |
 | `season.writer` | The name printed in the credit: `Claude`, `OpenAI`, `Grok`, `Muse`, or two names joined by ` & ` |
 | `chapters` | 13 (10 for the Prologue), numbered from 1 in order. A package may hold only the chapters delivered so far (section 5) |
@@ -82,6 +84,7 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 | `panels[].focus` | Optional `[x, y]` in the art file's own pixels: the point to keep when the picture is cropped to the panel's shape. Default: the centre |
 | `panels[].caption` | `strip` only: a short line at the top of that panel |
 | `panels[].balloons` | Up to two. `speaker` in capitals, `text` the line, `anchor` the `[x, y]` point **in the art file's own pixels** where the speaker's head is. Use `"anchor": null` for a voice from off the picture (radio, comlink): it is lettered as a square box with the speaker's name |
+| In a `hold` scene | The picture is the previous scene's, already cropped: give that scene's balloon `anchor` points **in panel pixels** (0,0 = the panel's top-left), not in the original file's |
 | `panels[].clear` | Optional list of `[x, y, w, h]` boxes, in the art file's own pixels, that no balloon may cover: each character's body, a key object. Every balloon `anchor` is kept clear automatically; mark the rest |
 
 ## 3. Templates
@@ -91,7 +94,7 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 | `wide` | 1 | 776 × 346 | caption, narration, up to 2 balloons |
 | `split` | 2 | 382 × 346 each | narration, up to 2 balloons per panel |
 | `strip` | 3 | 252 × 346 each | narration, a short caption per panel, 1 balloon per panel |
-| `splash` | 1 | 800 × 444 | caption only (scene 1: lettered automatically) |
+| `splash` | 1 | 800 × 443 | caption only (scene 1: lettered automatically) |
 | `panel-text` | 1 | 476 × 426 | caption, long narration in the right-hand column, 1 balloon |
 
 Every template has **calm zones** where the words will sit: the top third for balloons and captions on `wide`, `split` and `strip`; the bottom-left corner on `splash`. Keep those areas plain (sky, wall, floor, shadow) with no faces, hands or key details. The template guide images will show the exact zones.
@@ -126,7 +129,7 @@ The import measures every line with the real panel font, so these are guides, no
 
 ## 5. Delivering in parts
 
-A season may be delivered chapter by chapter: at least chapters 1 and 2 before the premiere, then each chapter **at least 7 days before it airs**. Each delivery is the same folder with the new chapters added to `season.json` and `art/`; earlier chapters may be corrected in the same delivery. A missing chapter 7 days out raises an alert to the owner.
+Deliver each part as a zip named `season-NN-chapter-NN.zip` (or `season-NN.zip`) in Dropbox `00_SHARED_INBOX/series/`, holding `season.json`, `art/`, `sheets/`, `handover.md` and optionally `banned.txt` (one extra banned name per line). A season may be delivered chapter by chapter: at least chapters 1 and 2 before the premiere, then each chapter **at least 7 days before it airs**. Each delivery is the same folder with the new chapters added to `season.json` and `art/`; earlier chapters may be corrected in the same delivery. A missing chapter 7 days out raises an alert to the owner.
 
 ## 6. Sheets and handover
 
