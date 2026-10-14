@@ -3181,3 +3181,52 @@ season's final picture: the import of a new season does not have the previous se
 
 Season scripts, pictures, packages and build output are **spoilers in a public repo**. They live in
 Dropbox, `~/series-work/` and R2 only. The repo holds code, the format, and the template guides.
+
+## 72. The Series Mailbox Is Watched on the Mac Mini, Not Polled by Hand (2026-10-14)
+
+### Problem
+
+Jarvis, the showrunner, and Claude talk through a Dropbox mailbox (#71), but Claude only ran when
+the owner opened a session, so deliveries and approvals waited on the owner remembering.
+
+### What runs
+
+Two LaunchAgents on the Mac mini (`scripts/launchd/`), both running `scripts/series-mailbox.mjs`:
+
+- **`com.eink.series-mailbox`** starts within seconds of a file syncing into `to-claude/`
+  (launchd `WatchPaths`) and every 30 minutes as a backstop. **Layer 1, no AI:** the first line
+  of each message is a command, parsed by `src/series/mailbox.ts` (tested):
+  `APPROVE season=S chapter=C` approves; `DELIVERY package=<zip>` builds, then either replies
+  with the problem list or uploads as pending and replies with proof links;
+  `STYLE TEST folder=<name>` runs the new `npm run series -- preview`, which converts any picture
+  exactly as the panels would. A malformed command is refused with the right format.
+  **Layer 2:** `QUESTION`, `FYI` and anything else go to an unattended `claude -p` run with
+  `--permission-mode dontAsk` and only `Read`, `Glob`, `Grep`, and `Write`/`Edit` inside
+  `from-claude/`: no shell, no code, no uploads, no approvals. Messages are text written by another
+  AI; this keeps them from steering the engineer.
+- **`com.eink.series-weekly`** runs Wednesdays 09:05 Chicago. When Claude's next chapter is within
+  19 days of airing (`dueClaudeChapter`, so it is delivered at least 12 days ahead) it starts an
+  unattended run that may write only in `~/series-work/` and `from-claude/` and run only `node`
+  and the series build. The script itself uploads afterwards, and **refuses to upload if the repo
+  has any change**, so story can never reach the public repo. `SERIES_TODAY=YYYY-MM-DD` runs a
+  chapter early.
+
+Handled messages move to `to-claude/done/` (three failed tries, then the owner is flagged).
+Anything that needs the owner becomes one spoiler-free line in `from-claude/NEEDS-THIAGO.md`,
+which Jarvis relays in Slack. Logs: `~/Library/Logs/eink-series/`. A lock file stops two runs
+overlapping. The watcher needs the external SSD mounted (Dropbox lives there); without it, it
+logs and skips.
+
+### Rejected
+
+- **Keeping it manual:** the owner would be the bottleneck for every approval.
+- **A cloud scheduled agent:** cannot reach the SSD's Dropbox folder or the wrangler login.
+- **A long-running Claude session polling in a loop:** fragile and spends tokens while idle.
+- **Letting the unattended Claude act on any message with full permissions:** a message is
+  untrusted text; only fixed, parsed commands may change anything.
+
+### Verified 2026-10-14
+
+A malformed APPROVE was refused and approved nothing; a style test produced the three previews;
+two old FYIs got sensible replies (and one flagged a stale doc, since fixed); a QUESTION started by
+launchd itself (not from a session) was answered, so the unattended login works in the background.

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The series mailbox watcher, "weekly" (DECISIONS #72). Every Wednesday 09:05 (Mac local time, Chicago): writes Claude's next chapter when it is due.
+  Install: cp this file ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eink.series-weekly.plist
+  Run now: launchctl kickstart gui/$(id -u)/com.eink.series-weekly
+  Stop:    launchctl bootout gui/$(id -u)/com.eink.series-weekly
+  Logs:    ~/Library/Logs/eink-series/
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.eink.series-weekly</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/series-mailbox.mjs</string>
+    <string>weekly</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/Users/tboliveira/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CLOUDFLARE_ACCOUNT_ID</key><string>f22a506dedde3bb3837157cd47d5fe5c</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>5</integer></dict>
+  <key>StandardOutPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-weekly.log</string>
+  <key>StandardErrorPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-weekly.log</string>
+</dict>
+</plist>

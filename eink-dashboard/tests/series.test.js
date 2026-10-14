@@ -589,3 +589,36 @@ test("office conversion: a tinted grey field barely changes the area after it", 
   const shifted = after.reduce((sum, v, k) => sum + Math.abs(v - alone[k]), 0);
   assert.ok(shifted < 40, `${shifted} dots shifted in the cream area by the grey before it`);
 });
+
+// --- Mailbox watcher ---
+
+const mb = fromBuild("src/series/mailbox.js");
+
+test("mailbox: APPROVE, DELIVERY and STYLE TEST first lines are parsed", () => {
+  assert.deepEqual(mb.parseMessage("APPROVE season=0 chapter=1\n\nLooks good."), { kind: "APPROVE", season: 0, chapters: [1] });
+  assert.deepEqual(mb.parseMessage("\napprove season=0 chapters=1,2"), { kind: "APPROVE", season: 0, chapters: [1, 2] });
+  assert.deepEqual(mb.parseMessage("DELIVERY package=season-01-chapter-01.zip\nnotes"), { kind: "DELIVERY", package: "season-01-chapter-01.zip", replaceApproved: false });
+  assert.deepEqual(mb.parseMessage("DELIVERY package=s01.zip replace-approved"), { kind: "DELIVERY", package: "s01.zip", replaceApproved: true });
+  assert.deepEqual(mb.parseMessage("STYLE TEST folder=openai-1"), { kind: "STYLE TEST", folder: "openai-1" });
+});
+
+test("mailbox: other kinds go to Claude, broken commands are explained", () => {
+  assert.deepEqual(mb.parseMessage("QUESTION\nCan a balloon point off-panel?"), { kind: "QUESTION" });
+  assert.deepEqual(mb.parseMessage("FYI\n# Notion ready"), { kind: "FYI" });
+  assert.deepEqual(mb.parseMessage("Hello Claude"), { kind: "OTHER" });
+  assert.match(mb.parseMessage("APPROVE chapter=1").reason, /season=/);
+  assert.match(mb.parseMessage("DELIVERY\nzip is in packages").reason, /package=/);
+  assert.match(mb.parseMessage("DELIVERY package=../../etc/passwd").reason, /file name/);
+  assert.match(mb.parseMessage("STYLE TEST folder=a/b").reason, /folder name/);
+});
+
+test("mailbox: Claude's next chapter is due 19 days before it airs, one at a time", () => {
+  const s = { seasons: [
+    { number: 0, show: "X", title: "P", writer: "Claude", premiere: "2026-10-26", chapters: 10, approved: [1], pending: [2] },
+    { number: 1, show: "X", title: "S1", writer: "OpenAI", premiere: "2027-01-04", chapters: 13, approved: [], pending: [] },
+  ] };
+  assert.deepEqual(mb.dueClaudeChapter(s, "2026-10-20"), null);           // ch3 airs 9 Nov: 20 days away
+  assert.deepEqual(mb.dueClaudeChapter(s, "2026-10-21"), { season: 0, chapter: 3, airs: "2026-11-09" });
+  const done = { seasons: [{ ...s.seasons[0], approved: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], pending: [] }] };
+  assert.equal(mb.dueClaudeChapter(done, "2026-12-20"), null);            // season complete
+});

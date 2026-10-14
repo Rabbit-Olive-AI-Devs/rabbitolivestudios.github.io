@@ -8,6 +8,7 @@
  *   npm run series -- upload <out-dir>
  *   npm run series -- approve --season S --chapter C
  *   npm run series -- templates
+ *   npm run series -- preview <picture|folder> --out DIR   (a writer's style test on all three panels)
  *
  * Needs macOS `sips` and `ditto`, and CLOUDFLARE_ACCOUNT_ID for upload/approve.
  */
@@ -29,7 +30,7 @@ function compile() {
   return {
     pkgv: load("src/series/package.js"), build: load("src/series/build.js"), art: load("src/series/art.js"),
     tpl: load("src/series/templates.js"), types: load("src/series/types.js"), dec: load("src/png-decode.js"),
-    schedule: load("src/series/schedule.js"),
+    schedule: load("src/series/schedule.js"), convert: load("src/series/convert.js"), spectra: load("src/spectra6.js"),
     hud: { canvas: load("src/hud/canvas.js"), type: load("src/hud/type.js"), parts: load("src/hud/parts.js") },
     png: load("src/png.js"),
   };
@@ -215,6 +216,45 @@ async function cmdTemplates() {
 }
 
 const cmd = process.argv[2];
-const run = { build: cmdBuild, upload: cmdUpload, approve: cmdApprove, templates: cmdTemplates }[cmd];
-if (!run) { console.error("usage: series-import.mjs build|upload|approve|templates"); process.exit(2); }
+/**
+ * A style test: each picture cropped into the Wide panel and converted exactly as an
+ * imported scene would be, without words, as three PNGs (desk, home, office).
+ */
+async function cmdPreview() {
+  const src = path.resolve(process.argv[3]);
+  const out = safeOut(arg("--out", path.join(os.homedir(), "series-work", "previews")));
+  const m = compile();
+  const files = fs.statSync(src).isDirectory()
+    ? fs.readdirSync(src).filter((f) => /\.(png|jpe?g|webp|heic|tiff?)$/i.test(f)).map((f) => path.join(src, f))
+    : [src];
+  const panel = m.tpl.TEMPLATES.wide.panels[0];
+  const W = 800, H = 480, tmp = fs.mkdtempSync(path.join(os.tmpdir(), "series-preview-"));
+  fs.mkdirSync(out, { recursive: true });
+  const done = [];
+  for (const f of files) {
+    const name = path.basename(f).replace(/\.[^.]+$/, "");
+    try {
+      const png = path.join(tmp, `${name}.png`);
+      execFileSync("sips", ["-s", "format", "png", f, "--out", png], { stdio: "ignore" });
+      const d = await m.dec.decodePNG(new Uint8Array(fs.readFileSync(png)));
+      const rgbIn = d.rgb ?? Uint8Array.from({ length: d.width * d.height * 3 }, (_, i) => d.gray[Math.floor(i / 3)]);
+      const img = { w: d.width, h: d.height, rgb: m.art.flattenAlpha(rgbIn, d.alpha) };
+      if (img.w < panel.w || img.h < panel.h) { done.push(`${name}: ${img.w}x${img.h} is smaller than the ${panel.w}x${panel.h} panel`); continue; }
+      const { image } = m.art.cropToFill(img, panel.w, panel.h);
+      const rgb = new Uint8Array(W * H * 3).fill(255);
+      for (let y = 0; y < panel.h; y++) rgb.set(image.rgb.subarray(y * panel.w * 3, (y + 1) * panel.w * 3), ((panel.y + y) * W + panel.x) * 3);
+      const gray = m.convert.luminance(rgb);
+      fs.writeFileSync(path.join(out, `${name}-desk.png`), await m.png.encodePNG1Bit(m.convert.toDeskBits(gray, W, H), W, H));
+      fs.writeFileSync(path.join(out, `${name}-home.png`), await m.png.encodePNGGray8(m.convert.toHomeGray(gray), W, H));
+      fs.writeFileSync(path.join(out, `${name}-office.png`), await m.png.encodePNGIndexed(m.convert.toOfficeIndices(rgb, W, H), W, H, m.spectra.SPECTRA6_PALETTE));
+      done.push(`${name}: desk, home and office previews written`);
+    } catch (err) {
+      done.push(`${name}: could not be read (${err.message})`);
+    }
+  }
+  console.log(done.join("\n"));
+}
+
+const run = { build: cmdBuild, upload: cmdUpload, approve: cmdApprove, templates: cmdTemplates, preview: cmdPreview }[cmd];
+if (!run) { console.error("usage: series-import.mjs build|upload|approve|templates|preview"); process.exit(2); }
 await run();

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The series mailbox watcher, "run" (DECISIONS #72). Handles the showrunner's messages as soon as Dropbox syncs one into to-claude/, and every 30 minutes as a backstop.
+  Install: cp this file ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eink.series-mailbox.plist
+  Run now: launchctl kickstart gui/$(id -u)/com.eink.series-mailbox
+  Stop:    launchctl bootout gui/$(id -u)/com.eink.series-mailbox
+  Logs:    ~/Library/Logs/eink-series/
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.eink.series-mailbox</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/series-mailbox.mjs</string>
+    <string>run</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/Users/tboliveira/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CLOUDFLARE_ACCOUNT_ID</key><string>f22a506dedde3bb3837157cd47d5fe5c</string>
+  </dict>
+  <key>WatchPaths</key>
+  <array><string>/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_SHARED_INBOX/series/to-claude</string></array>
+  <key>StartInterval</key><integer>1800</integer>
+  <key>StandardOutPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-mailbox.log</string>
+  <key>StandardErrorPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-mailbox.log</string>
+</dict>
+</plist>

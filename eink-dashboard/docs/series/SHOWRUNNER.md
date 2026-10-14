@@ -27,7 +27,7 @@ Your job: keep the show coherent and on schedule. The writers' job: their season
 | **The season's writer** | Character and ship sheets, all 13 chapters (script and pictures), the handover note to the next writer |
 | **Claude Code** | The panel pages, the import and its checks, template guide images, the proof sheet, uploading, alerts when something is missing |
 
-Coordination with the writers happens in the owner's Slack channel, where the agents already talk. **The engineer cannot read Slack**: talk to it through the Dropbox mailbox `00_SHARED_INBOX/series/` (`to-claude/` for your messages, `from-claude/` for its replies and `STATUS.md`, `packages/` for zips, `style-tests/` for a writer's sample pictures). One Markdown file per message, named `YYYY-MM-DD-HHMM-topic.md`, starting with `DELIVERY`, `APPROVE`, `STYLE TEST`, `QUESTION` or `FYI`. The engineer works when the owner opens a session, so for anything urgent also ask the owner in Slack to have Claude check the series inbox. The full standing brief is `00_SHARED_INBOX/series/JARVIS-BRIEF.md`.
+Coordination with the writers happens in the owner's Slack channel, where the agents already talk, and stays spoiler-free there. **The engineer cannot read Slack**, and deliveries, approvals and style tests never go through it: talk to it through the Dropbox mailbox `00_SHARED_INBOX/series/` (`to-claude/` for your messages, `from-claude/` for its replies and `STATUS.md`, `packages/` for zips, `style-tests/` for a writer's sample pictures). One Markdown file per message, named `YYYY-MM-DD-HHMM-topic.md`, starting with `DELIVERY`, `APPROVE`, `STYLE TEST`, `QUESTION` or `FYI`. A watcher on the Mac mini (DECISIONS #72) handles every message within minutes, at any hour: `APPROVE`, `DELIVERY` and `STYLE TEST` (first line `STYLE TEST folder=<name in style-tests/>`) by script, anything else by an unattended Claude that can only read and reply. When something needs Thiago, it adds a spoiler-free line to `from-claude/NEEDS-THIAGO.md`; please relay those lines to him in Slack. The full standing brief is `00_SHARED_INBOX/series/JARVIS-BRIEF.md`.
 
 ## 3. The bible (you own it)
 
@@ -69,7 +69,7 @@ The Scenes database maps one-to-one onto `season.json`, so the export to the pac
 
 After the Prologue, a season premieres on the **first Monday of a quarter** and runs 13 weeks. Some quarters leave a one-week gap; the panels show a "returns on" card then. **Muse can generate images** and draws its own season like the others.
 
-**The Prologue is tight:** it premieres 12 days after this plan. Claude writes and draws it inside the engineer's repo, chapters 1 and 2 by Friday 23 October, then a chapter at least 7 days before it airs. Your first jobs: set up Notion, start the bible from what the Prologue establishes (crew, ship, premise), and brief OpenAI for Season 1.
+**The Prologue is tight:** it premieres 12 days after this plan. Claude writes and draws it inside the engineer's repo, chapters 1 and 2 by Friday 23 October (both were uploaded on 14 October), then each chapter at least 12 days before it airs, written by a weekly unattended run (DECISIONS #72). Your first jobs: set up Notion, start the bible from what the Prologue establishes (crew, ship, premise), and brief OpenAI for Season 1.
 
 ### Deadlines for each season after the Prologue, counted back from its premiere
 
@@ -110,10 +110,10 @@ The import tool re-checks the mechanical rules and lists any failure by chapter 
 ## 8. Delivering a season
 
 1. Export the Scenes database to `season.json` exactly as in `SEASON-FORMAT.md`, with the art in `art/`, sheets in `sheets/`, and the writer's `handover.md`.
-2. Zip the folder as `season-NN-chapter-NN.zip` and put it in Dropbox `00_SHARED_INBOX/series/`, then tell the engineer in Slack. Seasons may be delivered in parts: see `SEASON-FORMAT.md` section 5.
+2. Zip the folder as `season-NN-chapter-NN.zip`, put it in Dropbox `00_SHARED_INBOX/series/packages/`, and write a message in `to-claude/` whose first line is `DELIVERY package=season-NN-chapter-NN.zip`. The mailbox watcher on the Mac mini picks it up within minutes, without anyone opening a session. Seasons may be delivered in parts: see `SEASON-FORMAT.md` section 5.
 3. The engineer runs the import. If it fails, you get the full list of problems; fix them in Notion and re-export.
 4. When it passes, the engineer uploads the chapter as *pending* and sends you its **proof page**: `https://eink-dashboard.thiago-oliveira77.workers.dev/series/proof?season=S&chapter=C&key=KEY`, every scene in order. The owner gives you the key privately (it is set with `scripts/series-set-key.sh`); never post it in Slack or Notion. You can also preview any moment on the panels' own addresses with `?at=YYYY-MM-DDTHH:MM&key=KEY`. **You approve it** (the owner has chosen to watch unspoiled, so do not send them the proof sheet or spoilers).
-5. Approve it in Slack; the engineer runs the approve step and the chapter airs on its Monday at 08:00. A chapter that is not approved never airs: the panels keep showing the last approved scene, and the owner gets an alert seven days before.
+5. Approve it with a message in `to-claude/` whose first line is `APPROVE season=S chapter=C` (or `chapters=C,D`); the watcher switches it on within minutes and confirms in `from-claude/`, and the chapter airs on its Monday at 08:00. A chapter that is not approved never airs: the panels keep showing the last approved scene, and the owner gets an alert seven days before.
 
 ### Fixes after a season is live
 

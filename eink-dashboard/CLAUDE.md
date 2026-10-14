@@ -43,6 +43,7 @@ Every session must begin with these steps:
 | An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list --remote …`) before assuming reads are racing (DECISIONS #59). Without `--remote`, wrangler 4 reports the empty local store |
 | Diagnosing what a panel actually received | `wrangler tail --format json` shows the renderer's requests (UA `HeadlessChrome`, from Azure US West via Cloudflare SJC). An `outcome: canceled` with no log line is the client hanging up — on SenseCraft that is a white frame. The tail can go silent while alive; `/health-detailed` cache ages are ground truth (DECISIONS #65) |
 | Touching the series (`src/series/`, `/series` routes) | **Never commit season scripts, pictures, packages or build output**: the repo is public and they are spoilers; they live in Dropbox, `~/series-work/` and R2. Pages are built offline by `npm run series -- build`; never convert images at request time. A chapter airs only after `npm run series -- approve` (Jarvis approves; the owner watches unspoiled, so never show them a scene). DECISIONS #71 |
+| A session starts | Read `from-claude/NEEDS-THIAGO.md` and `~/Library/Logs/eink-series/mailbox.log` in the Dropbox series mailbox: the watcher (DECISIONS #72) handles routine messages itself and flags only what needs a session |
 | Touching World Cup code | It is **retired but preserved** for 2030 — unwired, not deleted. Keep the files and their tests green; see DECISIONS #61 before removing anything |
 | Adding any per-request KV write or `list` | Cost it against the free tier's **1,000 writes/day** — a normal day already uses ~590 (DECISIONS #62). Reads are effectively free; writes and lists are not |
 | Adding a new failure mode | Ask whether the alert check in `src/alert.ts` would catch it. Graceful degradation without alerting is indistinguishable from working (DECISIONS #60) |
@@ -339,6 +340,7 @@ eink-dashboard/
       render.ts           — compose scene pages (+ replay), teasers, before/after cards; encode PNGs
       build.ts            — one chapter: hold, crop, map anchors, render → R2 key → PNG
       watch.ts            — alert problems and /health-detailed snapshot for the series
+      mailbox.ts          — parses mailbox first-line commands; dueClaudeChapter() for the weekly run (DECISIONS #72)
     planet.ts             — Desk panel planet of the day: NASA Exoplanet Archive queries + daily KV cache `planet:v1:DATE` (DECISIONS #68)
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
     images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)
@@ -412,6 +414,7 @@ eink-dashboard/
     tars-report.sh             — Runs on each Mac every 30 min (launchd): posts disk/memory/uptime + CodexBar snapshot to /desk/tars; key from the Keychain (DECISIONS #69)
     tars-launchd.plist.example — launchd template for the reporter
     series-import.mjs          — Offline series import: build | upload | approve | templates (`npm run series --`, DECISIONS #71)
+    series-mailbox.mjs         — The mailbox watcher (DECISIONS #72): `run` handles Jarvis's APPROVE/DELIVERY/STYLE TEST by script, other messages via a read-only `claude -p`; `weekly` writes Claude's next due chapter. Prompts in `series-agent/`, LaunchAgents in `launchd/`
     series-set-key.sh          — Owner runs it in a real terminal: choose SERIES_KEY (hidden prompt) → ~/.config/eink/series-key (600) + Cloudflare secret, then checks the proof page
     generate-desk-fonts.mjs    — Offline: rasterise fonts/desk/ into src/hud/fonts-data.ts (`npm run desk-fonts`, DECISIONS #67)
   fonts/
