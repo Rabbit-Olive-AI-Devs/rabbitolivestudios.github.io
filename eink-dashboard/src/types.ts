@@ -14,6 +14,10 @@ export interface Env {
   // Desk panel TARS page (DECISIONS #69): one secret both lets the owner's Macs post
   // their reports and unlocks the page, which shows plans and spend.
   TARS_KEY?: string;
+  // The series (DECISIONS #71): finished pages in R2, and the key that unlocks
+  // previews and the showrunner's proof page (they reveal unreleased chapters).
+  SERIES: R2Bucket;
+  SERIES_KEY?: string;
 }
 
 // --- Moment Before types ---

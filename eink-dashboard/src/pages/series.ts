@@ -1,0 +1,95 @@
+/**
+ * The series on the three panels (DECISIONS #71). The page for "now" is worked out
+ * from the clock and the schedule, read from R2 and inlined: one request, no KV,
+ * no AI, no image work. Previews (?at=) and the proof page reveal unreleased
+ * chapters, so they need SERIES_KEY when it is set.
+ */
+
+import { hudPageHTML } from "../hud/page";
+import { pngToBase64 } from "../png";
+import { htmlResponse } from "../response";
+import { resolveSlot, seriesSlot } from "../series/clock";
+import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey } from "../series/keys";
+import type { PanelId, Schedule } from "../series/types";
+import { SCENES_PER_CHAPTER } from "../series/types";
+import type { Env } from "../types";
+import { unavailableHTML } from "./unavailable";
+
+const TITLE = "The Series";
+const notFound = () => new Response("Not found", { status: 404 });
+
+function keyOk(env: Env, url: URL): boolean {
+  return !env.SERIES_KEY || url.searchParams.get("key") === env.SERIES_KEY;
+}
+
+export async function loadSchedule(bucket: R2Bucket): Promise<Schedule | null> {
+  try {
+    const obj = await bucket.get(SCHEDULE_KEY);
+    if (!obj) return null;
+    const s = JSON.parse(await obj.text()) as Schedule;
+    return Array.isArray(s?.seasons) ? s : null;
+  } catch (err) {
+    console.error("series: schedule unreadable:", err);
+    return null;
+  }
+}
+
+/** "2026-11-09T08:30" read as Chicago wall-clock time. */
+function parseChicago(at: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) return null;
+  const guess = new Date(at + ":00Z");
+  for (const offset of [5, 6]) {
+    const d = new Date(guess.getTime() + offset * 3600000);
+    const local = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .format(d).replace(", ", "T");
+    if (local === at) return d;
+  }
+  return null;
+}
+
+const textPage = (detail: string) => htmlResponse(unavailableHTML(TITLE, detail), "no-store");
+
+export async function handleSeries(env: Env, url: URL, panel: PanelId, now: Date = new Date()): Promise<Response> {
+  const at = url.searchParams.get("at");
+  if (at !== null && !keyOk(env, url)) return notFound();
+  const when = at !== null ? parseChicago(at) : now;
+  if (!when) return textPage("The preview time must look like 2026-11-09T08:30.");
+  const schedule = await loadSchedule(env.SERIES);
+  if (!schedule) return textPage("The series has not started yet.");
+  const slot = resolveSlot(seriesSlot(when, schedule), schedule, at !== null);
+  const key = slotKey(slot, panel);
+  if (!key) return textPage("The series has not started yet.");
+  try {
+    const obj = await env.SERIES.get(key);
+    if (!obj) {
+      console.error(`series: missing page ${key}`);
+      return textPage("This scene is not ready yet. It will appear at the next refresh.");
+    }
+    return htmlResponse(hudPageHTML(TITLE, pngToBase64(new Uint8Array(await obj.arrayBuffer()))), "no-store");
+  } catch (err) {
+    console.error("series: read failed:", err);
+    return textPage("This scene could not be loaded. It will try again at the next refresh.");
+  }
+}
+
+export async function handleSeriesProof(env: Env, url: URL): Promise<Response> {
+  if (!keyOk(env, url)) return notFound();
+  const season = Number(url.searchParams.get("season"));
+  const chapter = Number(url.searchParams.get("chapter"));
+  if (!Number.isInteger(season) || !Number.isInteger(chapter) || chapter < 1) return textPage("Ask for ?season=N&chapter=N.");
+  const schedule = await loadSchedule(env.SERIES);
+  const s = schedule?.seasons.find((x) => x.number === season);
+  const status = s?.approved.includes(chapter) ? "APPROVED" : s?.pending.includes(chapter) ? "PENDING" : "NOT IMPORTED";
+  const rows: string[] = [];
+  for (let n = 1; n <= SCENES_PER_CHAPTER; n++) {
+    const obj = await env.SERIES.get(sceneKey(season, chapter, n, false, "office"));
+    rows.push(obj
+      ? `<figure><figcaption>Scene ${n}</figcaption><img src="data:image/png;base64,${pngToBase64(new Uint8Array(await obj.arrayBuffer()))}" width="800" height="480" alt="Scene ${n}"></figure>`
+      : `<figure><figcaption>Scene ${n}: missing</figcaption></figure>`);
+  }
+  const teaser = await env.SERIES.get(teaserKey(season, chapter, "office"));
+  if (teaser) rows.push(`<figure><figcaption>Teaser</figcaption><img src="data:image/png;base64,${pngToBase64(new Uint8Array(await teaser.arrayBuffer()))}" width="800" height="480" alt="Teaser"></figure>`);
+  return htmlResponse(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Proof S${season} C${chapter}</title>
+<style>body{font-family:Helvetica,Arial,sans-serif;margin:24px;background:#fff;color:#000}figure{margin:0 0 28px}img{border:1px solid #000;max-width:100%;height:auto}</style></head>
+<body><h1>Season ${season}, chapter ${chapter}: ${status}</h1><p>Office panel version. Approve in Slack; the engineer runs the approve step.</p>${rows.join("")}</body></html>`, "no-store");
+}

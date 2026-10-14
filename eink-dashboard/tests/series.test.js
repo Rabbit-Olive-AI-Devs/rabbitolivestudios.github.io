@@ -422,3 +422,56 @@ test("a nearly blank picture is refused", async () => {
   const { problems } = await build.buildChapter(p, 1, () => solid(1200, 800, [250, 250, 250]));
   assert.ok(problems.some((x) => /picture c01-s02.png is nearly blank/.test(x)));
 });
+
+const sp = fromBuild("src/pages/series.js");
+
+/** An in-memory stand-in for an R2 bucket. */
+function bucket(objects) {
+  return {
+    async get(key) {
+      if (!(key in objects)) return null;
+      const v = objects[key];
+      const bytes = typeof v === "string" ? new TextEncoder().encode(v) : v;
+      return { arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), text: async () => new TextDecoder().decode(bytes) };
+    },
+  };
+}
+const PNG = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+
+test("a panel route serves the slot's page inline as one document", async () => {
+  const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(SCHEDULE), "series/s00/c01/s02-office.png": PNG }) };
+  const res = await sp.handleSeries(env, new URL("https://x/color/series"), "office", chi("2026-10-26T10:30:00", CDT));
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /data:image\/png;base64,iVBORw/);
+  assert.doesNotMatch(html, /<script/);
+});
+
+test("missing or broken schedule, or a missing page, gives the text page, never a 500", async () => {
+  for (const objects of [{}, { "series/schedule.json": "{not json" }, { "series/schedule.json": JSON.stringify(SCHEDULE) }]) {
+    const res = await sp.handleSeries({ SERIES: bucket(objects) }, new URL("https://x/series"), "home", chi("2026-10-26T10:30:00", CDT));
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.doesNotMatch(html, /data:image/);
+    assert.match(html, /<h1>/);
+  }
+});
+
+test("previews with ?at= need SERIES_KEY when it is set, and see pending chapters", async () => {
+  const objects = { "series/schedule.json": JSON.stringify(SCHEDULE), "series/s00/c03/s01-desk.png": PNG };
+  const env = { SERIES: bucket(objects), SERIES_KEY: "k" };
+  const denied = await sp.handleSeries(env, new URL("https://x/desk/series?at=2026-11-09T08:30"), "desk");
+  assert.equal(denied.status, 404);
+  const ok = await sp.handleSeries(env, new URL("https://x/desk/series?at=2026-11-09T08:30&key=k"), "desk");
+  assert.match(await ok.text(), /data:image\/png/);
+});
+
+test("the proof page needs the key and lists every scene of a chapter", async () => {
+  const objects = { "series/schedule.json": JSON.stringify(SCHEDULE) };
+  for (let s = 1; s <= 25; s++) objects[`series/s00/c03/s${String(s).padStart(2, "0")}-office.png`] = PNG;
+  const env = { SERIES: bucket(objects), SERIES_KEY: "k" };
+  assert.equal((await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3"))).status, 404);
+  const html = await (await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3&key=k"))).text();
+  assert.equal((html.match(/<img /g) || []).length, 25);
+  assert.match(html, /PENDING/);
+});

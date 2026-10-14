@@ -10,6 +10,7 @@ import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, 
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo } from "./pages/desk";
+import { handleSeries, handleSeriesProof } from "./pages/series";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
 import { getBirthdayToday, getBirthdayByKey } from "./birthday";
@@ -1291,6 +1292,14 @@ export default {
         return request.method === "POST" ? handleDeskTarsReport(request, env) : handleDeskTars(env, url);
       case "/desk/flamengo":
         return handleDeskFlamengo(env, ctx);
+      case "/desk/series":
+        return handleSeries(env, url, "desk");
+      case "/series":
+        return handleSeries(env, url, "home");
+      case "/color/series":
+        return handleSeries(env, url, "office");
+      case "/series/proof":
+        return handleSeriesProof(env, url);
       case "/health":
         return handleHealth();
       case "/health-detailed":
@@ -1303,6 +1312,7 @@ export default {
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
               "/skyline", "/skyline-bw", "/skyline.png", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo",
+              "/desk/series", "/series", "/color/series",
               "/test-birthday.png", "/health", "/health-detailed",
             ],
           },
