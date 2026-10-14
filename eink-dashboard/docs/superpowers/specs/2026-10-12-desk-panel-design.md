@@ -1,7 +1,7 @@
 # Desk Panel (third display) — Design
 
 **Date:** 2026-10-12
-**Status:** Approved by the owner on 2026-10-12. **Steps 1 and 2 are built (DECISIONS #66)**, and their lettering and layout were then redone with real fonts after the owner rejected the first version (**DECISIONS #67 supersedes sections 5–7 on type and layout**); the result was seen on the panel and approved. **Step 3, the planet page, is built too (DECISIONS #68).** Steps 4 and 5 (TARS, Flamengo) are not started. Current state and next steps: `HANDOVER.md` section 15.
+**Status:** Approved by the owner on 2026-10-12. **Steps 1 and 2 are built (DECISIONS #66)**, and their lettering and layout were then redone with real fonts after the owner rejected the first version (**DECISIONS #67 supersedes sections 5–7 on type and layout**); the result was seen on the panel and approved. **Step 3, the planet page, is built too (DECISIONS #68).** Steps 4 and 5 were built and deployed on 2026-10-13: **TARS (DECISIONS #69, v3.19.0)** and **the Flamengo board (DECISIONS #70, v3.20.0)**, both on the panel. All four pages of this design are live. Current state and next steps: `HANDOVER.md` section 15.
 **Plan for steps 1 and 2:** `docs/superpowers/plans/2026-10-12-desk-panel-style-kit-and-aurebesh.md`
 
 ## 1. What this is
@@ -183,6 +183,11 @@ other no-AI test parameters.
 - **Sportmonks** (<https://docs.sportmonks.com/v3/>) is a third candidate; the owner has a test
   API key. Not evaluated: which leagues the test plan covers is unknown, and it would add a
   secret (`wrangler secret put`, never in the repo) where the two feeds above need none.
+- **Outcome (2026-10-13):** the Flamengo board uses neither the calendar feed nor Sportmonks.
+  ESPN's `all` schedule endpoints cover results and fixtures in every competition, ESPN supplies
+  the table and crests, and the table's qualification zones come from FotMob's table legend
+  (`fotmob.com/api/data/tltable`), because ESPN's Serie A table has none. The layout also changed
+  from section 4's sketch: a full twenty-club table instead of a single position. See DECISIONS #70.
 - ~~Which exoplanet fields NASA's archive returns reliably enough to show every day.~~ Answered in DECISIONS #68:
   the `pscomppars` table, restricted to planets with a radius, a distance and an orbital period.
 - Whether a locked (not sleeping) Mac still runs the reporter.
