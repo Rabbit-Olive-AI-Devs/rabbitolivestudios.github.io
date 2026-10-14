@@ -3036,3 +3036,12 @@ accents all drew correctly (Estudiantes v Flamengo, Libertadores semifinal). Tes
 
 The page on the panel; a match day (the `LIVE` state and the half-hour refresh); the off-season,
 when there may be no fixtures and the table resets; a cup opponent ESPN has no crest for.
+
+### Follow-up (2026-10-13): qualification lines
+
+The owner asked for the continental places to be marked as Google's table does. Dashed lines now
+close four zones: after 4th (Libertadores group stage), after 5th (Libertadores qualifiers), after
+11th (Sudamericana) and after 16th (relegation below). The places are a constant, `ZONE_ENDS` in
+`src/hud/flamengo-page.ts`, taken from the 2026 table: ESPN's standings carry no zone notes, and
+the continental cut-offs move with who wins the cups, so **check them each season**. The lines are
+unlabelled; there is no room for a legend beside twenty rows.

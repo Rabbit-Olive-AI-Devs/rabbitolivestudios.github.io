@@ -388,6 +388,11 @@ test("the page draws all twenty clubs and both crests, and survives having nothi
   for (let y = 0; y < full.h; y++) for (let x = 0; x < 330; x++) if (full.px[y * full.w + x] === 0) last = y;
   assert.ok(last < 478, `the table ends inside the panel (deepest ink at ${last})`);
 
+  // Dashed lines close the Libertadores, qualifier and Sudamericana zones and open the relegation one.
+  const lineUnder = (pos) => full.px[(103 + (pos - 1) * 19 + 5) * full.w + 13] === 0;
+  assert.deepEqual([...page.ZONE_ENDS], [4, 5, 11, 16]);
+  for (let pos = 1; pos < 20; pos++) assert.equal(lineUnder(pos), page.ZONE_ENDS.includes(pos), `line under place ${pos}`);
+
   const empty = page.drawFlamengoPage(fla.flamengoView(null, NOW), new Date(NOW));
   assert.ok(cv.countBlack(empty) > 500);
   assert.ok(cv.countBlack(full) > cv.countBlack(empty) * 2);
