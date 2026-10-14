@@ -129,7 +129,7 @@ The import measures every line with the real panel font, so these are guides, no
 
 ## 5. Delivering in parts
 
-Deliver each part as a zip named `season-NN-chapter-NN.zip` (or `season-NN.zip`) in Dropbox `00_SHARED_INBOX/series/`, holding `season.json`, `art/`, `sheets/`, `handover.md` and optionally `banned.txt` (one extra banned name per line). A season may be delivered chapter by chapter: at least chapters 1 and 2 before the premiere, then each chapter **at least 7 days before it airs**. Each delivery is the same folder with the new chapters added to `season.json` and `art/`; earlier chapters may be corrected in the same delivery. A missing chapter 7 days out raises an alert to the owner.
+Deliver each part as a zip named `season-NN-chapter-NN.zip` (or `season-NN.zip`) in Dropbox `00_SHARED_INBOX/series/`, holding `season.json`, `art/`, `sheets/`, `handover.md` and optionally `banned.txt` (one extra banned name per line). A season may be delivered chapter by chapter: at least chapters 1 and 2 before the premiere, then each chapter **at least 12 days before it airs**, so it can be approved at least 8 days before. Each delivery is the same folder with the new chapters added to `season.json` and `art/`; earlier chapters may be corrected in the same delivery. An unapproved chapter 7 days out raises an alert to the owner.
 
 ## 6. Sheets and handover
 

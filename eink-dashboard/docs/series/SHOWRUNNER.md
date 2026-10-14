@@ -27,7 +27,7 @@ Your job: keep the show coherent and on schedule. The writers' job: their season
 | **The season's writer** | Character and ship sheets, all 13 chapters (script and pictures), the handover note to the next writer |
 | **Claude Code** | The panel pages, the import and its checks, template guide images, the proof sheet, uploading, alerts when something is missing |
 
-Coordination happens in the owner's Slack channel, where the agents already talk.
+Coordination with the writers happens in the owner's Slack channel, where the agents already talk. **The engineer cannot read Slack**: talk to it through the Dropbox mailbox `00_SHARED_INBOX/series/` (`to-claude/` for your messages, `from-claude/` for its replies and `STATUS.md`, `packages/` for zips, `style-tests/` for a writer's sample pictures). One Markdown file per message, named `YYYY-MM-DD-HHMM-topic.md`, starting with `DELIVERY`, `APPROVE`, `STYLE TEST`, `QUESTION` or `FYI`. The engineer works when the owner opens a session, so for anything urgent also ask the owner in Slack to have Claude check the series inbox. The full standing brief is `00_SHARED_INBOX/series/JARVIS-BRIEF.md`.
 
 ## 3. The bible (you own it)
 
@@ -36,7 +36,7 @@ The bible is the one place every writer reads before writing a word. Keep it in 
 1. **Premise:** one paragraph. Who the crew are, what they want, what keeps them moving.
 2. **Setting (awaiting owner):** the Star Wars galaxy, Outer Rim, after the fall of the Empire. Canon places, species and ship classes are fine. **No canon characters.** Whether Jedi may appear (as guests, not crew) is the owner's call.
 3. **Tone:** family-friendly. Peril, humour, warmth; no gore, nothing a child at home should not read. Dry humour from the droid is a house trait.
-4. **The crew:** for each member, name, role, how they talk (three sample lines), what they want, what they will never do. The Prologue (Claude) introduces the title, crew and ship; you write them into the bible; the owner approves. The mockup names, Vess Oro, Bolt, Hallan Dree and the ship *Last Lantern*, are placeholders.
+4. **The crew:** for each member, name, role, how they talk (three sample lines), what they want, what they will never do. **Fixed by the owner on 2026-10-14:** the show is *The Long Drift*; the crew are Vess Oro (pilot, captain), Bolt (deadpan droid) and Hallan Dree (old mechanic); the ship is the *Last Lantern*.
 5. **The ship:** name, layout, quirks, what breaks.
 6. **Running state:** credits, cargo, damage, who is owed what. Updated at the end of every season from the writer's handover note.
 7. **House rules for the page:** no words in pictures; flat colour and clear outlines; calm zones kept plain; plain ASCII text; the length guides. All are in `SEASON-FORMAT.md`; link it, do not copy it.
@@ -80,7 +80,7 @@ After the Prologue, a season premieres on the **first Monday of a quarter** and 
 | 7 weeks before | Season outline (13 chapter titles, one paragraph each) approved |
 | 4 weeks before | Chapters 1–4 scripted, drawn and reviewed |
 | **3 weeks before** | **First delivery to the engineer:** at least chapters 1 and 2 |
-| Every week after | The next chapter, at least 7 days before it airs (an alert fires otherwise) |
+| Every chapter after | Delivered **at least 12 days before it airs**, approved **at least 8 days before** (the alert emails the owner from 7 days before an unapproved chapter airs) |
 
 For Season 1: brief OpenAI by 2 November 2026; first delivery by 14 December 2026.
 
