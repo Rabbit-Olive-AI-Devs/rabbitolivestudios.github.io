@@ -3078,7 +3078,7 @@ crests and zones `[4, 5, 11, 16]`. So **FotMob does answer a request from Cloudf
 which was the one thing a local run could not show. Still not seen: a match day, the off-season,
 and the page on the panel.
 
-## 71. The Series: A Graphic Novel Made Ahead of Time, Shown From R2 (built 2026-10-14, for v3.21.0)
+## 71. The Series: A Graphic Novel Made Ahead of Time, Shown From R2 (v3.21.0, 2026-10-14)
 
 ### What it is
 
