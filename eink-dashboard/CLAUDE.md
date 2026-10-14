@@ -412,6 +412,7 @@ eink-dashboard/
     tars-report.sh             — Runs on each Mac every 30 min (launchd): posts disk/memory/uptime + CodexBar snapshot to /desk/tars; key from the Keychain (DECISIONS #69)
     tars-launchd.plist.example — launchd template for the reporter
     series-import.mjs          — Offline series import: build | upload | approve | templates (`npm run series --`, DECISIONS #71)
+    series-set-key.sh          — Owner runs it in a real terminal: choose SERIES_KEY (hidden prompt) → ~/.config/eink/series-key (600) + Cloudflare secret, then checks the proof page
     generate-desk-fonts.mjs    — Offline: rasterise fonts/desk/ into src/hud/fonts-data.ts (`npm run desk-fonts`, DECISIONS #67)
   fonts/
     desk/                 — Source fonts for the desk panel + licences (IBM Plex Mono OFL, Aurebesh AF CC0); not shipped
