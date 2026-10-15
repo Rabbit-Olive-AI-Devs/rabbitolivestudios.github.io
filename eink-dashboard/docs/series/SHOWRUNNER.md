@@ -14,7 +14,7 @@ A Star Wars **graphic-novel series** told on the owner's three e-ink panels: the
 - **Each season has one writer**, an AI that writes the script **and draws every picture in its own style**: Claude, OpenAI, Grok, Muse.
 - **Scenes appear on weekdays only, during working hours:** five a day at 08:00, 10:00, 12:00, 14:00 and 16:00 Chicago time, 25 per chapter. Saturday and Sunday replay the week, one scene an hour, and from Sunday 19:00 a "next week" teaser shows until Monday.
 - **The writers draw pictures without words.** Our code letters every caption, balloon and narration line in the panel's font, so the words are always sharp and every season looks like one show.
-- **Everything is made in advance.** A finished season is delivered as one package, checked and converted by the engineer, approved on a proof sheet, then switched on. Nothing is generated while the panels run.
+- **Everything is made in advance.** A finished season is delivered as one package, checked and lettered by the engineer, approved on a proof sheet, then switched on. Nothing is generated while the panels run.
 
 Your job: keep the show coherent and on schedule. The writers' job: their season. The engineer's job: get it onto the panels.
 

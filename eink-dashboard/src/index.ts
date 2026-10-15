@@ -10,7 +10,7 @@ import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, 
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo } from "./pages/desk";
-import { handleSeries, handleSeriesProof, handleSeriesProofImage, handleSeriesTest } from "./pages/series";
+import { handleSeries, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
 import { seriesHealth } from "./series/watch";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
@@ -1296,21 +1296,21 @@ export default {
       case "/desk/flamengo":
         return handleDeskFlamengo(env, ctx);
       case "/desk/series":
-        return handleSeries(env, url, "desk");
+        return handleSeries(env, url);
       case "/series":
-        return handleSeries(env, url, "desk"); // both E1001s show the same black-and-white page
+        return handleSeries(env, url); // every panel gets the same full-colour page (DECISIONS #73)
       case "/color/series":
-        return handleSeries(env, url, "office");
+        return handleSeries(env, url);
       case "/series/proof":
         return handleSeriesProof(env, url);
-      case "/series/proof/img":
-        return handleSeriesProofImage(env, url);
+      case "/series/proof/page":
+        return handleSeriesProofPage(env, url);
       case "/desk/series/test":
-        return handleSeriesTest(env, url, "desk");
+        return handleSeriesTest(env, url);
       case "/series/test":
-        return handleSeriesTest(env, url, "desk");
+        return handleSeriesTest(env, url);
       case "/color/series/test":
-        return handleSeriesTest(env, url, "office");
+        return handleSeriesTest(env, url);
       case "/health":
         return handleHealth();
       case "/health-detailed":

@@ -125,21 +125,14 @@ function handle(file, m) {
       if (!fs.existsSync(dir)) { reply("style-test-missing", `FYI: reply to ${file}\n\nI cannot find style-tests/${msg.folder}/.`); return true; }
       const out = path.join(OUTBOX, "style-tests", msg.folder);
       const r = series(["preview", dir, "--out", out]);
-      // Also put the previews where the panels can show them: /…/series/test (key needed).
-      const panelPath = { desk: "desk/series/test", office: "color/series/test" };
+      // Also put the pages where the panels can show them: /series/test (key needed).
       const links = [];
-      for (const f of fs.readdirSync(out).filter((n) => /-(desk|office)\.png$/.test(n)).sort()) {
-        const [, image, panel] = f.match(/^(.*)-(desk|office)\.png$/);
-        const put = spawnSync("npx", ["wrangler", "r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "image/png", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
-        links.push(put.status === 0 ? `- ${image}, ${panel}: ${SITE}/${panelPath[panel]}?folder=${msg.folder}&image=${image}&key=` : `- ${image}, ${panel}: upload failed`);
+      for (const f of fs.readdirSync(out).filter((n) => n.endsWith(".html")).sort()) {
+        const image = f.replace(/\.html$/, "");
+        const put = spawnSync("npx", ["wrangler", "r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "text/html; charset=utf-8", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+        links.push(put.status === 0 ? `- ${image}: ${SITE}/series/test?folder=${msg.folder}&image=${image}&key=` : `- ${image}: upload failed`);
       }
-      // The as-is copy: sent unconverted so the colour panel's own processing can be compared.
-      for (const f of fs.readdirSync(out).filter((n) => n.endsWith("-original.jpg")).sort()) {
-        const image = f.replace(/-original\.jpg$/, "");
-        const put = spawnSync("npx", ["wrangler", "r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "image/jpeg", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
-        links.push(put.status === 0 ? `- ${image}, office AS-IS (unconverted): ${SITE}/color/series/test?folder=${msg.folder}&image=${image}&original=1&key=` : `- ${image}, as-is: upload failed`);
-      }
-      reply(`style-test-${msg.folder}`, `FYI: reply to ${file}\n\nEach picture, cropped into a Wide panel and converted as the panels show it, is in from-claude/style-tests/${msg.folder}/ as -desk (black and white, both E1001 panels) and -office (six colours, the E1002).\n\n${r.out}\n\nLook hardest at -desk: fine lines and soft gradients are what get lost there.\n\nTo see them on a real panel, add one of these as a temporary page in SenseCraft (HTML widget, 800x480) with your key at the end, and remove it afterwards:\n${links.join("\n")}`);
+      reply(`style-test-${msg.folder}`, `FYI: reply to ${file}\n\nEach picture, untouched and only cropped to the 800x480 screen, is in from-claude/style-tests/${msg.folder}/ as .png. The panels get the picture exactly like this and convert it themselves: the E1001s to black and white, the E1002 to its six colours.\n\n${r.out}\n\nTo see them on a real panel, add one of these as a temporary page in SenseCraft (HTML widget, 800x480) with your key at the end, and remove it afterwards. The same address works on every panel:\n${links.join("\n")}`);
       return true;
     }
     case "INVALID":

@@ -42,7 +42,7 @@ Every session must begin with these steps:
 | Any image pipeline change | Never pass raw bytes to `env.IMAGES.input()` — it throws `undefined (reading 'font')` and burns the AI call before failing (DECISIONS #59) |
 | An image cache looks empty | Check whether *writes* are failing (`wrangler kv key list --remote …`) before assuming reads are racing (DECISIONS #59). Without `--remote`, wrangler 4 reports the empty local store |
 | Diagnosing what a panel actually received | `wrangler tail --format json` shows the renderer's requests (UA `HeadlessChrome`, from Azure US West via Cloudflare SJC). An `outcome: canceled` with no log line is the client hanging up — on SenseCraft that is a white frame. The tail can go silent while alive; `/health-detailed` cache ages are ground truth (DECISIONS #65) |
-| Touching the series (`src/series/`, `/series` routes) | **Never commit season scripts, pictures, packages or build output**: the repo is public and they are spoilers; they live in Dropbox, `~/series-work/` and R2. Pages are built offline by `npm run series -- build`; never convert images at request time. A chapter airs only after `npm run series -- approve` (Jarvis approves; the owner watches unspoiled, so never show them a scene). DECISIONS #71 |
+| Touching the series (`src/series/`, `/series` routes) | **Never commit season scripts, pictures, packages or build output**: the repo is public and they are spoilers; they live in Dropbox, `~/series-work/` and R2. Pages are built offline by `npm run series -- build`; never convert images at request time. The writer's picture goes to every panel untouched in full colour and each panel converts it itself: do not add a dithering step back without the owner seeing it on the panels (DECISIONS #73). A chapter airs only after `npm run series -- approve` (Jarvis approves; the owner watches unspoiled, so never show them a scene). DECISIONS #71 |
 | A session starts | Read `from-claude/NEEDS-THIAGO.md` and `~/Library/Logs/eink-series/mailbox.log` in the Dropbox series mailbox: the watcher (DECISIONS #72) handles routine messages itself and flags only what needs a session |
 | Touching World Cup code | It is **retired but preserved** for 2030 — unwired, not deleted. Keep the files and their tests green; see DECISIONS #61 before removing anything |
 | Adding any per-request KV write or `list` | Cost it against the free tier's **1,000 writes/day** — a normal day already uses ~590 (DECISIONS #62). Reads are effectively free; writes and lists are not |
@@ -333,11 +333,10 @@ eink-dashboard/
       keys.ts             — R2 key of every page and card; slotKey()
       templates.ts        — the five page templates and the strip
       art.ts              — flatten alpha, crop-to-fill around a focus point, blank check
-      convert.ts          — desk 1-bit (FS + contrast, shown on BOTH E1001s), office Spectra 6 (greys stay black/white)
       letter.ts           — captions and balloons: sized from text, placed by search, checked by pixel
       package.ts          — validatePackage(): structure, ASCII, banned names, a new picture each weekday
       banned.ts           — canon names the series must never print
-      render.ts           — compose scene pages (+ replay), teasers, before/after cards; encode PNGs
+      render.ts           — compose scene pages (+ replay) in full colour, untouched art (#73); teasers, before/after cards; encode PNGs
       build.ts            — one chapter: hold, crop, map anchors, render → R2 key → PNG
       watch.ts            — alert problems and /health-detailed snapshot for the series
       mailbox.ts          — parses mailbox first-line commands; dueClaudeChapter() for the weekly run (DECISIONS #72)

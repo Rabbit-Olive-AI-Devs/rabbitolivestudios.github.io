@@ -1,17 +1,16 @@
 /**
- * The series on the three panels (DECISIONS #71). The page for "now" is worked out
- * from the clock and the schedule, read from R2 and inlined: one request, no KV,
- * no AI, no image work. Previews (?at=) and the proof page reveal unreleased
- * chapters, so they need SERIES_KEY when it is set.
+ * The series on the three panels (DECISIONS #71, #73). The page for "now" is worked out
+ * from the clock and the schedule and read from R2, where it is stored as a finished
+ * one-request document: the Worker passes it through, with no image work, no KV and no
+ * AI. Every panel gets the same full-colour page and converts it itself. Previews (?at=),
+ * the proof page and style tests reveal unreleased work, so they need SERIES_KEY when set.
  */
 
-import { hudPageHTML } from "../hud/page";
-import { pngToBase64 } from "../png";
 import { htmlResponse } from "../response";
 import { resolveSlot, seriesSlot } from "../series/clock";
-import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey, testGreyKey, testKey, testOriginalKey } from "../series/keys";
+import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey, testKey } from "../series/keys";
 import { isSchedule } from "../series/schedule";
-import type { PanelId, Schedule } from "../series/types";
+import type { Schedule } from "../series/types";
 import { SCENES_PER_CHAPTER } from "../series/types";
 import type { Env } from "../types";
 import { unavailableHTML } from "./unavailable";
@@ -54,31 +53,42 @@ function parseChicago(at: string): Date | null {
 
 const textPage = (detail: string) => htmlResponse(unavailableHTML(TITLE, detail), "no-store");
 
-export async function handleSeries(env: Env, url: URL, panel: PanelId, now: Date = new Date()): Promise<Response> {
+/** A stored page, or the text page when it is missing or unreadable. */
+async function storedPage(env: Env, key: string, missing: string): Promise<Response> {
+  try {
+    const obj = await env.SERIES.get(key);
+    if (!obj) {
+      console.error(`series: missing page ${key}`);
+      return textPage(missing);
+    }
+    return htmlResponse(await obj.text(), "no-store");
+  } catch (err) {
+    console.error("series: read failed:", err);
+    return textPage("This page could not be loaded. It will try again at the next refresh.");
+  }
+}
+
+export async function handleSeries(env: Env, url: URL, now: Date = new Date()): Promise<Response> {
   const at = url.searchParams.get("at");
   if (at !== null && !keyOk(env, url)) return notFound();
   const when = at !== null ? parseChicago(at) : now;
   if (!when) return textPage("The preview time must look like 2026-11-09T08:30.");
   const schedule = await loadSchedule(env.SERIES);
   if (!schedule) return textPage("The series has not started yet.");
+  let key: string | null;
   try {
-    const key = slotKey(resolveSlot(seriesSlot(when, schedule), schedule, at !== null), panel);
-    if (!key) return textPage("The series has not started yet.");
-    const obj = await env.SERIES.get(key);
-    if (!obj) {
-      console.error(`series: missing page ${key}`);
-      return textPage("This scene is not ready yet. It will appear at the next refresh.");
-    }
-    return htmlResponse(hudPageHTML(TITLE, pngToBase64(new Uint8Array(await obj.arrayBuffer()))), "no-store");
+    key = slotKey(resolveSlot(seriesSlot(when, schedule), schedule, at !== null));
   } catch (err) {
-    console.error("series: read failed:", err);
+    console.error("series: slot failed:", err);
     return textPage("This scene could not be loaded. It will try again at the next refresh.");
   }
+  if (!key) return textPage("The series has not started yet.");
+  return storedPage(env, key, "This scene is not ready yet. It will appear at the next refresh.");
 }
 
-/** Proof images are served one per request: inlining 26 pages would blow the CPU budget. */
-const proofImg = (k: string, key: string | null) =>
-  `<img src="/series/proof/img?k=${encodeURIComponent(k)}${key ? `&key=${encodeURIComponent(key)}` : ""}" width="800" height="480" alt="">`;
+/** Each scene is framed at panel size, one request per frame; inlining 26 pages would be too heavy. */
+const proofFrame = (k: string, key: string | null) =>
+  `<iframe src="/series/proof/page?k=${encodeURIComponent(k)}${key ? `&key=${encodeURIComponent(key)}` : ""}" width="800" height="480" loading="lazy"></iframe>`;
 
 export async function handleSeriesProof(env: Env, url: URL): Promise<Response> {
   if (!keyOk(env, url)) return notFound();
@@ -91,43 +101,30 @@ export async function handleSeriesProof(env: Env, url: URL): Promise<Response> {
   const key = url.searchParams.get("key");
   const rows: string[] = [];
   for (let n = 1; n <= SCENES_PER_CHAPTER; n++) {
-    rows.push(`<figure><figcaption>Scene ${n}</figcaption>${proofImg(sceneKey(season, chapter, n, false, "office"), key)}</figure>`);
+    rows.push(`<figure><figcaption>Scene ${n}</figcaption>${proofFrame(sceneKey(season, chapter, n, false), key)}</figure>`);
   }
-  rows.push(`<figure><figcaption>Teaser</figcaption>${proofImg(teaserKey(season, chapter, "office"), key)}</figure>`);
+  rows.push(`<figure><figcaption>Teaser</figcaption>${proofFrame(teaserKey(season, chapter), key)}</figure>`);
   return htmlResponse(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Proof S${season} C${chapter}</title>
-<style>body{font-family:Helvetica,Arial,sans-serif;margin:24px;background:#fff;color:#000}figure{margin:0 0 28px}img{border:1px solid #000;max-width:100%;height:auto}</style></head>
-<body><h1>Season ${season}, chapter ${chapter}: ${status}</h1><p>Office panel version. A missing scene shows as a broken image. Approve in Slack; the engineer runs the approve step.</p>${rows.join("")}</body></html>`, "no-store");
+<style>body{font-family:Helvetica,Arial,sans-serif;margin:24px;background:#fff;color:#000}figure{margin:0 0 28px}iframe{border:1px solid #000;display:block}</style></head>
+<body><h1>Season ${season}, chapter ${chapter}: ${status}</h1><p>Every scene exactly as the panels receive it; each panel converts it itself. Approve with an APPROVE message in the mailbox.</p>${rows.join("")}</body></html>`, "no-store");
 }
 
-/** One finished page from the series bucket, for the proof page. Keyed, PNG pages only. */
-export async function handleSeriesProofImage(env: Env, url: URL): Promise<Response> {
+/** One finished series page, for a proof frame. Keyed, chapter pages only. */
+export async function handleSeriesProofPage(env: Env, url: URL): Promise<Response> {
   if (!keyOk(env, url)) return notFound();
   const k = url.searchParams.get("k") ?? "";
-  if (!/^series\/s\d{2}\/c\d{2}\/[a-z0-9-]+\.png$/.test(k)) return notFound();
-  const obj = await env.SERIES.get(k);
-  if (!obj) return notFound();
-  return new Response(await obj.arrayBuffer(), { headers: { "Content-Type": "image/png", "Cache-Control": "no-store" } });
+  if (!/^series\/s\d{2}\/c\d{2}\/[a-z0-9-]+\.html$/.test(k)) return notFound();
+  return storedPage(env, k, "This page is missing.");
 }
 
 /**
- * A writer's style test as one panel shows it, for judging art on the real device. Keyed:
- * the watcher uploads every STYLE TEST to series/tests/ (DECISIONS #72).
+ * A writer's style test as the panels will show it, for judging art on a real device: the
+ * picture untouched, only cropped to the screen. Keyed: the watcher uploads every STYLE TEST
+ * to series/tests/ (DECISIONS #72).
  */
-export async function handleSeriesTest(env: Env, url: URL, panel: PanelId): Promise<Response> {
+export async function handleSeriesTest(env: Env, url: URL): Promise<Response> {
   if (!keyOk(env, url)) return notFound();
-  const folder = url.searchParams.get("folder") ?? "", image = url.searchParams.get("image") ?? "";
-  // original=1 sends the writer's picture unconverted, leaving the panel's own processing to it.
-  // grey=1 sends the four-grey version, for comparing with the 1-bit one on a real E1001.
-  const original = url.searchParams.get("original") === "1";
-  const grey = url.searchParams.get("grey") === "1";
-  const key = original ? testOriginalKey(folder, image) : grey ? testGreyKey(folder, image) : testKey(folder, image, panel);
+  const key = testKey(url.searchParams.get("folder") ?? "", url.searchParams.get("image") ?? "");
   if (!key) return notFound();
-  try {
-    const obj = await env.SERIES.get(key);
-    if (!obj) return textPage("No style test picture with that folder and image name.");
-    return htmlResponse(hudPageHTML("Style Test", pngToBase64(new Uint8Array(await obj.arrayBuffer())), original ? "image/jpeg" : "image/png"), "no-store");
-  } catch (err) {
-    console.error("series: style test read failed:", err);
-    return textPage("This style test could not be loaded.");
-  }
+  return storedPage(env, key, "No style test picture with that folder and image name.");
 }

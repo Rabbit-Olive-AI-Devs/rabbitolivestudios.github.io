@@ -101,20 +101,19 @@ test("scene time labels", () => {
   assert.equal(clock.nextSceneLabel(25), "MON 08:00");
 });
 
-test("R2 keys", () => {
+test("R2 keys: one finished HTML page per slot, the same for every panel", () => {
   assert.equal(keys.SCHEDULE_KEY, "series/schedule.json");
-  assert.equal(keys.sceneKey(0, 3, 14, false, "desk"), "series/s00/c03/s14-desk.png");
-  assert.equal(keys.sceneKey(0, 3, 14, true, "office"), "series/s00/c03/r14-office.png");
-  assert.equal(keys.teaserKey(1, 13, "office"), "series/s01/c13/teaser-office.png");
-  assert.equal(keys.cardKey(0, "before", "desk"), "series/s00/before-desk.png");
-  assert.equal(keys.slotKey({ kind: "between", next: 1, prev: 0 }, "desk"), "series/s01/before-desk.png");
-  assert.equal(keys.slotKey({ kind: "between", next: null, prev: 0 }, "desk"), "series/s00/after-desk.png");
-  assert.equal(keys.slotKey({ kind: "between", next: null, prev: null }, "desk"), null);
+  assert.equal(keys.sceneKey(0, 3, 14, false), "series/s00/c03/s14.html");
+  assert.equal(keys.sceneKey(0, 3, 14, true), "series/s00/c03/r14.html");
+  assert.equal(keys.teaserKey(1, 13), "series/s01/c13/teaser.html");
+  assert.equal(keys.cardKey(0, "before"), "series/s00/before.html");
+  assert.equal(keys.slotKey({ kind: "between", next: 1, prev: 0 }), "series/s01/before.html");
+  assert.equal(keys.slotKey({ kind: "between", next: null, prev: 0 }), "series/s00/after.html");
+  assert.equal(keys.slotKey({ kind: "between", next: null, prev: null }), null);
 });
 
 const tpl = fromBuild("src/series/templates.js");
 const art = fromBuild("src/series/art.js");
-const conv = fromBuild("src/series/convert.js");
 
 function solid(w, h, [r, g, b]) {
   const rgb = new Uint8Array(w * h * 3);
@@ -167,22 +166,6 @@ test("a nearly blank picture is detected", () => {
   const busy = solid(50, 50, [0, 0, 0]);
   for (let i = 0; i < busy.rgb.length; i += 6) busy.rgb[i] = busy.rgb[i + 1] = busy.rgb[i + 2] = 255;
   assert.equal(art.isNearlyBlank(busy), false);
-});
-
-test("desk conversion is pure black and white", () => {
-  const gray = new Uint8Array(64 * 64).map((_, i) => i % 256);
-  const bits = conv.toDeskBits(gray, 64, 64);
-  assert.ok([...bits].every((b) => b === 0 || b === 1));
-  assert.equal(conv.toHomeGray, undefined, "the four-grey version is gone: both E1001s show the desk version");
-});
-
-test("office conversion keeps greys black-and-white and saturated red red", () => {
-  const grey = solid(32, 32, [90, 90, 90]);
-  const idx = conv.toOfficeIndices(grey.rgb, 32, 32);
-  assert.ok([...idx].every((k) => k === 0 || k === 1), "a grey used a coloured ink");
-  const red = solid(32, 32, [178, 19, 24]);
-  const ridx = conv.toOfficeIndices(red.rgb, 32, 32);
-  assert.ok([...ridx].every((k) => k === 2));
 });
 
 const letter = fromBuild("src/series/letter.js");
@@ -335,19 +318,20 @@ function panelArt(w, h) {
   return img;
 }
 
-test("a wide scene renders four 800x480 pages: two versions, live and replay", async () => {
+test("a wide scene renders two full-colour 800x480 pages, live and replay, with the art untouched", async () => {
   const p = pkgv.samplePackage();
-  const sc = p.chapters[0].scenes[1];
-  const { pages, problems } = await render.renderScene(p.season, p.chapters[0], sc,
-    [{ image: panelArt(776, 346), anchors: [[612, 246]], clear: [] }]);
+  const art0 = panelArt(776, 346);
+  const { pages, problems } = await render.renderScene(p.season, p.chapters[0], p.chapters[0].scenes[1],
+    [{ image: art0, anchors: [[612, 246]], clear: [] }]);
   assert.deepEqual(problems, []);
-  assert.deepEqual(Object.keys(pages).sort(), ["r-desk", "r-office", "s-desk", "s-office"]);
-  for (const bytes of Object.values(pages)) {
-    const d = pngSize(bytes);
-    assert.equal(d.width, 800);
-    assert.equal(d.height, 480);
-  }
-  assert.notDeepEqual(pages["s-desk"], pages["r-desk"], "replay page must differ (REPLAY mark)");
+  assert.deepEqual(Object.keys(pages).sort(), ["r", "s"]);
+  const d = await decodePNG(pages.s);
+  assert.equal(d.width, 800);
+  assert.equal(d.height, 480);
+  // well inside the art and away from every word: the picture's exact colour, no conversion
+  const i = ((46 + 300) * 800 + 12 + 40) * 3, j = (300 * 776 + 40) * 3;
+  assert.deepEqual([...d.rgb.slice(i, i + 3)], [...art0.rgb.slice(j, j + 3)]);
+  assert.notDeepEqual(pages.s, pages.r, "replay page must differ (REPLAY mark)");
 });
 
 test("lettering problems surface from renderScene instead of a page", async () => {
@@ -364,7 +348,7 @@ test("the splash title card letters the chapter automatically", async () => {
   const { pages, problems } = await render.renderScene(p.season, p.chapters[0], p.chapters[0].scenes[0],
     [{ image: panelArt(800, 443), anchors: [], clear: [] }]);
   assert.deepEqual(problems, []);
-  assert.ok(pages["s-office"].length > 1000);
+  assert.ok(pages.s.length > 1000);
 });
 
 test("teaser and cards are 800x480 PNGs; pills name the prologue", async () => {
@@ -382,15 +366,16 @@ const build = fromBuild("src/series/build.js");
 
 const artSource = (w = 1200, h = 800) => (name) => (name.endsWith(".png") ? panelArt(w, h) : null);
 
-test("a chapter builds 102 files under the right keys: two versions, live and replay", async () => {
+test("a chapter builds 51 finished pages: live and replay for each scene, and the teaser", async () => {
   const p = pkgv.samplePackage();
   const { files, problems } = await build.buildChapter(p, 1, artSource());
   assert.deepEqual(problems, []);
-  assert.equal(files.size, 25 * 4 + 2);
-  assert.ok(files.has("series/s00/c01/s01-desk.png"));
-  assert.ok(files.has("series/s00/c01/r25-office.png"));
-  assert.ok(files.has("series/s00/c01/teaser-desk.png"));
-  assert.ok(![...files.keys()].some((k) => k.includes("-home")), "no third (grey) version");
+  assert.equal(files.size, 25 * 2 + 1);
+  for (const k of ["series/s00/c01/s01.html", "series/s00/c01/r25.html", "series/s00/c01/teaser.html"]) assert.ok(files.has(k), k);
+  const html = new TextDecoder().decode(files.get("series/s00/c01/s02.html"));
+  assert.match(html, /^<!DOCTYPE html>/);
+  assert.match(html, /data:image\/png;base64,iVBORw/);
+  assert.doesNotMatch(html, /<script/);
 });
 
 test("hold reuses the previous scene's picture", async () => {
@@ -437,42 +422,37 @@ function bucket(objects) {
   };
 }
 const PNG = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+const PAGE = "<!DOCTYPE html><html><body>PAGE-MARKER</body></html>";
 
-test("a panel route serves the slot's page inline as one document", async () => {
-  const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(SCHEDULE), "series/s00/c01/s02-office.png": PNG }) };
-  const res = await sp.handleSeries(env, new URL("https://x/color/series"), "office", chi("2026-10-26T10:30:00", CDT));
+test("a panel route sends the slot's finished page as one document", async () => {
+  const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(SCHEDULE), "series/s00/c01/s02.html": PAGE }) };
+  const res = await sp.handleSeries(env, new URL("https://x/color/series"), chi("2026-10-26T10:30:00", CDT));
   assert.equal(res.status, 200);
-  const html = await res.text();
-  assert.match(html, /data:image\/png;base64,iVBORw/);
-  assert.doesNotMatch(html, /<script/);
+  assert.match(res.headers.get("Content-Type"), /text\/html/);
+  assert.match(await res.text(), /PAGE-MARKER/);
 });
 
 test("missing or broken schedule, or a missing page, gives the text page, never a 500", async () => {
   for (const objects of [{}, { "series/schedule.json": "{not json" }, { "series/schedule.json": JSON.stringify(SCHEDULE) }]) {
-    const res = await sp.handleSeries({ SERIES: bucket(objects) }, new URL("https://x/series"), "desk", chi("2026-10-26T10:30:00", CDT));
+    const res = await sp.handleSeries({ SERIES: bucket(objects) }, new URL("https://x/series"), chi("2026-10-26T10:30:00", CDT));
     assert.equal(res.status, 200);
     const html = await res.text();
-    assert.doesNotMatch(html, /data:image/);
+    assert.doesNotMatch(html, /PAGE-MARKER/);
     assert.match(html, /<h1>/);
   }
 });
 
 test("previews with ?at= need SERIES_KEY when it is set, and see pending chapters", async () => {
-  const objects = { "series/schedule.json": JSON.stringify(SCHEDULE), "series/s00/c03/s01-desk.png": PNG };
-  const env = { SERIES: bucket(objects), SERIES_KEY: "k" };
-  const denied = await sp.handleSeries(env, new URL("https://x/desk/series?at=2026-11-09T08:30"), "desk");
-  assert.equal(denied.status, 404);
-  const ok = await sp.handleSeries(env, new URL("https://x/desk/series?at=2026-11-09T08:30&key=k"), "desk");
-  assert.match(await ok.text(), /data:image\/png/);
+  const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(SCHEDULE), "series/s00/c03/s01.html": PAGE }), SERIES_KEY: "k" };
+  assert.equal((await sp.handleSeries(env, new URL("https://x/desk/series?at=2026-11-09T08:30"))).status, 404);
+  assert.match(await (await sp.handleSeries(env, new URL("https://x/desk/series?at=2026-11-09T08:30&key=k"))).text(), /PAGE-MARKER/);
 });
 
-test("the proof page needs the key and lists every scene of a chapter", async () => {
-  const objects = { "series/schedule.json": JSON.stringify(SCHEDULE) };
-  for (let s = 1; s <= 25; s++) objects[`series/s00/c03/s${String(s).padStart(2, "0")}-office.png`] = PNG;
-  const env = { SERIES: bucket(objects), SERIES_KEY: "k" };
+test("the proof page needs the key and frames every scene of a chapter plus the teaser", async () => {
+  const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(SCHEDULE) }), SERIES_KEY: "k" };
   assert.equal((await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3"))).status, 404);
   const html = await (await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3&key=k"))).text();
-  assert.equal((html.match(/<img /g) || []).length, 26); // 25 scenes + teaser, linked not inlined
+  assert.equal((html.match(/<iframe /g) || []).length, 26);
   assert.match(html, /PENDING/);
 });
 
@@ -500,12 +480,13 @@ test("end to end: PNG pictures decode, build and give valid pages", async () => 
   const { encodePNGIndexed } = fromBuild("src/png.js");
   const { SPECTRA6_PALETTE } = fromBuild("src/spectra6.js");
   const idx = new Uint8Array(1200 * 800).map((_, i) => ((i % 1200) >> 5) % 6);
-  const png = await encodePNGIndexed(idx, 1200, 800, SPECTRA6_PALETTE);
-  const d = await decodePNG(png);
+  const d = await decodePNG(await encodePNGIndexed(idx, 1200, 800, SPECTRA6_PALETTE));
   const pic = { w: d.width, h: d.height, rgb: art.flattenAlpha(d.rgb, d.alpha) };
   const { files, problems } = await build.buildChapter(pkgv.samplePackage(), 1, () => pic);
   assert.deepEqual(problems, []);
-  const page = await decodePNG(files.get("series/s00/c01/s02-office.png"));
+  const html = new TextDecoder().decode(files.get("series/s00/c01/s02.html"));
+  const b64 = html.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)[1];
+  const page = await decodePNG(Uint8Array.from(Buffer.from(b64, "base64")));
   assert.equal(page.width, 800);
 });
 
@@ -529,7 +510,7 @@ test("review: a failing series check reports a problem instead of throwing", asy
 test("review: a schedule season with the wrong shape gives the text page, not a 500", async () => {
   const bad = { seasons: [{ number: 0, premiere: "2026-10-26", chapters: 10 }] }; // no approved/pending
   const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(bad) }) };
-  const res = await sp.handleSeries(env, new URL("https://x/series"), "desk", chi("2026-10-26T10:30:00", CDT));
+  const res = await sp.handleSeries(env, new URL("https://x/series"), chi("2026-10-26T10:30:00", CDT));
   assert.equal(res.status, 200);
   assert.match(await res.text(), /<h1>/);
   assert.equal(sched.isSchedule(bad), false);
@@ -544,18 +525,13 @@ test("review: a held panel's anchor outside the panel is refused", async () => {
   assert.ok(problems.some((x) => /chapter 1 scene 3: balloon 1 anchor \[900, 100\] is outside the held panel/.test(x)), problems.join("\n"));
 });
 
-test("review: the proof page links its images instead of inlining them", async () => {
-  const objects = { "series/schedule.json": JSON.stringify(SCHEDULE) };
-  for (let s = 1; s <= 25; s++) objects[`series/s00/c03/s${String(s).padStart(2, "0")}-office.png`] = PNG;
-  const env = { SERIES: { ...bucket(objects), async head(k) { return k in objects ? {} : null; } }, SERIES_KEY: "k" };
-  const html = await (await sp.handleSeriesProof(env, new URL("https://x/series/proof?season=0&chapter=3&key=k"))).text();
-  assert.doesNotMatch(html, /data:image/);
-  assert.equal((html.match(/<img src="\/series\/proof\/img\?/g) || []).length, 26); // 25 scenes + teaser
-  const img = await sp.handleSeriesProofImage(env, new URL("https://x/series/proof/img?k=series/s00/c03/s01-office.png&key=k"));
-  assert.equal(img.status, 200);
-  assert.equal(img.headers.get("Content-Type"), "image/png");
-  assert.equal((await sp.handleSeriesProofImage(env, new URL("https://x/series/proof/img?k=series/s00/c03/s01-office.png"))).status, 404);
-  assert.equal((await sp.handleSeriesProofImage(env, new URL("https://x/series/proof/img?k=series/schedule.json&key=k"))).status, 404);
+test("review: proof frames load one finished page each, only with the key and only series pages", async () => {
+  const env = { SERIES: bucket({ "series/s00/c03/s01.html": PAGE }), SERIES_KEY: "k" };
+  const ok = await sp.handleSeriesProofPage(env, new URL("https://x/series/proof/page?k=series/s00/c03/s01.html&key=k"));
+  assert.equal(ok.status, 200);
+  assert.match(await ok.text(), /PAGE-MARKER/);
+  assert.equal((await sp.handleSeriesProofPage(env, new URL("https://x/series/proof/page?k=series/s00/c03/s01.html"))).status, 404);
+  assert.equal((await sp.handleSeriesProofPage(env, new URL("https://x/series/proof/page?k=series/schedule.json&key=k"))).status, 404);
 });
 
 test("review: uploading does not replace approved chapters unless asked", () => {
@@ -571,23 +547,6 @@ test("review: uploading does not replace approved chapters unless asked", () => 
   assert.deepEqual(all.upload, [1, 2]);
   const fresh = sched.mergeUpload({ seasons: [] }, { ...info, number: 2, premiere: "2027-04-05" }, [1], false);
   assert.deepEqual(fresh.schedule.seasons[0], { ...info, number: 2, premiere: "2027-04-05", chapters: 13, approved: [], pending: [1] });
-});
-
-test("office conversion: a tinted grey field barely changes the area after it", () => {
-  // The same cream area dithered on its own and right after a bluish near-grey field (which is
-  // printed in black and white only). Carrying the grey's tint forward used to shift ~128 dots.
-  const w = 200, h = 60;
-  const field = (before) => {
-    const rgb = new Uint8Array(w * h * 3);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) rgb.set(x < 140 ? before : [235, 215, 170], (y * w + x) * 3);
-    const idx = conv.toOfficeIndices(rgb, w, h);
-    const counts = [0, 0, 0, 0, 0, 0];
-    for (let y = 0; y < h; y++) for (let x = 144; x < w; x++) counts[idx[y * w + x]]++;
-    return counts;
-  };
-  const after = field([60, 70, 110]), alone = field([235, 215, 170]);
-  const shifted = after.reduce((sum, v, k) => sum + Math.abs(v - alone[k]), 0);
-  assert.ok(shifted < 40, `${shifted} dots shifted in the cream area by the grey before it`);
 });
 
 // --- Mailbox watcher ---
@@ -626,37 +585,26 @@ test("mailbox: Claude's next chapter is due 19 days before it airs, one at a tim
 // --- Style-test address ---
 
 test("style-test pages live under series/tests/ and only take plain names", () => {
-  assert.equal(keys.testKey("trial-zoe-1", "source", "office"), "series/tests/trial-zoe-1/source-office.png");
-  assert.equal(keys.testKey("../x", "source", "desk"), null);
-  assert.equal(keys.testKey("ok", "a/b", "desk"), null);
+  assert.equal(keys.testKey("trial-zoe-1", "source"), "series/tests/trial-zoe-1/source.html");
+  assert.equal(keys.testKey("../x", "source"), null);
+  assert.equal(keys.testKey("ok", "a/b"), null);
 });
 
-test("the test address shows a style test inline, only with the key", async () => {
-  const objects = { "series/tests/trial-zoe-1/source-desk.png": PNG };
-  const env = { SERIES: bucket(objects), SERIES_KEY: "k" };
-  const ok = await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=trial-zoe-1&image=source&key=k"), "desk");
-  assert.equal(ok.status, 200);
-  assert.match(await ok.text(), /data:image\/png;base64,iVBORw/);
-  assert.equal((await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=trial-zoe-1&image=source"), "desk")).status, 404);
-  assert.equal((await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=../x&image=source&key=k"), "desk")).status, 404);
-  const missing = await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=trial-zoe-1&image=source&key=k"), "office");
+test("the test address sends a style test's finished page, only with the key", async () => {
+  const env = { SERIES: bucket({ "series/tests/trial-zoe-1/source.html": PAGE }), SERIES_KEY: "k" };
+  assert.match(await (await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=trial-zoe-1&image=source&key=k"))).text(), /PAGE-MARKER/);
+  assert.equal((await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=trial-zoe-1&image=source"))).status, 404);
+  assert.equal((await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=../x&image=source&key=k"))).status, 404);
+  const missing = await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=trial-zoe-1&image=other&key=k"));
   assert.equal(missing.status, 200);
-  assert.doesNotMatch(await missing.text(), /data:image/);
+  assert.match(await missing.text(), /<h1>/);
 });
 
-test("the colour test address can send the original picture as-is (original=1)", async () => {
-  assert.equal(keys.testOriginalKey("trial-zoe-1", "source"), "series/tests/trial-zoe-1/source-original.jpg");
-  assert.equal(keys.testOriginalKey("../x", "source"), null);
-  const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
-  const env = { SERIES: bucket({ "series/tests/trial-zoe-1/source-original.jpg": JPG }), SERIES_KEY: "k" };
-  const html = await (await sp.handleSeriesTest(env, new URL("https://x/color/series/test?folder=trial-zoe-1&image=source&original=1&key=k"), "office")).text();
-  assert.match(html, /data:image\/jpeg;base64,\/9j\//);
-});
-
-test("the test address can also send the four-grey version (grey=1), for comparing on a real E1001", async () => {
-  assert.equal(keys.testGreyKey("trial-zoe-1", "source"), "series/tests/trial-zoe-1/source-grey.png");
-  assert.equal(keys.testGreyKey("a/b", "source"), null);
-  const env = { SERIES: bucket({ "series/tests/trial-zoe-1/source-grey.png": PNG }), SERIES_KEY: "k" };
-  const html = await (await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=trial-zoe-1&image=source&grey=1&key=k"), "desk")).text();
-  assert.match(html, /data:image\/png;base64,iVBORw/);
+test("full-colour PNG round trip (the as-is series pages)", async () => {
+  const { encodePNGRGB } = fromBuild("src/png.js");
+  const w = 37, h = 11, rgb = new Uint8Array(w * h * 3).map((_, i) => (i * 37 + (i >> 5)) & 255);
+  const d = await decodePNG(await encodePNGRGB(rgb, w, h));
+  assert.equal(d.width, w);
+  assert.equal(d.height, h);
+  assert.deepEqual([...d.rgb], [...rgb]);
 });

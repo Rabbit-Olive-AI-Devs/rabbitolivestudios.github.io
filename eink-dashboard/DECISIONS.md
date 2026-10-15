@@ -3267,3 +3267,47 @@ panel's own processing does: style tests now include `-original.jpg` (cropped to
 shown by the colour test address with `&original=1`. The outcome decides whether the series keeps
 its own Spectra 6 conversion.
 
+
+---
+
+## 73. The Series Sends Every Panel the Untouched Picture; the Panels Convert It (2026-10-14)
+
+### What the owner saw
+
+The series converted each picture itself: 1-bit Floyd–Steinberg with a contrast curve for the two
+E1001s, and Spectra 6 with greys held to black and white for the E1002 (#71, #72). The owner
+asked to send a writer's picture **as-is** to a real panel and see what the panel does with it.
+A style test was sent cropped to 800x480 and otherwise untouched. On the E1001 the owner found
+it "beautiful" and said: "we should not change from that. even for the e1002".
+
+### Decision
+
+- **One page for every panel.** The writer's picture is placed in the template untouched, in
+  full colour. The chrome (top bar, frames, strip) and the lettering are drawn over it in pure
+  black and white, so the text stays crisp whatever the panel does to the art. `/desk/series`,
+  `/series` and `/color/series` serve the same page.
+- **No conversion of our own.** `src/series/convert.ts` is deleted, along with the per-panel
+  versions (`desk`, `office`, the earlier four-grey `home`) and the `&original=` and `&grey=`
+  test switches. Teasers and season cards stay 1-bit; they are text only.
+- **Stored as finished HTML.** A full-colour scene is a PNG of about 400 KB. Base64-encoding it
+  on every request would cost the Worker CPU for no reason. The import therefore writes each
+  page as the complete one-request document (`hudPageHTML` with the PNG inlined, #65) to
+  `series/sNN/cNN/{sNN,rNN,teaser}.html` and `series/sNN/{before,after}.html`. The Worker passes
+  the stored text through. A chapter is 51 files.
+- **Proof page.** Inlining 26 colour pages would make one heavy document. `/series/proof` frames
+  each page instead (`/series/proof/page?k=`, keyed, chapter pages only).
+- **Style tests.** `npm run series -- preview` writes `<name>.html` and `<name>.png`: the
+  picture cropped to fill 800x480, nothing else. The watcher uploads them to
+  `series/tests/<folder>/<name>.html` and replies with one address, `/series/test`.
+
+### Caveats
+
+- **Verified on the E1001 only.** The E1002's own handling of a colour page has not been seen
+  yet. If it looks wrong there, the old Spectra 6 conversion is in git history
+  (`src/series/convert.ts` before this decision). It would come back for `/color/series` only.
+- **Old keys are orphaned.** Pages uploaded before this change (`*.png`, `-desk`, `-office`,
+  `-home`) are no longer read. Chapters 1–3 of the Prologue were rebuilt and re-uploaded as
+  HTML.
+- **Pages are heavier:** about 500–700 KB each instead of a few tens of KB. The renderer waits
+  for the document itself (#65), so this is a download-time cost, not a blank-frame risk. A
+  scene that shows white on a panel is the first thing to check against this.

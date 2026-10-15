@@ -14,7 +14,7 @@ export function canvasToPng(c: Canvas): Promise<Uint8Array> {
   return encodePNG1Bit(c.px, c.w, c.h);
 }
 
-export function hudPageHTML(title: string, base64: string, mime: "image/png" | "image/jpeg" = "image/png"): string {
+export function hudPageHTML(title: string, base64: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,7 +28,7 @@ export function hudPageHTML(title: string, base64: string, mime: "image/png" | "
 </style>
 </head>
 <body>
-  <img src="data:${mime};base64,${base64}" width="800" height="480" alt="${title}">
+  <img src="data:image/png;base64,${base64}" width="800" height="480" alt="${title}">
 </body>
 </html>`;
 }

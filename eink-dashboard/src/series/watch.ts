@@ -50,7 +50,7 @@ export async function seriesProblems(env: Env, now: Date): Promise<string[]> {
     const parsed: unknown = JSON.parse(await obj.text());
     if (!isSchedule(parsed)) return ["The series: schedule.json is malformed"];
     const out = scheduleProblems(parsed, now);
-    const key = slotKey(resolveSlot(seriesSlot(now, parsed), parsed, false), "office");
+    const key = slotKey(resolveSlot(seriesSlot(now, parsed), parsed, false));
     if (key && !(await env.SERIES.get(key))) out.push(`The series: the page on the panels now is missing (${key})`);
     return out;
   } catch (err) {
@@ -62,7 +62,7 @@ export async function seriesHealth(env: Env, now: Date): Promise<{ schedule: boo
   const schedule = env.SERIES ? await loadSchedule(env.SERIES) : null;
   if (!schedule) return { schedule: false, slot: null, key: null, present: false };
   const slot = resolveSlot(seriesSlot(now, schedule), schedule, false);
-  const key = slotKey(slot, "office");
+  const key = slotKey(slot);
   const present = key ? (await env.SERIES.get(key)) !== null : false;
   return { schedule: true, slot, key, present };
 }

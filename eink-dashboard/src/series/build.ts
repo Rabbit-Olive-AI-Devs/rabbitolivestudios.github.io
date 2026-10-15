@@ -6,6 +6,8 @@
  * returned, so one run lists every problem in the chapter.
  */
 
+import { hudPageHTML } from "../hud/page";
+import { pngToBase64 } from "../png";
 import type { RGBImage } from "./art";
 import { cropToFill, isNearlyBlank } from "./art";
 import { cardKey, sceneKey, teaserKey } from "./keys";
@@ -14,7 +16,15 @@ import { renderCard, renderScene, renderTeaser } from "./render";
 import type { Rect } from "./templates";
 import { TEMPLATES } from "./templates";
 import type { SeasonInfo, SeasonPackage } from "./types";
-import { PANELS, plannedChapters } from "./types";
+import { plannedChapters } from "./types";
+
+/**
+ * The finished one-request document the panels load, stored as-is in R2 so the Worker only
+ * passes it through: encoding a full-colour page per request would cost too much CPU.
+ */
+function toDocument(png: Uint8Array): Uint8Array {
+  return new TextEncoder().encode(hudPageHTML("The Series", pngToBase64(png)));
+}
 
 export type ArtSource = (name: string) => RGBImage | null;
 
@@ -80,16 +90,14 @@ export async function buildChapter(
     if (!ok) continue;
     const { pages, problems: p } = await renderScene(pkg.season, ch, scene, panels);
     problems.push(...p);
-    for (const panel of PANELS) {
-      if (pages[`s-${panel}`]) files.set(sceneKey(season, chapterNo, scene.number, false, panel), pages[`s-${panel}`]);
-      if (pages[`r-${panel}`]) files.set(sceneKey(season, chapterNo, scene.number, true, panel), pages[`r-${panel}`]);
-    }
+    if (pages.s) files.set(sceneKey(season, chapterNo, scene.number, false), toDocument(pages.s));
+    if (pages.r) files.set(sceneKey(season, chapterNo, scene.number, true), toDocument(pages.r));
     prevPanels = panels;
   }
 
   const finale = chapterNo === plannedChapters(season);
   const teaser = await renderTeaser(pkg.season, ch, finale);
-  for (const panel of PANELS) files.set(teaserKey(season, chapterNo, panel), teaser);
+  files.set(teaserKey(season, chapterNo), toDocument(teaser));
   return { files, problems };
 }
 
@@ -97,9 +105,7 @@ export async function buildCards(info: SeasonInfo): Promise<Map<string, Uint8Arr
   const files = new Map<string, Uint8Array>();
   const before = await renderCard(info, "before");
   const after = await renderCard(info, "after");
-  for (const panel of PANELS) {
-    files.set(cardKey(info.number, "before", panel), before);
-    files.set(cardKey(info.number, "after", panel), after);
-  }
+  files.set(cardKey(info.number, "before"), toDocument(before));
+  files.set(cardKey(info.number, "after"), toDocument(after));
   return files;
 }

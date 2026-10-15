@@ -303,3 +303,34 @@ export async function encodePNGGray8(
 
   return png;
 }
+
+/**
+ * Encode a full-colour image (8-bit RGB, colour type 2). Rows use the Sub filter, which
+ * compresses painted art far better than None. Used for the series' as-is pages, which the
+ * panels convert themselves (DECISIONS #73).
+ */
+export async function encodePNGRGB(rgb: Uint8Array, width: number, height: number): Promise<Uint8Array> {
+  const ihdrData = new Uint8Array(13);
+  writeU32BE(ihdrData, 0, width);
+  writeU32BE(ihdrData, 4, height);
+  ihdrData[8] = 8;  // bit depth
+  ihdrData[9] = 2;  // colour type: RGB
+  const ihdr = makeChunk("IHDR", ihdrData);
+
+  const stride = width * 3;
+  const raw = new Uint8Array(height * (1 + stride));
+  for (let y = 0; y < height; y++) {
+    const o = y * (1 + stride), src = y * stride;
+    raw[o] = 1; // filter: Sub
+    for (let x = 0; x < stride; x++) {
+      raw[o + 1 + x] = (rgb[src + x] - (x >= 3 ? rgb[src + x - 3] : 0)) & 255;
+    }
+  }
+  const idat = makeChunk("IDAT", zlibWrap(await deflateRaw(raw), raw));
+  const iend = makeIEND();
+  const png = new Uint8Array(PNG_SIGNATURE.length + ihdr.length + idat.length + iend.length);
+  let offset = 0;
+  for (const part of [PNG_SIGNATURE, ihdr, idat, iend]) { png.set(part, offset); offset += part.length; }
+  return png;
+}
+

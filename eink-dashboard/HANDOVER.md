@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-14 · **Describes:** v3.21.0 (the series, DECISIONS #71), which is what production runs.
+**Last verified:** 2026-10-14 · **Describes:** v3.21.0 (the series, DECISIONS #71; full-colour pages converted by each panel, #73), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -70,11 +70,11 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/desk/planet` | Desk E1001 | Planet of the day from NASA's Exoplanet Archive, drawn from its data; `?date=` (#68) |
 | `/desk/tars` | Desk E1001 | TARS: the owner's Macs and AI allowances. `GET ?key=` shows the page, `POST` with a bearer key takes a report from a Mac (#69) |
 | `/desk/flamengo` | Desk E1001 | Flamengo board: Serie A table, next match with crests, last result, form, countdown; ESPN's public feeds, zone lines from FotMob's table legend (#70) |
-| `/desk/series` | Desk E1001 | The series, black and white: current scene from R2 `eink-series`, pre-built offline (#71) |
-| `/series` | Home E1001 | The series: the same black-and-white page as `/desk/series`, since both E1001s are identical (#71) |
-| `/color/series` | Office E1002 | The series, six colours (#71) |
-| `/desk/series/test`, `/series/test`, `/color/series/test` | Any (temporary) | A writer's style-test picture as that panel shows it (`?folder=&image=&key=`; `/series/test` = the desk version; `&original=1` on the colour one sends the picture unconverted), uploaded by the watcher (#72) |
-| `/series/proof` | Showrunner | A chapter's scenes and teaser for approval, images from `/series/proof/img`; needs `SERIES_KEY` (#71) |
+| `/desk/series` | Desk E1001 | The series: current scene from R2 `eink-series`, pre-built offline, full colour, converted by the panel (#71, #73) |
+| `/series` | Home E1001 | The series: the same page as `/desk/series` (#71, #73) |
+| `/color/series` | Office E1002 | The series: the same page again (#71, #73) |
+| `/desk/series/test`, `/series/test`, `/color/series/test` | Any (temporary) | A writer's style-test picture, untouched and cropped to the screen (`?folder=&image=&key=`; the three addresses are the same page), uploaded by the watcher (#72) |
+| `/series/proof` | Showrunner | A chapter's scenes and teaser for approval, each page framed from `/series/proof/page`; needs `SERIES_KEY` (#71) |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
 | `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
@@ -93,7 +93,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `env.IMAGES` | Cloudflare Images | JPEG to PNG, centre-crop and resize to 800x480 |
 | `env.CACHE` | KV namespace `de97776d35af4df08b13fd2158acebdc` | Every cache in the project |
 | `env.PHOTOS` | R2 bucket `eink-birthday-photos` | `portraits/` (birthday references), `skylines/` (city references) |
-| `env.SERIES` | R2 bucket `eink-series` (private) | The series: every finished page (`series/sNN/cNN/…png`) and `series/schedule.json` (#71) |
+| `env.SERIES` | R2 bucket `eink-series` (private) | The series: every finished page (`series/sNN/cNN/…html`, one-request documents) and `series/schedule.json` (#71) |
 | `env.SEND_EMAIL` | Email Routing | Failure-alert email |
 | `TEST_AUTH_KEY`, `ALERT_TO`, `ALERT_FROM` | Secrets | Test-route auth; alert addresses (secrets because the repo is public) |
 | `TARS_KEY` | Secret | Lets the owner's Macs post to `/desk/tars` and unlocks that page |
@@ -130,7 +130,7 @@ Facts that have each cost real debugging time:
 - **One FLUX attempt, then fall back. No retry loops.** When changing a retry or budget pattern, grep every call site; a past fix missed four of five (#38).
 - Floyd–Steinberg is right for the colour panel and wrong for the mono panel, where Bayer 8x8 or a histogram threshold is used (#4, #14).
 - Captions are drawn **after** dithering, or mapped by nearest colour, so diffused error cannot corrupt them (#64).
-- **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped, converted (1-bit Floyd–Steinberg with contrast for both E1001s; office Spectra 6 where greyish pixels may only be black or white and pass on only their brightness error) and lettered by `scripts/series-import.mjs` on the Mac mini, then uploaded to R2. The Worker only reads one finished PNG per request. Never move that work onto the request path.
+- **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped and lettered by `scripts/series-import.mjs` on the Mac mini and stored in R2 as finished one-request HTML pages, the picture untouched in full colour. Every panel gets the same page and converts it itself; the series does no dithering of its own (#73). The Worker only passes one stored page through per request. Never move that work onto the request path.
 - Workers cannot run native image libraries; the PNG encoder and decoder are hand-written (`png.ts`, `png-decode.ts`) and the caption font is an 8x8 bitmap.
 
 ## 6. Caching

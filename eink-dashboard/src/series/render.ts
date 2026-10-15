@@ -1,10 +1,8 @@
 /**
- * Compose finished series pages. Each scene becomes two panel pages, black and white for
- * both E1001s (desk and home) and Spectra 6 for the office E1002, plus their weekend
- * replays. The art is converted
- * once per panel; the chrome (top bar, frames, strip) and the lettering layers are
- * laid over it afterwards as solid black and white, so dithering never touches words.
- * Teasers and season cards are text-only 1-bit pages used for every panel.
+ * Compose finished series pages. Each scene becomes one full-colour page, the writer's
+ * picture untouched, plus its weekend replay; every panel gets the same page and converts it
+ * itself (DECISIONS #73). The chrome (top bar, frames, strip) and the lettering layers are laid
+ * over the picture as solid black and white. Teasers and season cards are text-only 1-bit pages.
  */
 
 import type { Canvas } from "../hud/canvas";
@@ -12,11 +10,9 @@ import { createCanvas, fillRect, hline, strokeRect, vline } from "../hud/canvas"
 import { displayDate, topBar } from "../hud/chrome";
 import { brackets, dotGrid } from "../hud/parts";
 import { drawType, measureType } from "../hud/type";
-import { encodePNG1Bit, encodePNGIndexed } from "../png";
-import { SPECTRA6_PALETTE } from "../spectra6";
+import { encodePNG1Bit, encodePNGRGB } from "../png";
 import type { RGBImage } from "./art";
 import { nextSceneLabel, sceneTimeLabel } from "./clock";
-import { luminance, toDeskBits, toOfficeIndices } from "./convert";
 import type { Layers } from "./letter";
 import { captionBox, newLayers, placeBalloon, textBlock, wrapText } from "./letter";
 import type { Rect } from "./templates";
@@ -148,22 +144,19 @@ export async function renderScene(
       }
     }
   });
-  const gray = luminance(rgb);
-  const desk = toDeskBits(gray, W, H), office = toOfficeIndices(rgb, W, H);
   const { L } = lettering;
-  /** 0 black, 1 white, -1 keep the converted art. */
+  /** 0 black, 1 white, -1 keep the writer's picture untouched. */
   const over = (c: Canvas, i: number) => (!inArt[i] ? c.px[i] : L.ink.px[i] === 0 ? 0 : L.paper.px[i] === 0 ? 1 : -1);
 
+  // Full colour, unconverted: each panel turns the page into what it can show (DECISIONS #73).
   const pages: Record<string, Uint8Array> = {};
   for (const [tag, c] of [["s", live.c], ["r", replay.c]] as const) {
-    const d = desk.slice(), o = office.slice();
+    const page = rgb.slice();
     for (let i = 0; i < W * H; i++) {
       const v = over(c, i);
-      if (v === -1) continue;
-      d[i] = v; o[i] = v ? 1 : 0;
+      if (v !== -1) page.fill(v ? 255 : 0, i * 3, i * 3 + 3);
     }
-    pages[`${tag}-desk`] = await encodePNG1Bit(d, W, H);
-    pages[`${tag}-office`] = await encodePNGIndexed(o, W, H, SPECTRA6_PALETTE);
+    pages[tag] = await encodePNGRGB(page, W, H);
   }
   return { pages, problems: [] };
 }
