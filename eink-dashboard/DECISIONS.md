@@ -3400,3 +3400,6 @@ Zoe, Volt or Pepper on a schedule: they are chat agents and act when Jarvis mess
   `src/series/mailbox.ts` (`CALENDAR`, `heartbeat()`, tested); no AI, no Worker change, no KV.
   It gives Jarvis a reliable weekly prompt whether or not he has a scheduler of his own; the
   Worker's alert still emails the owner 7 days before an unapproved chapter airs.
+- **Jarvis owns the rhythm (owner, same day).** The showrunner sets the cadence for the writers and
+  nudges them on his own schedule; the heartbeat is only the engineering status board he works from
+  (what is uploaded, approved, late, due), and can be switched off if he runs his own.
