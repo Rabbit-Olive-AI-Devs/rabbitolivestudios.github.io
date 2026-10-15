@@ -3677,3 +3677,17 @@ moves to `flamengo:v2:state` because a refresh reuses the crests it already hold
 old 1-bit bits (they would fail `drawCrest`'s size check and fall back to the abbreviation). One
 extra refresh of a few ESPN fetches and one write. Checked locally at 800x480: the planet and both
 crests in grey, all type crisp.
+
+**Addendum 4 (same day, owner: "why not do the desk panels in full color like the series and the
+others, and let the display handle it, instead of making it greyscale? this would allow me to use
+the same panels in other displays or the e1002"):** right, grey was still us choosing for the
+panel. The canvas now holds `COLOR` pixels (px value 2) whose RGB lives in a lazily created
+`rgb` buffer (`setColor`, `colorAt`, `lumaAt`); 0 and 1 stay pure black and white, and black drawn
+over a colour pixel wins. `canvasToPng` writes an RGB PNG when any colour is present, 1-bit
+otherwise (the grey path is gone). Crests keep their real colours (`crestColors`, 96x96x3 bytes,
+about 37 KB of base64 each in the entry; `flamengo:v3:state`, v2 held grey). The planet had no
+colour to keep, so each kind of world gets one, consistent with its data: lava dark crust with
+orange cracks, ocean blue with green land and white clouds and caps, ice pale blue with blue
+cracks, rock tan with craters, gas giants tan bands with a red storm, Neptune-likes blue, rings
+beige. Shading and patterns are as before. Checked locally on all six kinds and the crests
+(commit `6ea2725`, deployed as 66ffc051).
