@@ -126,14 +126,20 @@ function handle(file, m) {
       const out = path.join(OUTBOX, "style-tests", msg.folder);
       const r = series(["preview", dir, "--out", out]);
       // Also put the previews where the panels can show them: /…/series/test (key needed).
-      const panelPath = { desk: "desk/series/test", home: "series/test", office: "color/series/test" };
+      const panelPath = { desk: "desk/series/test", office: "color/series/test" };
       const links = [];
-      for (const f of fs.readdirSync(out).filter((n) => /-(desk|home|office)\.png$/.test(n)).sort()) {
-        const [, image, panel] = f.match(/^(.*)-(desk|home|office)\.png$/);
+      for (const f of fs.readdirSync(out).filter((n) => /-(desk|office)\.png$/.test(n)).sort()) {
+        const [, image, panel] = f.match(/^(.*)-(desk|office)\.png$/);
         const put = spawnSync("npx", ["wrangler", "r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "image/png", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
         links.push(put.status === 0 ? `- ${image}, ${panel}: ${SITE}/${panelPath[panel]}?folder=${msg.folder}&image=${image}&key=` : `- ${image}, ${panel}: upload failed`);
       }
-      reply(`style-test-${msg.folder}`, `FYI: reply to ${file}\n\nEach picture, cropped into a Wide panel and converted as the panels show it, is in from-claude/style-tests/${msg.folder}/ as -desk (black and white), -home (four greys) and -office (six colours).\n\n${r.out}\n\nLook hardest at -desk: fine lines and soft gradients are what get lost there.\n\nTo see them on a real panel, add one of these as a temporary page in SenseCraft (HTML widget, 800x480) with your key at the end, and remove it afterwards:\n${links.join("\n")}`);
+      // The as-is copy: sent unconverted so the colour panel's own processing can be compared.
+      for (const f of fs.readdirSync(out).filter((n) => n.endsWith("-original.jpg")).sort()) {
+        const image = f.replace(/-original\.jpg$/, "");
+        const put = spawnSync("npx", ["wrangler", "r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "image/jpeg", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+        links.push(put.status === 0 ? `- ${image}, office AS-IS (unconverted): ${SITE}/color/series/test?folder=${msg.folder}&image=${image}&original=1&key=` : `- ${image}, as-is: upload failed`);
+      }
+      reply(`style-test-${msg.folder}`, `FYI: reply to ${file}\n\nEach picture, cropped into a Wide panel and converted as the panels show it, is in from-claude/style-tests/${msg.folder}/ as -desk (black and white, both E1001 panels) and -office (six colours, the E1002).\n\n${r.out}\n\nLook hardest at -desk: fine lines and soft gradients are what get lost there.\n\nTo see them on a real panel, add one of these as a temporary page in SenseCraft (HTML widget, 800x480) with your key at the end, and remove it afterwards:\n${links.join("\n")}`);
       return true;
     }
     case "INVALID":
@@ -154,8 +160,13 @@ function note(line) {
 function cmdRun() {
   if (!fs.existsSync(INBOX)) { log("mailbox not mounted; skipped"); return; }
   const files = fs.readdirSync(INBOX).filter((f) => f.endsWith(".md") && fs.statSync(path.join(INBOX, f)).isFile()).sort();
-  // Leave files Dropbox may still be writing.
-  const ready = files.filter((f) => Date.now() - fs.statSync(path.join(INBOX, f)).mtimeMs > 60 * 1000);
+  // Files Dropbox may still be writing: wait until each is a minute old rather than skip it,
+  // because launchd starts this run the moment a file lands and will not start it again until
+  // the 30-minute backstop.
+  const age = (f) => Date.now() - fs.statSync(path.join(INBOX, f)).mtimeMs;
+  const youngest = Math.min(...files.map(age));
+  if (files.length > 0 && youngest < 60 * 1000) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 60 * 1000 - youngest + 1000);
+  const ready = files.filter((f) => fs.existsSync(path.join(INBOX, f)));
   if (ready.length === 0) return;
   const m = compile();
   const attempts = fs.existsSync(ATTEMPTS) ? JSON.parse(fs.readFileSync(ATTEMPTS, "utf8")) : {};

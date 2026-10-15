@@ -2,12 +2,10 @@
  * The series' own conversions (round 4 of the mockups). They call shared helpers
  * but change no other pipeline:
  * - desk E1001: Floyd-Steinberg 1-bit after a mild contrast boost (Bayer muddied ink detail);
- * - home E1001: 4-level grey, Pipeline A's quantizer;
  * - office E1002: Spectra 6 Floyd-Steinberg where low-saturation pixels may only use
  *   black and white (Pipeline D's method turned greys into coloured speckle).
  */
 
-import { quantize4Level } from "../image";
 import { SPECTRA6_PALETTE } from "../spectra6";
 
 const CONTRAST = 1.25;
@@ -38,12 +36,6 @@ export function toDeskBits(gray: Uint8Array, w: number, h: number): Uint8Array {
     }
   }
   return out;
-}
-
-export function toHomeGray(gray: Uint8Array): Uint8Array {
-  const g = gray.slice();
-  quantize4Level(g);
-  return g;
 }
 
 export function toOfficeIndices(rgb: Uint8Array, w: number, h: number): Uint8Array {

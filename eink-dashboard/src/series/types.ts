@@ -5,8 +5,9 @@
  * the schedule kept in R2, and the slot the clock picks.
  */
 
-export type PanelId = "desk" | "home" | "office";
-export const PANELS: PanelId[] = ["desk", "home", "office"];
+/** Two versions: both E1001s (desk and home) are identical panels and show "desk" (owner, 2026-10-14). */
+export type PanelId = "desk" | "office";
+export const PANELS: PanelId[] = ["desk", "office"];
 
 export type TemplateId = "wide" | "split" | "strip" | "splash" | "panel-text";
 

@@ -1298,7 +1298,7 @@ export default {
       case "/desk/series":
         return handleSeries(env, url, "desk");
       case "/series":
-        return handleSeries(env, url, "home");
+        return handleSeries(env, url, "desk"); // both E1001s show the same black-and-white page
       case "/color/series":
         return handleSeries(env, url, "office");
       case "/series/proof":
@@ -1308,7 +1308,7 @@ export default {
       case "/desk/series/test":
         return handleSeriesTest(env, url, "desk");
       case "/series/test":
-        return handleSeriesTest(env, url, "home");
+        return handleSeriesTest(env, url, "desk");
       case "/color/series/test":
         return handleSeriesTest(env, url, "office");
       case "/health":

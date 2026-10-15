@@ -71,9 +71,9 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/desk/tars` | Desk E1001 | TARS: the owner's Macs and AI allowances. `GET ?key=` shows the page, `POST` with a bearer key takes a report from a Mac (#69) |
 | `/desk/flamengo` | Desk E1001 | Flamengo board: Serie A table, next match with crests, last result, form, countdown; ESPN's public feeds, zone lines from FotMob's table legend (#70) |
 | `/desk/series` | Desk E1001 | The series, black and white: current scene from R2 `eink-series`, pre-built offline (#71) |
-| `/series` | Home E1001 | The series, four greys (#71) |
+| `/series` | Home E1001 | The series: the same black-and-white page as `/desk/series`, since both E1001s are identical (#71) |
 | `/color/series` | Office E1002 | The series, six colours (#71) |
-| `/desk/series/test`, `/series/test`, `/color/series/test` | Any (temporary) | A writer's style-test picture as that panel shows it (`?folder=&image=&key=`), uploaded by the watcher (#72) |
+| `/desk/series/test`, `/series/test`, `/color/series/test` | Any (temporary) | A writer's style-test picture as that panel shows it (`?folder=&image=&key=`; `/series/test` = the desk version; `&original=1` on the colour one sends the picture unconverted), uploaded by the watcher (#72) |
 | `/series/proof` | Showrunner | A chapter's scenes and teaser for approval, images from `/series/proof/img`; needs `SERIES_KEY` (#71) |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
@@ -130,7 +130,7 @@ Facts that have each cost real debugging time:
 - **One FLUX attempt, then fall back. No retry loops.** When changing a retry or budget pattern, grep every call site; a past fix missed four of five (#38).
 - Floyd–Steinberg is right for the colour panel and wrong for the mono panel, where Bayer 8x8 or a histogram threshold is used (#4, #14).
 - Captions are drawn **after** dithering, or mapped by nearest colour, so diffused error cannot corrupt them (#64).
-- **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped, converted (desk 1-bit Floyd–Steinberg with contrast; home Pipeline A's 4-level; office Spectra 6 where greyish pixels may only be black or white and pass on only their brightness error) and lettered by `scripts/series-import.mjs` on the Mac mini, then uploaded to R2. The Worker only reads one finished PNG per request. Never move that work onto the request path.
+- **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped, converted (1-bit Floyd–Steinberg with contrast for both E1001s; office Spectra 6 where greyish pixels may only be black or white and pass on only their brightness error) and lettered by `scripts/series-import.mjs` on the Mac mini, then uploaded to R2. The Worker only reads one finished PNG per request. Never move that work onto the request path.
 - Workers cannot run native image libraries; the PNG encoder and decoder are hand-written (`png.ts`, `png-decode.ts`) and the caption font is an 8x8 bitmap.
 
 ## 6. Caching
@@ -280,7 +280,7 @@ npx wrangler tail eink-dashboard --format json     # can go silent while alive; 
 npm run series -- build <package.zip|dir> [--chapter N] --out ~/series-work/out-…
 CLOUDFLARE_ACCOUNT_ID=f22a506dedde3bb3837157cd47d5fe5c npm run series -- upload ~/series-work/out-…   # pending until approved
 CLOUDFLARE_ACCOUNT_ID=f22a506dedde3bb3837157cd47d5fe5c npm run series -- approve --season S --chapter C
-npm run series -- preview <picture|folder> --out DIR    # a style test on the three panels
+npm run series -- preview <picture|folder> --out DIR    # a style test: desk, office and as-is versions
 npm run series -- templates                             # regenerate docs/series/templates/*.png
 curl -s "https://eink-dashboard.thiago-oliveira77.workers.dev/series/proof?season=0&chapter=1&key=$(cat ~/.config/eink/series-key)" | grep -c '<img'
 launchctl kickstart gui/$(id -u)/com.eink.series-mailbox   # handle the mailbox now

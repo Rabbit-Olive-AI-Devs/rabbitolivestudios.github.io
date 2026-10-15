@@ -333,7 +333,7 @@ eink-dashboard/
       keys.ts             — R2 key of every page and card; slotKey()
       templates.ts        — the five page templates and the strip
       art.ts              — flatten alpha, crop-to-fill around a focus point, blank check
-      convert.ts          — desk 1-bit (FS + contrast), home 4-grey, office Spectra 6 (greys stay black/white)
+      convert.ts          — desk 1-bit (FS + contrast, shown on BOTH E1001s), office Spectra 6 (greys stay black/white)
       letter.ts           — captions and balloons: sized from text, placed by search, checked by pixel
       package.ts          — validatePackage(): structure, ASCII, banned names, a new picture each weekday
       banned.ts           — canon names the series must never print

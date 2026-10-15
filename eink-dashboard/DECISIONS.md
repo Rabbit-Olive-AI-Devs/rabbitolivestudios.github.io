@@ -3256,3 +3256,14 @@ picture on an actual panel. The watcher now uploads each `STYLE TEST` preview to
 temporary SenseCraft page. Keyed because the pictures are unreleased work; names are restricted to
 plain characters so nothing can climb out of `series/tests/`. The owner also chose the writer
 **agent** names for on-panel credits: Claude, Zoe (OpenAI), Volt (Grok), Pepper (Muse).
+
+**Two versions, not three; the as-is colour experiment (2026-10-14).** The owner pointed out that
+the desk and home E1001 are identical panels, and liked the black-and-white version. The series
+now builds two versions per page: `desk` (1-bit, shown on both E1001s; `/series` serves the same
+page as `/desk/series`) and `office` (Spectra 6). The four-grey conversion is gone, and a chapter
+is 102 files instead of 153. Pages already uploaded keep their old `-home` files in R2, unused.
+The owner also asked to send the colour panel a writer's picture **unconverted** and see what the
+panel's own processing does: style tests now include `-original.jpg` (cropped to 800x480 only),
+shown by the colour test address with `&original=1`. The outcome decides whether the series keeps
+its own Spectra 6 conversion.
+

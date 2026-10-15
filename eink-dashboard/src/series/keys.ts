@@ -34,3 +34,9 @@ export function testKey(folder: string, image: string, panel: PanelId): string |
   if (!PLAIN.test(folder) || !PLAIN.test(image)) return null;
   return `series/tests/${folder}/${image}-${panel}.png`;
 }
+
+/** A writer's style-test picture sent as-is, only cropped to the screen (the "original=1" experiment). */
+export function testOriginalKey(folder: string, image: string): string | null {
+  if (!PLAIN.test(folder) || !PLAIN.test(image)) return null;
+  return `series/tests/${folder}/${image}-original.jpg`;
+}

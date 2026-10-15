@@ -105,11 +105,11 @@ test("R2 keys", () => {
   assert.equal(keys.SCHEDULE_KEY, "series/schedule.json");
   assert.equal(keys.sceneKey(0, 3, 14, false, "desk"), "series/s00/c03/s14-desk.png");
   assert.equal(keys.sceneKey(0, 3, 14, true, "office"), "series/s00/c03/r14-office.png");
-  assert.equal(keys.teaserKey(1, 13, "home"), "series/s01/c13/teaser-home.png");
+  assert.equal(keys.teaserKey(1, 13, "office"), "series/s01/c13/teaser-office.png");
   assert.equal(keys.cardKey(0, "before", "desk"), "series/s00/before-desk.png");
-  assert.equal(keys.slotKey({ kind: "between", next: 1, prev: 0 }, "home"), "series/s01/before-home.png");
-  assert.equal(keys.slotKey({ kind: "between", next: null, prev: 0 }, "home"), "series/s00/after-home.png");
-  assert.equal(keys.slotKey({ kind: "between", next: null, prev: null }, "home"), null);
+  assert.equal(keys.slotKey({ kind: "between", next: 1, prev: 0 }, "desk"), "series/s01/before-desk.png");
+  assert.equal(keys.slotKey({ kind: "between", next: null, prev: 0 }, "desk"), "series/s00/after-desk.png");
+  assert.equal(keys.slotKey({ kind: "between", next: null, prev: null }, "desk"), null);
 });
 
 const tpl = fromBuild("src/series/templates.js");
@@ -169,12 +169,11 @@ test("a nearly blank picture is detected", () => {
   assert.equal(art.isNearlyBlank(busy), false);
 });
 
-test("desk conversion is pure black and white; home has four greys", () => {
+test("desk conversion is pure black and white", () => {
   const gray = new Uint8Array(64 * 64).map((_, i) => i % 256);
   const bits = conv.toDeskBits(gray, 64, 64);
   assert.ok([...bits].every((b) => b === 0 || b === 1));
-  const g4 = conv.toHomeGray(gray);
-  assert.deepEqual([...new Set(g4)].sort((a, b) => a - b), [0, 85, 170, 255]);
+  assert.equal(conv.toHomeGray, undefined, "the four-grey version is gone: both E1001s show the desk version");
 });
 
 test("office conversion keeps greys black-and-white and saturated red red", () => {
@@ -336,13 +335,13 @@ function panelArt(w, h) {
   return img;
 }
 
-test("a wide scene renders six 800x480 pages: three panels, live and replay", async () => {
+test("a wide scene renders four 800x480 pages: two versions, live and replay", async () => {
   const p = pkgv.samplePackage();
   const sc = p.chapters[0].scenes[1];
   const { pages, problems } = await render.renderScene(p.season, p.chapters[0], sc,
     [{ image: panelArt(776, 346), anchors: [[612, 246]], clear: [] }]);
   assert.deepEqual(problems, []);
-  assert.deepEqual(Object.keys(pages).sort(), ["r-desk", "r-home", "r-office", "s-desk", "s-home", "s-office"]);
+  assert.deepEqual(Object.keys(pages).sort(), ["r-desk", "r-office", "s-desk", "s-office"]);
   for (const bytes of Object.values(pages)) {
     const d = pngSize(bytes);
     assert.equal(d.width, 800);
@@ -383,14 +382,15 @@ const build = fromBuild("src/series/build.js");
 
 const artSource = (w = 1200, h = 800) => (name) => (name.endsWith(".png") ? panelArt(w, h) : null);
 
-test("a chapter builds 153 files under the right keys", async () => {
+test("a chapter builds 102 files under the right keys: two versions, live and replay", async () => {
   const p = pkgv.samplePackage();
   const { files, problems } = await build.buildChapter(p, 1, artSource());
   assert.deepEqual(problems, []);
-  assert.equal(files.size, 25 * 6 + 3);
+  assert.equal(files.size, 25 * 4 + 2);
   assert.ok(files.has("series/s00/c01/s01-desk.png"));
   assert.ok(files.has("series/s00/c01/r25-office.png"));
-  assert.ok(files.has("series/s00/c01/teaser-home.png"));
+  assert.ok(files.has("series/s00/c01/teaser-desk.png"));
+  assert.ok(![...files.keys()].some((k) => k.includes("-home")), "no third (grey) version");
 });
 
 test("hold reuses the previous scene's picture", async () => {
@@ -449,7 +449,7 @@ test("a panel route serves the slot's page inline as one document", async () => 
 
 test("missing or broken schedule, or a missing page, gives the text page, never a 500", async () => {
   for (const objects of [{}, { "series/schedule.json": "{not json" }, { "series/schedule.json": JSON.stringify(SCHEDULE) }]) {
-    const res = await sp.handleSeries({ SERIES: bucket(objects) }, new URL("https://x/series"), "home", chi("2026-10-26T10:30:00", CDT));
+    const res = await sp.handleSeries({ SERIES: bucket(objects) }, new URL("https://x/series"), "desk", chi("2026-10-26T10:30:00", CDT));
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.doesNotMatch(html, /data:image/);
@@ -505,7 +505,7 @@ test("end to end: PNG pictures decode, build and give valid pages", async () => 
   const pic = { w: d.width, h: d.height, rgb: art.flattenAlpha(d.rgb, d.alpha) };
   const { files, problems } = await build.buildChapter(pkgv.samplePackage(), 1, () => pic);
   assert.deepEqual(problems, []);
-  const page = await decodePNG(files.get("series/s00/c01/s02-home.png"));
+  const page = await decodePNG(files.get("series/s00/c01/s02-office.png"));
   assert.equal(page.width, 800);
 });
 
@@ -529,7 +529,7 @@ test("review: a failing series check reports a problem instead of throwing", asy
 test("review: a schedule season with the wrong shape gives the text page, not a 500", async () => {
   const bad = { seasons: [{ number: 0, premiere: "2026-10-26", chapters: 10 }] }; // no approved/pending
   const env = { SERIES: bucket({ "series/schedule.json": JSON.stringify(bad) }) };
-  const res = await sp.handleSeries(env, new URL("https://x/series"), "home", chi("2026-10-26T10:30:00", CDT));
+  const res = await sp.handleSeries(env, new URL("https://x/series"), "desk", chi("2026-10-26T10:30:00", CDT));
   assert.equal(res.status, 200);
   assert.match(await res.text(), /<h1>/);
   assert.equal(sched.isSchedule(bad), false);
@@ -639,7 +639,16 @@ test("the test address shows a style test inline, only with the key", async () =
   assert.match(await ok.text(), /data:image\/png;base64,iVBORw/);
   assert.equal((await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=trial-zoe-1&image=source"), "desk")).status, 404);
   assert.equal((await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=../x&image=source&key=k"), "desk")).status, 404);
-  const missing = await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=trial-zoe-1&image=source&key=k"), "home");
+  const missing = await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=trial-zoe-1&image=source&key=k"), "office");
   assert.equal(missing.status, 200);
   assert.doesNotMatch(await missing.text(), /data:image/);
+});
+
+test("the colour test address can send the original picture as-is (original=1)", async () => {
+  assert.equal(keys.testOriginalKey("trial-zoe-1", "source"), "series/tests/trial-zoe-1/source-original.jpg");
+  assert.equal(keys.testOriginalKey("../x", "source"), null);
+  const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const env = { SERIES: bucket({ "series/tests/trial-zoe-1/source-original.jpg": JPG }), SERIES_KEY: "k" };
+  const html = await (await sp.handleSeriesTest(env, new URL("https://x/color/series/test?folder=trial-zoe-1&image=source&original=1&key=k"), "office")).text();
+  assert.match(html, /data:image\/jpeg;base64,\/9j\//);
 });

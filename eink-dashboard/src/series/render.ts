@@ -1,6 +1,7 @@
 /**
- * Compose finished series pages. Each scene becomes three panel pages (desk 1-bit,
- * home 4-grey, office Spectra 6) plus their weekend replays. The art is converted
+ * Compose finished series pages. Each scene becomes two panel pages, black and white for
+ * both E1001s (desk and home) and Spectra 6 for the office E1002, plus their weekend
+ * replays. The art is converted
  * once per panel; the chrome (top bar, frames, strip) and the lettering layers are
  * laid over it afterwards as solid black and white, so dithering never touches words.
  * Teasers and season cards are text-only 1-bit pages used for every panel.
@@ -11,11 +12,11 @@ import { createCanvas, fillRect, hline, strokeRect, vline } from "../hud/canvas"
 import { displayDate, topBar } from "../hud/chrome";
 import { brackets, dotGrid } from "../hud/parts";
 import { drawType, measureType } from "../hud/type";
-import { encodePNG1Bit, encodePNGGray8, encodePNGIndexed } from "../png";
+import { encodePNG1Bit, encodePNGIndexed } from "../png";
 import { SPECTRA6_PALETTE } from "../spectra6";
 import type { RGBImage } from "./art";
 import { nextSceneLabel, sceneTimeLabel } from "./clock";
-import { luminance, toDeskBits, toHomeGray, toOfficeIndices } from "./convert";
+import { luminance, toDeskBits, toOfficeIndices } from "./convert";
 import type { Layers } from "./letter";
 import { captionBox, newLayers, placeBalloon, textBlock, wrapText } from "./letter";
 import type { Rect } from "./templates";
@@ -148,21 +149,20 @@ export async function renderScene(
     }
   });
   const gray = luminance(rgb);
-  const desk = toDeskBits(gray, W, H), home = toHomeGray(gray), office = toOfficeIndices(rgb, W, H);
+  const desk = toDeskBits(gray, W, H), office = toOfficeIndices(rgb, W, H);
   const { L } = lettering;
   /** 0 black, 1 white, -1 keep the converted art. */
   const over = (c: Canvas, i: number) => (!inArt[i] ? c.px[i] : L.ink.px[i] === 0 ? 0 : L.paper.px[i] === 0 ? 1 : -1);
 
   const pages: Record<string, Uint8Array> = {};
   for (const [tag, c] of [["s", live.c], ["r", replay.c]] as const) {
-    const d = desk.slice(), g = home.slice(), o = office.slice();
+    const d = desk.slice(), o = office.slice();
     for (let i = 0; i < W * H; i++) {
       const v = over(c, i);
       if (v === -1) continue;
-      d[i] = v; g[i] = v ? 255 : 0; o[i] = v ? 1 : 0;
+      d[i] = v; o[i] = v ? 1 : 0;
     }
     pages[`${tag}-desk`] = await encodePNG1Bit(d, W, H);
-    pages[`${tag}-home`] = await encodePNGGray8(g, W, H);
     pages[`${tag}-office`] = await encodePNGIndexed(o, W, H, SPECTRA6_PALETTE);
   }
   return { pages, problems: [] };

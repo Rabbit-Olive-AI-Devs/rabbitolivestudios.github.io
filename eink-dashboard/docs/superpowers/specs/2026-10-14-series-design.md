@@ -26,7 +26,7 @@ Success means: a page worth glancing at during the working day, a story that rew
 | Words | **The writers deliver pictures without words; our code letters every caption and balloon** in the panel fonts | Painted lettering garbles and blurs on e-ink; same lettering keeps it one show |
 | Layout | Full-page comic: the picture fills the panel, a caption box and balloons over calm zones, a narration strip below | Round 3 mockup, approved |
 | Templates | Five page templates with "keep calm" zones for the words | Owner asked for them, so the text always has a place |
-| Displays | Desk E1001 (black and white), home E1001 (4 greys), office E1002 (6 colours) | Owner asked for all three; one story clock, so all show the same scene |
+| Displays | Desk E1001 and home E1001 (black and white; identical panels, so one version since 2026-10-14), office E1002 (6 colours) | Owner asked for all three; one story clock, so all show the same scene |
 | Pace | Weekdays only, working hours: 5 scenes a day at 08, 10, 12, 14, 16 Chicago | Owner: the story rolls while they are at the desk |
 | Weekends | Replay of the week, one scene an hour, then a "next week" teaser from Sunday 19:00 | Owner: catch up on missed scenes |
 | Source of truth | Notion, run by Jarvis; seasons copied into the project once, when finished (option A) | No runtime dependency on Notion; every season reviewed once before it goes live |

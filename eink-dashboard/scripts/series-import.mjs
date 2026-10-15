@@ -218,7 +218,7 @@ async function cmdTemplates() {
 const cmd = process.argv[2];
 /**
  * A style test: each picture cropped into the Wide panel and converted exactly as an
- * imported scene would be, without words, as three PNGs (desk, home, office).
+ * imported scene would be, without words, as two PNGs: desk (both E1001s) and office (E1002).
  */
 async function cmdPreview() {
   const src = path.resolve(process.argv[3]);
@@ -246,9 +246,13 @@ async function cmdPreview() {
       for (let y = 0; y < panel.h; y++) rgb.set(image.rgb.subarray(y * panel.w * 3, (y + 1) * panel.w * 3), ((panel.y + y) * W + panel.x) * 3);
       const gray = m.convert.luminance(rgb);
       fs.writeFileSync(path.join(out, `${name}-desk.png`), await m.png.encodePNG1Bit(m.convert.toDeskBits(gray, W, H), W, H));
-      fs.writeFileSync(path.join(out, `${name}-home.png`), await m.png.encodePNGGray8(m.convert.toHomeGray(gray), W, H));
       fs.writeFileSync(path.join(out, `${name}-office.png`), await m.png.encodePNGIndexed(m.convert.toOfficeIndices(rgb, W, H), W, H, m.spectra.SPECTRA6_PALETTE));
-      done.push(`${name}: desk, home and office previews written`);
+      // The as-is copy for the colour panel: unconverted, only scaled and centre-cropped to 800x480.
+      const scale = Math.max(W / img.w, H / img.h);
+      const orig = path.join(out, `${name}-original.jpg`);
+      execFileSync("sips", ["--resampleWidth", String(Math.ceil(img.w * scale)), png, "--out", path.join(tmp, `${name}-big.png`)], { stdio: "ignore" });
+      execFileSync("sips", ["-c", String(H), String(W), path.join(tmp, `${name}-big.png`), "-s", "format", "jpeg", "-s", "formatOptions", "90", "--out", orig], { stdio: "ignore" });
+      done.push(`${name}: desk, office and as-is (original) previews written`);
     } catch (err) {
       done.push(`${name}: could not be read (${err.message})`);
     }
