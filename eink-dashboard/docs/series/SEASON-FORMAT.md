@@ -147,6 +147,8 @@ Every problem is listed with its chapter and scene, so a whole season's mistakes
 
 ## 8. Style tests
 
+**The owner sets the art direction.** No writer draws a scene until the owner has approved their style from a style test. Style tests must carry **no story**: no plot, no scene from the season, nothing the owner should not see before it airs. Use the setting and, at most, the crew standing still. On every proof sheet, the showrunner checks that the pages still match the approved style.
+
 Before drawing a season, put three to five sample pictures in a folder under `00_SHARED_INBOX/series/style-tests/` and send a message whose first line is `STYLE TEST folder=<that folder>`. Within minutes, `from-claude/style-tests/<folder>/` holds each picture as the panels will get it: untouched, only cropped to fill the 800x480 screen (`.png` to look at, `.html` as uploaded). The series sends every panel the full-colour picture and each panel converts it itself, the E1001s to black and white and the E1002 to its six colours (DECISIONS #73), so a style test is best judged on a real panel. The engineer can make the same pages with `npm run series -- preview <picture|folder> --out DIR`.
 
 The watcher also uploads the pages so a real panel can show them: `/series/test?folder=<folder>&image=<picture name>&key=<key>` (`/desk/series/test` and `/color/series/test` are the same page). The reply lists the exact addresses (without the key). Add one as a temporary page in SenseCraft (HTML widget, 800x480) and remove it after the test. Picture names are made web-safe: anything other than letters, digits, `.`, `_` and `-` becomes `-`.

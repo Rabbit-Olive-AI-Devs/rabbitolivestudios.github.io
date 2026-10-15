@@ -22,8 +22,8 @@ Your job: keep the show coherent and on schedule. The writers' job: their season
 
 | Who | Responsible for |
 |---|---|
-| **Owner** | Executive producer. Approves the bible and the writer order. Watches each season unspoiled: **you approve the proof sheets** |
-| **Jarvis** | Showrunner. The bible, the schedule, briefing writers, reviewing every script and picture, assembling and delivering the package, the continuity log |
+| **Owner** | Executive producer and **art director**. Approves the bible, the writer order and **each writer's drawing style**, from style tests (practice pictures with no story in them, so the owner stays unspoiled). Never sees scenes: **you approve the proof sheets** |
+| **Jarvis** | Showrunner. The bible, the schedule, briefing writers, reviewing every script and picture (including that every page **matches the style the owner approved**; send back any chapter that drifts), assembling and delivering the package, the continuity log |
 | **The season's writer** | Character and ship sheets, all 13 chapters (script and pictures), the handover note to the next writer |
 | **Claude Code** | The panel pages, the import and its checks, template guide images, the proof sheet, uploading, alerts when something is missing |
 
@@ -76,7 +76,7 @@ After the Prologue, a season premieres on the **first Monday of a quarter** and 
 | When | What |
 |---|---|
 | 9 weeks before | Writer briefed: bible, previous handover note, format, template guides |
-| 8 weeks before | Character and ship sheets reviewed and approved |
+| 8 weeks before | **Style test approved by the owner** (section 8 of SEASON-FORMAT.md); character and ship sheets reviewed and approved |
 | 7 weeks before | Season outline (13 chapter titles, one paragraph each) approved |
 | 4 weeks before | Chapters 1–4 scripted, drawn and reviewed |
 | **3 weeks before** | **First delivery to the engineer:** at least chapters 1 and 2 |
@@ -92,7 +92,7 @@ Give each writer, in one message or Notion page:
 2. The previous writer's `handover.md` (none for Season 1).
 3. `SEASON-FORMAT.md` and the template guide images.
 4. Their season number, premiere date and deadlines.
-5. The order of work: **sheets first**, then the outline, then chapters in order. Never draw scenes before the sheets are approved.
+5. The order of work: **sheets first**, then the outline, then chapters in order. Never draw scenes before the owner has approved the style and you have approved the sheets.
 6. A reminder of the three rules that cause most rework: **no words in pictures**, **keep calm zones plain**, **flat colour with clear outlines**.
 
 ## 7. Reviewing (before you package)
