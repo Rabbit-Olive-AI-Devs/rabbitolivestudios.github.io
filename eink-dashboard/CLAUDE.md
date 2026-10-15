@@ -403,7 +403,7 @@ eink-dashboard/
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
       desk.ts             — /desk/test, /desk/aurebesh, /desk/planet, /desk/tars (view + report), /desk/flamengo handlers (DECISIONS #66–#70)
-      series.ts           — /desk/series, /series, /color/series (one R2 page inlined) and /series/proof (DECISIONS #71)
+      series.ts           — /desk/series, /series, /color/series (one R2 page inlined; before a premiere the "coming soon" card is drawn live with a countdown, #80) and /series/proof (DECISIONS #71)
   photos/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)

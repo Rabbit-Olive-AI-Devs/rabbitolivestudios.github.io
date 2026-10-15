@@ -6,8 +6,11 @@
  * the proof page and style tests reveal unreleased work, so they need SERIES_KEY when set.
  */
 
+import { hudPageHTML } from "../hud/page";
+import { pngToBase64 } from "../png";
 import { htmlResponse } from "../response";
-import { resolveSlot, seriesSlot } from "../series/clock";
+import { chicagoParts, daysUntil, resolveSlot, seriesSlot } from "../series/clock";
+import { renderCard } from "../series/render";
 import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey, testKey } from "../series/keys";
 import { isSchedule } from "../series/schedule";
 import type { Schedule } from "../series/types";
@@ -77,7 +80,19 @@ export async function handleSeries(env: Env, url: URL, now: Date = new Date()): 
   if (!schedule) return textPage("The series has not started yet.");
   let key: string | null;
   try {
-    key = slotKey(resolveSlot(seriesSlot(when, schedule), schedule, at !== null));
+    const slot = resolveSlot(seriesSlot(when, schedule), schedule, at !== null);
+    // Before a premiere the card counts the days down, so it is drawn here, not stored (#80).
+    const next = slot.kind === "between" ? schedule.seasons.find((s) => s.number === slot.next) : undefined;
+    const days = next ? daysUntil(next.premiere, when) : -1;
+    if (next && (days > 0 || (days === 0 && chicagoParts(when).hour < 8))) {
+      try {
+        const png = await renderCard(next, "before", days);
+        return htmlResponse(hudPageHTML(TITLE, pngToBase64(png)), "no-store");
+      } catch (err) {
+        console.error("series: countdown card failed, serving the stored card:", err);
+      }
+    }
+    key = slotKey(slot);
   } catch (err) {
     console.error("series: slot failed:", err);
     return textPage("This scene could not be loaded. It will try again at the next refresh.");

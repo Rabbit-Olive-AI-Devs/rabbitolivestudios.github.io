@@ -32,6 +32,14 @@ function dayDiff(a: string, b: string): number {
   return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
 }
 
+/**
+ * Whole Chicago calendar days from `now` to a premiere date: 0 on the day itself,
+ * negative once it has passed. Drives the countdown on the "coming soon" card.
+ */
+export function daysUntil(premiere: string, now: Date): number {
+  return dayDiff(chicagoParts(now).date, premiere);
+}
+
 function seasonEnd(s: ScheduleSeason): string {
   return shiftDateStr(s.premiere, s.chapters * 7);
 }

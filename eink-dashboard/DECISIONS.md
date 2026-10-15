@@ -3540,3 +3540,21 @@ Jarvis reported three decisions the owner had made with him; the owner confirmed
   ignores `Write(path)` allow rules for files; only `Edit(path)` rules cover file writes. With
   `Edit(...)` the reviewer opened all 51 pages, said REVISE, and the record and copy landed. The first real run will be Season 1 chapter 1 (delivery due 14 Dec).
 - A review blocks the mailbox run while it works (one lock per job, #72).
+
+---
+
+## 80. The "Coming Soon" Card Counts Down to the Premiere, Drawn Live (2026-10-15)
+
+The owner asked for a days-left countdown on the panels' "coming soon" card (an idea from the
+teaser work, #77). The stored `before.html` cannot count, so before a premiere the Worker now
+draws the card itself on each request: the same 1-bit text card (`renderCard(info, "before",
+daysLeft)`) with a large number and "DAYS TO GO" ("1 DAY TO GO", then "TODAY / AT 08:00") in a
+clear band of the dot grid. This is text drawn with the desk panel's fonts, like the `/desk/*`
+pages: no writer art is touched at request time (#71), and there is no AI and no KV. The days are
+whole Chicago calendar days (`daysUntil` in `src/series/clock.ts`).
+
+- It shows whenever the slot is "between" and the next season's premiere is still ahead, so it also
+  counts down to every later season in the gaps between them.
+- On the premiere day after 08:00 (only possible if chapter 1 is not approved) it falls back to the
+  stored card, which says "PREMIERES MONDAY ... 08:00" with no countdown.
+- If drawing fails, the stored card is served, so the page never goes blank.

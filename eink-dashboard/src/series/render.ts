@@ -161,11 +161,21 @@ export async function renderScene(
   return { pages, problems: [] };
 }
 
-function card(info: SeasonInfo, trail: string, pill: string, status: string[], lines: { face: "plex11m" | "plex15s" | "plex28r" | "plex13r"; text: string }[]): Promise<Uint8Array> {
+/** The big number (or TODAY) and its label, in the band above the card's text. */
+const COUNTDOWN_BOX = { x: 220, y: 66, w: 360, h: 112 };
+
+function countdown(c: Canvas, days: number): void {
+  const [big, label] = days === 0 ? ["TODAY", "AT 08:00"] : [String(days), days === 1 ? "DAY TO GO" : "DAYS TO GO"];
+  drawType(c, "plex50r", 400, 132, big, { align: "center" });
+  drawType(c, "plex15s", 400, 164, label, { align: "center", spacing: 2 });
+}
+
+function card(info: SeasonInfo, trail: string, pill: string, status: string[], lines: { face: "plex11m" | "plex15s" | "plex28r" | "plex13r"; text: string }[], days: number | null = null): Promise<Uint8Array> {
   const c = createCanvas();
   topBar(c, [info.show, trail], status, pill);
   brackets(c, 30, 52, 740, 410, 26);
-  dotGrid(c, 40, 60, 720, 120, 12);
+  dotGrid(c, 40, 60, 720, 120, 12, days === null ? undefined : COUNTDOWN_BOX);
+  if (days !== null) countdown(c, days);
   let y = 230;
   for (const l of lines) {
     for (const row of wrapText(l.face, l.text, 680)) {
@@ -185,14 +195,18 @@ export function renderTeaser(info: SeasonInfo, chapter: Chapter, finale: boolean
   ]);
 }
 
-export function renderCard(info: SeasonInfo, which: "before" | "after"): Promise<Uint8Array> {
+/**
+ * A season card. `daysLeft` (0 or more) adds the premiere countdown to the "before" card;
+ * the stored card has none, and the Worker draws the live one each request (DECISIONS #80).
+ */
+export function renderCard(info: SeasonInfo, which: "before" | "after", daysLeft: number | null = null): Promise<Uint8Array> {
   const name = info.number === 0 ? "THE PROLOGUE" : `SEASON ${info.number}`;
   return which === "before"
     ? card(info, "Coming soon", name, [displayDate(info.premiere)], [
       { face: "plex11m", text: `${name}  /  STORY & ART ${info.writer.toUpperCase()}` },
       { face: "plex28r", text: info.show },
       { face: "plex15s", text: `PREMIERES MONDAY ${displayDate(info.premiere)} 08:00` },
-    ])
+    ], daysLeft !== null && daysLeft >= 0 ? daysLeft : null)
     : card(info, "Between seasons", name, [], [
       { face: "plex11m", text: `END OF ${name}` },
       { face: "plex28r", text: info.show },

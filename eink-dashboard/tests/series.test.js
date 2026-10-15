@@ -362,6 +362,21 @@ test("teaser and cards are 800x480 PNGs; pills name the prologue", async () => {
   assert.equal(render.pillFor({ ...p.season, number: 2 }, 11), "S2 / CH 11");
 });
 
+test("countdown: days to a premiere by Chicago date; the card draws every state", async () => {
+  assert.equal(clock.daysUntil("2026-10-26", chi("2026-10-15T23:30:00", CDT)), 11);
+  assert.equal(clock.daysUntil("2026-10-26", chi("2026-10-25T23:59:00", CDT)), 1);
+  assert.equal(clock.daysUntil("2026-10-26", chi("2026-10-26T07:59:00", CDT)), 0);
+  assert.equal(clock.daysUntil("2026-10-26", chi("2026-10-27T09:00:00", CDT)), -1);
+  const p = pkgv.samplePackage();
+  const plain = await render.renderCard(p.season, "before");
+  for (const days of [11, 1, 0]) {
+    const live = await render.renderCard(p.season, "before", days);
+    assert.equal(pngSize(live).width, 800);
+    assert.notDeepEqual(live, plain);
+  }
+  assert.deepEqual(await render.renderCard(p.season, "before", -3), plain);
+});
+
 const build = fromBuild("src/series/build.js");
 
 const artSource = (w = 1200, h = 800) => (name) => (name.endsWith(".png") ? panelArt(w, h) : null);
