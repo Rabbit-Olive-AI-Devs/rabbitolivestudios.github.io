@@ -3,8 +3,9 @@
  *
  * Two separate pipelines, each with a configurable AI model:
  *
- * Pipeline A (/fact.png — 4-level grayscale):
- *   AI model → grayscale → resize → caption → tone curve → quantize 4 levels
+ * Pipeline A (/fact.png — full colour, as-is):
+ *   AI model → crop/resize → caption burned in as solid black and white → RGB PNG.
+ *   The panel converts the picture itself (DECISIONS #81; the 4-level quantiser was retired).
  *
  * Pipeline B (/fact1.png — true 1-bit):
  *   AI model → grayscale → resize → style-aware 1-bit (Bayer or threshold) → caption
@@ -12,16 +13,16 @@
  * Output: 800 × 480 px, full-bleed image
  */
 
-import { encodePNGGray8, encodePNG1Bit } from "./png";
+import { encodePNG1Bit, encodePNGRGB } from "./png";
 import { decodePNG } from "./png-decode";
 import { measureText } from "./font";
 import { FONT_8X8 as FONT_DATA } from "./font";
-import { applyToneCurve } from "./convert-1bit";
 import { convert1Bit } from "./convert-1bit";
 import { pick1BitStyle, findStyleByName, ANTI_TEXT_SUFFIX } from "./styles-1bit";
 import { isNeuronBudgetError } from "./cache-guard";
 import type { Env, MomentBeforeData } from "./types";
 import { bytesToImageStream } from "./images-input";
+import { generateAndDecodeColor, generateAndDecodeColorFlux } from "./image-color";
 
 export const WIDTH = 800;
 export const HEIGHT = 480;
@@ -379,15 +380,21 @@ export async function generateMomentImageRaw(
   return generateAIImage(env, moment.imagePrompt);
 }
 
-// --- 4-level quantization (no dithering) ---
+// --- Captions on a full-colour picture ---
 
-export function quantize4Level(gray: Uint8Array): void {
-  for (let i = 0; i < gray.length; i++) {
-    const v = gray[i];
-    if (v < 64) gray[i] = 0;
-    else if (v < 128) gray[i] = 85;
-    else if (v < 192) gray[i] = 170;
-    else gray[i] = 255;
+/** Marks a pixel the caption did not touch; the caption drawers only write 0 and 255. */
+const UNTOUCHED = 128;
+
+/**
+ * Burn a caption into a full-colour picture as solid black and white: `draw` lays it out on a
+ * grey mask with the existing grey caption code, and every pixel it wrote replaces the picture's.
+ * The panels convert the picture but keep pure black and white exact (DECISIONS #81).
+ */
+export function burnCaption(rgb: Uint8Array, draw: (mask: Uint8Array) => void): void {
+  const mask = new Uint8Array(WIDTH * HEIGHT).fill(UNTOUCHED);
+  draw(mask);
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] !== UNTOUCHED) rgb.fill(mask[i], i * 3, i * 3 + 3);
   }
 }
 
@@ -414,25 +421,7 @@ async function generateAndDecodeGray(
     : resizeGray(cropped.gray, cropped.width, cropped.height, WIDTH, HEIGHT);
 }
 
-// --- FLUX.2 decode helper ---
-
-async function generateAndDecodeGrayFlux(
-  env: Env,
-  prompt: string,
-): Promise<Uint8Array> {
-  const jpegBytes = await generateFluxImage(env, prompt);
-
-  const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
-  const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
-  const decoded = await decodePNG(pngBytes);
-
-  const cropped = centerCropGray(decoded.gray, decoded.width, decoded.height, WIDTH, HEIGHT);
-  return (cropped.width === WIDTH && cropped.height === HEIGHT)
-    ? cropped.gray
-    : resizeGray(cropped.gray, cropped.width, cropped.height, WIDTH, HEIGHT);
-}
-
-// --- Pipeline A: 4-level grayscale (/fact.png) ---
+// --- Pipeline A: full colour, as-is (/fact.png) ---
 // Uses FLUX.2 klein-9b with daily style rotation, SDXL fallback.
 
 export async function generateMomentImage(
@@ -445,34 +434,27 @@ export async function generateMomentImage(
   const styledPrompt = `${style.prompt}, ${moment.imagePrompt}, no text, no words, no letters, no writing`;
   console.log(`Pipeline A: using ${style.name} style with FLUX.2`);
 
-  let gray: Uint8Array | null = null;
+  let rgb: Uint8Array | null = null;
 
   // Single FLUX.2 attempt — no retry to conserve neuron budget (free tier)
   try {
-    gray = await generateAndDecodeGrayFlux(env, styledPrompt);
+    rgb = await generateAndDecodeColorFlux(env, styledPrompt);
   } catch (err) {
     console.error("Pipeline A FLUX.2 failed:", err);
     if (isNeuronBudgetError(err)) throw err;
   }
 
   // Fallback to SDXL with woodcut style
-  if (!gray) {
+  if (!rgb) {
     console.log("Pipeline A: FLUX.2 failed, falling back to SDXL");
     const woodcutStyle = findStyleByName("woodcut");
     const fallbackPrompt = `${woodcutStyle.prompt}, ${moment.imagePrompt}, ${ANTI_TEXT_SUFFIX}`;
-    gray = await generateAndDecodeGray(env, fallbackPrompt);
+    rgb = await generateAndDecodeColor(env, fallbackPrompt, SDXL_STEPS, SDXL_GUIDANCE);
   }
 
-  // Caption bar (before tone curve so text stays clean)
-  drawOverlayText(gray, moment, displayDate);
-
-  // Gentle tone curve
-  applyToneCurve(gray, 1.2, 0.95);
-
-  // Quantize to exactly 4 levels, no dithering
-  quantize4Level(gray);
-
-  return encodePNGGray8(gray, WIDTH, HEIGHT);
+  // The picture untouched; the caption bar as solid black and white (DECISIONS #81).
+  burnCaption(rgb, (mask) => drawOverlayText(mask, moment, displayDate));
+  return encodePNGRGB(rgb, WIDTH, HEIGHT);
 }
 
 // --- Pipeline B: style-aware 1-bit (/fact1.png) ---

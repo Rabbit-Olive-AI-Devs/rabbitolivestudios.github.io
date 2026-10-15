@@ -12,7 +12,7 @@ Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyl
 1. Fetches all historical events for today's date from Wikipedia
 2. An LLM (Llama 3.3 70B) picks the most visually dramatic event
 3. An image model generates an illustration of the event at its defining moment of action, with a daily rotating art style
-4. Two versions are produced: a 4-level grayscale PNG (FLUX.2, rotating styles) and a 1-bit PNG (SDXL, 6 rotating styles with style-aware conversion)
+4. The picture is sent to the panels **as-is**: the AI image cropped to 800x480 in full colour, untouched, with a solid black-and-white caption bar; each panel converts it to what it can show (DECISIONS #81). A separate 1-bit version (SDXL, 6 styles, style-aware conversion) still exists at `/fact1.png`, unused by the panels.
 
 Example: For the sinking of the Titanic, the image would show the ocean liner tilting steeply into dark water, lifeboats scattered on the sea below. The text reads: **"Sinking of the Titanic"** / **"North Atlantic Ocean"** / **"Apr 14, 1912"**
 
@@ -22,11 +22,11 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 |----------|-------------|-------|
 | `GET /weather` | 800x480 HTML weather dashboard (night icons, wind direction, sunrise/sunset, moon phase, NWS alerts, rain warnings, indoor temp/humidity, battery level) | 15 min |
 | `GET /fact` | 800x480 HTML page displaying the Moment Before image. Degrades to a plain text page when the image cannot be produced, so the panel never shows a broken-image glyph (DECISIONS #58) | 24 hours |
-| `GET /fact.png` | 800x480 4-level grayscale "Moment Before" illustration (or birthday portrait on family birthdays) | 24 hours |
+| `GET /fact.png` | 800x480 full-colour, as-is "Moment Before" illustration with a black caption bar (or birthday portrait on family birthdays); the panel converts it (#81) | 24 hours |
 | `GET /fact1.png` | 800x480 1-bit "Moment Before" illustration (6 rotating styles) | 24 hours |
 | `GET /fact.json` | "On This Day" historical event (JSON) | 24 hours |
 | `GET /fact-raw.jpg` | Raw AI-generated JPEG (before processing) | none |
-| `GET /test.png?m=MM&d=DD&key=KEY` | Generate 4-level image for any date (requires `TEST_AUTH_KEY` in production) | none |
+| `GET /test.png?m=MM&d=DD&key=KEY` | Generate the as-is image for any date (requires `TEST_AUTH_KEY` in production) | none |
 | `GET /test1.png?m=MM&d=DD&style=NAME&key=KEY` | Generate 1-bit image for any date + optional style override (requires `TEST_AUTH_KEY`) | none |
 | `GET /test-birthday.png?name=KEY&key=KEY` | Generate birthday portrait for a person (requires `TEST_AUTH_KEY`) | none |
 | `GET /weather.json` | Current + 12h hourly + 5-day forecast + alerts (metric) | 15 min |
@@ -35,7 +35,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | **E1002 Color Endpoints** | | |
 | `GET /color/weather` | 800x480 color HTML weather dashboard (Spectra 6 palette accents, moon phase) | 30 min |
 | `GET /color/weather?test-provider=nws\|fail` | Local test: force the NWS fallback (`nws`) or the no-data path (`fail`) | none |
-| `GET /color/moment` | 800x480 color "Moment Before" (Floyd-Steinberg dithered to 6 colors) | 24 hours |
+| `GET /color/moment` | 800x480 color "Moment Before", the picture untouched in full colour; the E1002 converts it to its 6 colours (#81) | 24 hours |
 | `GET /color/headlines` | Steel/trade headlines page for E1002. Uses deterministic RSS/source ranking, no LLM call. | 6 hours |
 | `GET /color/test-moment?m=MM&d=DD&style=ID&key=KEY` | Generate color moment for any date + optional style override (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
@@ -44,7 +44,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for E1002 with the PNG **inlined as a data URI** — one request, nothing for the renderer to cancel (DECISIONS #65). Always no-store. Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
 | `GET /skyline-bw` | 800x480 HTML skyline page for E1001 mono, BW styles only, PNG inlined the same way. Same text fallback as `/skyline` (DECISIONS #58, #65) | none |
-| `GET /skyline.png?mode=rotate\|daily\|random&rotateMin=N&bw=1` | 800x480 skyline PNG (default: daily; `bw=1` restricts to BW styles; `mode=rotate` for 15-min rotation) | 24 hours |
+| `GET /skyline.png?mode=rotate\|daily\|random&rotateMin=N&bw=1` | 800x480 skyline PNG, full colour as-is with a black caption bar for both modes; the panels convert it (#81) (default: daily; `bw=1` restricts to BW styles; `mode=rotate` for 15-min rotation) | 24 hours |
 | `GET /skyline-test?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline HTML (forwards params to .png, requires `TEST_AUTH_KEY`) | none |
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/apod` | 301 redirect to `/skyline` (legacy compatibility) | — |
@@ -149,7 +149,9 @@ open fact.png fact1.png
 
 Two pipelines share the same LLM event selection (scene-only prompt), then each prepends its own art style and uses its own image model.
 
-### Pipeline A: 4-level grayscale (`/fact.png`)
+> **As-is since 2026-10-15 (DECISIONS #81).** Every picture the panels show (`/fact`, `/color/moment`, `/skyline`, `/skyline-bw`, both birthday portraits) is now the AI image cropped to 800x480 in full colour and otherwise untouched, with any caption burned in as solid black and white; each panel converts it itself, as the series does (#73). The 4-grey quantiser and our Spectra 6 Floyd-Steinberg step are no longer used for these. Only `/fact1.png` (1-bit by design, not on any panel) still converts. The diagrams below keep the older steps where noted, for history.
+
+### Pipeline A: full colour, as-is (`/fact.png`; 4-level grayscale until #81)
 
 Uses **FLUX.2 klein-9b** with daily rotating art styles: Woodcut → Pencil Sketch → Charcoal (cycles by `dayOfYear % 3`). Falls back to SDXL with woodcut style if FLUX.2 fails.
 
@@ -166,19 +168,13 @@ Prepend daily style (Woodcut / Pencil Sketch / Charcoal) + anti-text suffix
 FLUX.2 klein-9b (4 steps, guidance 7.0) → JPEG  [fallback: SDXL 20 steps]
         │
         ▼
-Cloudflare Images (JPEG → PNG conversion)
+Cloudflare Images (.transform → center-crop + resize to 800x480, PNG) → decode RGB
         │
         ▼
-PNG decode → grayscale → center-crop → resize to 800x480
+Caption bar burned in as solid black and white (location left, title center, date right)
         │
         ▼
-Caption bar (24px black bar: location left, title center, date right)
-        │
-        ▼
-Tone curve (contrast 1.2, gamma 0.95) → quantize to 4 levels
-        │
-        ▼
-8-bit grayscale PNG → KV cache (24h)
+Full-colour RGB PNG, picture untouched → KV cache (fact4:v5)   [until #81: grayscale → tone curve → 4 levels]
 ```
 
 ### Pipeline B: Style-aware 1-bit (`/fact1.png`)
@@ -242,13 +238,13 @@ Chicago date → birthday check (9 family members)
         FLUX.2 klein-9b (multipart FormData, guidance 7.0, reference images)
                 │
                 ▼
-        base64 decode → Cloudflare Images (JPEG→PNG, resize to 800×480) → grayscale
+        base64 decode → Cloudflare Images (crop + resize to 800×480) → RGB
                 │
                 ▼
         Birthday caption (24px black bar: "Happy Birthday!" | "Name - age years" | style name)
                 │
                 ▼
-        Tone curve → quantize 4 levels → 8-bit PNG → KV cache (24h)
+        Full-colour RGB PNG, picture untouched → KV cache (birthday:v2)   [until #81: tone curve → 4 levels]
 ```
 
 **Art styles** rotate yearly: Woodcut, Watercolor, Art Nouveau, Pop Art, Impressionist, Ukiyo-e, Art Deco, Pointillist, Pencil Sketch, Charcoal.
@@ -260,9 +256,9 @@ npm run upload-photos
 
 Photos go in `photos/portraits/` with naming: `{key}_0.jpg`, `{key}_1.jpg`, etc. (max 4 per person, pre-resized to <512x512).
 
-### Pipeline D: Color Spectra 6 (`/color/moment`)
+### Pipeline D: Color, as-is (`/color/moment`)
 
-Uses **FLUX.2 klein-9b** (fallback SDXL) with 5 daily-rotating art styles optimized for 6-color dithering, then Floyd-Steinberg dithers to the Spectra palette.
+Uses **FLUX.2 klein-9b** (fallback SDXL) with 5 daily-rotating art styles (originally tuned for our 6-colour dithering). Since #81 the picture goes to the E1002 untouched in full colour and the panel converts it.
 
 **Styles** (rotate daily by `(dayOfYear - 1) % 5`): Gouache, Oil Painting, Graphic Novel, Ink + Wash, Color Woodblock. Test override: `/color/test-moment?m=7&d=20&style=ink_wash`.
 
@@ -282,10 +278,7 @@ FLUX.2 klein-9b → JPEG  [fallback: SDXL]
 Cloudflare Images (.transform → center-crop + resize to 800×480, PNG) → decode RGB
         │
         ▼
-Floyd-Steinberg dithering → 6-color Spectra palette indices
-        │
-        ▼
-Palette-indexed PNG → base64 → inline in HTML page
+Full-colour RGB PNG, untouched → base64 → inline in HTML page   [until #81: Floyd-Steinberg → Spectra 6 indexed PNG]
         │
         ▼
 KV cache (24h)
@@ -302,10 +295,10 @@ KV cache (24h)
 - **Image models**: FLUX.2 klein-9b (Pipeline A, Skyline with ref photos), SDXL (Pipeline B, Skyline fallback)
 - **LLM**: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (scene-only prompts, no style baked in)
 - **Art styles**: Daily rotation for Pipeline A (Woodcut / Pencil Sketch / Charcoal); 6-style rotation for Pipeline B (Woodcut / Silhouette / Linocut / Noir / Pen & Ink / Charcoal Block); 5-style rotation for Pipeline D (Gouache / Oil Painting / Graphic Novel / Ink+Wash / Color Woodblock)
-- **4-level output**: 8-bit grayscale PNG quantized to 4 levels (0, 85, 170, 255)
+- **Panel pictures**: full-colour RGB PNG, the AI image untouched apart from crop/resize and a solid black-and-white caption; the panels convert (#81). (Until #81: 4-level grayscale for the mono panel, Spectra 6 Floyd-Steinberg for the colour panel.)
 - **1-bit output**: True 1-bit PNG with style-aware conversion (Bayer dithering or histogram threshold)
 - **PNG encoder/decoder**: Pure JavaScript using Web API `CompressionStream`/`DecompressionStream`
-- **Text rendering**: Custom 8x8 bitmap font (CP437), white-on-black (4-level) or black-on-white (1-bit)
+- **Text rendering**: Custom 8x8 bitmap font (CP437), white-on-black caption bars, or black-on-white (1-bit)
 
 ---
 

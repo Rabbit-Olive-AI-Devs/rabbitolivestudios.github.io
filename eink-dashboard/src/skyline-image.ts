@@ -4,36 +4,23 @@
  * Primary:    FLUX.2 + reference photo from R2 → artistic reinterpretation (when photo available)
  * Fallback:   SDXL text-only (when no reference photo, or FLUX.2 fails)
  *
- * BW path:    → grayscale → crop/resize → caption → tone curve → 4-level quantize → 8-bit PNG
- * Color path: → RGB crop/resize → caption bar in RGB → Floyd-Steinberg dither (picture rows only) → Spectra 6 indexed PNG
+ * Both modes: → RGB crop/resize → caption bar in solid black and white → full-colour PNG, the
+ * picture untouched. The panels convert it themselves (DECISIONS #81); the BW/colour modes now
+ * differ only in their prompts and styles. (Until #81 BW was quantised to 4 greys and colour was
+ * Floyd-Steinberg dithered to Spectra 6 with the caption rows kept out of the diffusion, #64.)
  *
- * Caption is ALWAYS baked into the PNG (both BW and color) so HTML wrappers are pure <img> tags.
- * For color: the caption rows are mapped to the palette directly, never diffused — error from a bright
- * sky above the bar turned it into red/blue speckle (DECISIONS #64).
+ * Caption is ALWAYS baked into the PNG so HTML wrappers are pure <img> tags.
  */
 
 import type { Env } from "./types";
 import type { SkylineColorMode } from "./skyline";
 import { djb2 } from "./skyline";
-import {
-  generateAIImage,
-  WIDTH,
-  HEIGHT,
-  centerCropGray,
-  resizeGray,
-  drawText,
-  quantize4Level,
-} from "./image";
-import { applyToneCurve } from "./convert-1bit";
-import { encodePNGGray8, encodePNGIndexed, pngToBase64 } from "./png";
-import { decodePNG } from "./png-decode";
+import { generateAIImage, WIDTH, HEIGHT } from "./image";
+import { encodePNGRGB, pngToBase64 } from "./png";
 import { FONT_8X8 as FONT_DATA, measureText } from "./font";
-import { generateAndDecodeColor } from "./image-color";
-import { ditherFloydSteinberg, findNearestColor } from "./dither-spectra6";
-import { SPECTRA6_PALETTE } from "./spectra6";
+import { jpegToRGB } from "./image-color";
 import { getPhotoFromR2 } from "./birthday-image";
 import { isNeuronBudgetError } from "./cache-guard";
-import { bytesToImageStream } from "./images-input";
 
 // SDXL params (same as Pipeline B — stable for architectural subjects)
 const SDXL_STEPS = 20;
@@ -171,53 +158,7 @@ function computeCaptionLayout(left: string, center: string, right: string): Capt
 
 // --- BW path: grayscale 4-level ---
 
-async function jpegToGray(env: Env, jpegBytes: Uint8Array): Promise<Uint8Array> {
-  const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
-  const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
-  const decoded = await decodePNG(pngBytes);
-
-  const cropped = centerCropGray(decoded.gray, decoded.width, decoded.height, WIDTH, HEIGHT);
-  return (cropped.width === WIDTH && cropped.height === HEIGHT)
-    ? cropped.gray
-    : resizeGray(cropped.gray, cropped.width, cropped.height, WIDTH, HEIGHT);
-}
-
-async function jpegToRGB(env: Env, jpegBytes: Uint8Array): Promise<Uint8Array> {
-  const pngResponse = (await env.IMAGES
-    .input(bytesToImageStream(jpegBytes))
-    .transform({ width: WIDTH, height: HEIGHT, fit: "cover" })
-    .output({ format: "image/png" })
-  ).response();
-  const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
-  const decoded = await decodePNG(pngBytes);
-  if (!decoded.rgb) throw new Error("Expected color PNG but got grayscale");
-  return decoded.rgb;
-}
-
-function drawSkylineCaptionGray(
-  buf: Uint8Array,
-  left: string,
-  center: string,
-  right: string,
-): void {
-  const layout = computeCaptionLayout(left, center, right);
-
-  // Solid black bar
-  for (let y = layout.barY; y < HEIGHT; y++) {
-    for (let x = 0; x < WIDTH; x++) {
-      buf[y * WIDTH + x] = 0;
-    }
-  }
-
-  // White text on black bar
-  drawText(buf, layout.leftX, layout.textY, layout.leftText, CAPTION_SCALE, 255);
-  drawText(buf, layout.rightX, layout.textY, layout.rightText, CAPTION_SCALE, 255);
-  if (layout.centerText) {
-    drawText(buf, layout.centerX, layout.textY, layout.centerText, CAPTION_SCALE, 255);
-  }
-}
-
-// --- Color path: RGB caption + Spectra 6 dithered ---
+// --- Caption, drawn into the RGB picture in solid black and white ---
 
 /** Draw a single character into an RGB buffer (3 bytes per pixel). */
 function drawCharRGB(
@@ -354,10 +295,8 @@ export interface SkylineImageResult {
 /**
  * Generate a skyline image with caption baked into the PNG.
  *
- * Tries FLUX.2 + reference photo first; falls back to SDXL text-only.
- *
- * BW mode:  → gray → caption → tone curve → 4-level → 8-bit PNG
- * Color mode: → RGB → caption bar → Floyd-Steinberg dither → Spectra 6 indexed PNG
+ * Tries FLUX.2 + reference photo first; falls back to SDXL text-only. Both modes send the
+ * picture untouched in full colour with a solid black-and-white caption bar (DECISIONS #81).
  */
 export async function generateSkylineImage(
   env: Env,
@@ -370,43 +309,8 @@ export async function generateSkylineImage(
   sdxlOnly: boolean = false,
 ): Promise<SkylineImageResult> {
   const { jpeg, usedRef } = await generateSkylineJpeg(env, refPrompt, sdxlPrompt, cityKey, photoSeed, sdxlOnly);
-
-  if (colorMode === "bw") {
-    const gray = await jpegToGray(env, jpeg);
-    drawSkylineCaptionGray(gray, caption.left, caption.center, caption.right);
-    applyToneCurve(gray, 1.2, 0.95);
-    quantize4Level(gray);
-    const png = await encodePNGGray8(gray, WIDTH, HEIGHT);
-    return { png, base64: pngToBase64(png), colorMode, usedRef };
-  }
-
-  // Color path: → RGB → caption in RGB → dither picture → map caption → indexed PNG
   const rgb = await jpegToRGB(env, jpeg);
   drawSkylineCaptionRGB(rgb, caption.left, caption.center, caption.right);
-  const indices = ditherPictureKeepCaption(rgb);
-  const png = await encodePNGIndexed(indices, WIDTH, HEIGHT, SPECTRA6_PALETTE);
+  const png = await encodePNGRGB(rgb, WIDTH, HEIGHT);
   return { png, base64: pngToBase64(png), colorMode, usedRef };
-}
-
-/**
- * Dither the picture rows only; map the caption rows to the palette directly.
- *
- * Floyd-Steinberg carries quantisation error downward, so a bright sky above
- * the bar dumped enough residual into the pure-black rows that they came out
- * as red/blue speckle and the white text vanished into it (Havana,
- * 2026-09-10). The bar is drawn in exact palette colours, so it needs no
- * diffusion at all — nearest-colour on those rows is lossless and keeps the
- * bar solid (DECISIONS #64).
- */
-export function ditherPictureKeepCaption(rgb: Uint8Array): Uint8Array {
-  const pictureH = HEIGHT - BAR_H;
-  const picture = ditherFloydSteinberg(rgb.subarray(0, pictureH * WIDTH * 3), WIDTH, pictureH, SPECTRA6_PALETTE);
-
-  const indices = new Uint8Array(WIDTH * HEIGHT);
-  indices.set(picture, 0);
-  for (let i = pictureH * WIDTH; i < WIDTH * HEIGHT; i++) {
-    const off = i * 3;
-    indices[i] = findNearestColor(rgb[off], rgb[off + 1], rgb[off + 2], SPECTRA6_PALETTE);
-  }
-  return indices;
 }

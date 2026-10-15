@@ -3,8 +3,10 @@ import { htmlResponse } from "../response";
 import { getChicagoDateParts } from "../date-utils";
 import { imageUnavailable } from "../stale-cache";
 import { unavailableHTML } from "./unavailable";
+import { pngToBase64 } from "../png";
 
-const IMAGE_HTML = `<!DOCTYPE html>
+/** The page carries its picture inline: one request, like every panel page (DECISIONS #65, #81). */
+const imageHTML = (base64: string) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -22,26 +24,29 @@ img {
 </style>
 </head>
 <body>
-<img src="/fact.png" width="800" height="480" alt="Moment Before - image unavailable">
+<img src="data:image/png;base64,${base64}" width="800" height="480" alt="Moment Before - image unavailable">
 </body>
 </html>`;
 
-export async function handleFactPage(env: Env): Promise<Response> {
+export async function handleFactPage(env: Env, fetchPng: () => Promise<Response>): Promise<Response> {
   const { dateStr } = getChicagoDateParts();
 
   // Never point the panel at an image we already know cannot be produced — a
   // dead <img> renders as a broken-image glyph on the display. On a birthday the
   // picture comes from the birthday cache instead, so either family counts.
+  const unavailable = () => htmlResponse(
+    unavailableHTML(
+      "Moment Before",
+      "Today's illustration could not be generated. The daily image budget resets at midnight UTC and the picture returns on its own.",
+    ),
+    "no-store",
+  );
   const noFact = await imageUnavailable(env, "fact4:", dateStr);
-  if (noFact && await imageUnavailable(env, "birthday:", dateStr)) {
-    return htmlResponse(
-      unavailableHTML(
-        "Moment Before",
-        "Today's illustration could not be generated. The daily image budget resets at midnight UTC and the picture returns on its own.",
-      ),
-      "no-store",
-    );
-  }
+  if (noFact && await imageUnavailable(env, "birthday:", dateStr)) return unavailable();
 
-  return htmlResponse(IMAGE_HTML, "public, max-age=86400");
+  // The full-colour picture is ~10x the old 4-grey one: as a separate <img> it would race the
+  // renderer's ~1 s cut-off for sub-resources (#65), so it is inlined like the skyline.
+  const png = await fetchPng();
+  if (!png.ok || !(png.headers.get("Content-Type") ?? "").startsWith("image/png")) return unavailable();
+  return htmlResponse(imageHTML(pngToBase64(new Uint8Array(await png.arrayBuffer()))), "no-store");
 }

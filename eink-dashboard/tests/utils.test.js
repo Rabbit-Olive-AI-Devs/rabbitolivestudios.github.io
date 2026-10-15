@@ -57,11 +57,11 @@ test("moon phase override is bounded in rendered HTML", () => {
 test("histogram threshold and cache keys stay stable", () => {
   const ramp = Uint8Array.from({ length: 256 }, (_, i) => i);
   assert.equal(thresholdFromHistogram(ramp, 0.5), 127);
-  assert.equal(fact4CacheKey("2026-04-27"), "fact4:v4:2026-04-27");
+  assert.equal(fact4CacheKey("2026-04-27"), "fact4:v5:2026-04-27");
   assert.equal(fact1CacheKey("2026-04-27"), "fact1:v7:2026-04-27");
-  assert.equal(colorMomentCacheKey("2026-04-27", "gouache"), "color-moment:v2:2026-04-27:gouache");
-  assert.equal(skylineCacheKey("2026-04-27", "daily", 15, 0, true), "skyline:v3:2026-04-27:daily:bw");
-  assert.equal(generationLockKey("fact4:v4:2026-04-27"), "gen-lock:v1:fact4:v4:2026-04-27");
+  assert.equal(colorMomentCacheKey("2026-04-27", "gouache"), "color-moment:v3:2026-04-27:gouache");
+  assert.equal(skylineCacheKey("2026-04-27", "daily", 15, 0, true), "skyline:v4:2026-04-27:daily:bw");
+  assert.equal(generationLockKey("fact4:v5:2026-04-27"), "gen-lock:v1:fact4:v5:2026-04-27");
 });
 
 test("tempColor: blue below 10C, green 10-27C, red above 27C", () => {

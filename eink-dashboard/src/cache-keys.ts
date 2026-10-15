@@ -1,12 +1,12 @@
 import type { SkylineMode } from "./skyline";
 
-export const FACT4_CACHE_VERSION = "v4";
+export const FACT4_CACHE_VERSION = "v5"; // v5: full colour as-is, no 4-grey quantise (DECISIONS #81)
 export const FACT1_CACHE_VERSION = "v7";
-export const BIRTHDAY_CACHE_VERSION = "v1";
-export const COLOR_MOMENT_CACHE_VERSION = "v2";
-export const COLOR_BIRTHDAY_CACHE_VERSION = "v1";
+export const BIRTHDAY_CACHE_VERSION = "v2"; // v2: full colour as-is (#81)
+export const COLOR_MOMENT_CACHE_VERSION = "v3"; // v3: full colour as-is, no Spectra 6 dithering (#81)
+export const COLOR_BIRTHDAY_CACHE_VERSION = "v2"; // v2: full colour as-is (#81)
 export const MOMENT_CACHE_VERSION = "v1";
-export const SKYLINE_CACHE_VERSION = "v3";
+export const SKYLINE_CACHE_VERSION = "v4"; // v4: both modes full colour as-is (#81)
 export const WORLDCUP_CACHE_VERSION = "v4"; // v4: penalty shootout result on the data blob (DECISIONS #50); v3: current-round phase (earliest active KO round) (#49); v2: fixture-aware top-2 flags (#47)
 
 export function fact4CacheKey(dateStr: string): string {

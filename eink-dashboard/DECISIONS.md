@@ -3581,3 +3581,59 @@ which the six-hourly check (cron `5 0,6,12,18 * * *` UTC, skipped before 03:00 C
 about 07:05 Chicago that Monday; nothing if chapter 1 is approved first. No test email was sent:
 the mail path itself was proven end to end on 2026-08-21 (#60).
 
+
+---
+
+## 81. Every Panel Picture Goes As-Is; the Panels Convert It (2026-10-15)
+
+### Why
+
+The series showed the owner that a full-colour picture sent untouched looks better on both panels
+than anything we convert ourselves (#73): "beautiful" on the E1001, and confirmed on the E1002 on
+15 Oct. The owner then asked to move every other picture to the same route, all at once today,
+with no side-by-side trial: "if it doesn't work we revert back".
+
+### What changed
+
+| Page | Before | Now |
+|---|---|---|
+| `/fact.png`, `/fact` (Pipeline A) | grey → tone curve → 4 greys | full colour as-is; `fact4:v5` |
+| Birthday portrait, mono | grey → tone curve → 4 greys | full colour as-is; `birthday:v2` |
+| `/color/moment` (Pipeline D) | Floyd-Steinberg to Spectra 6 | full colour as-is; `color-moment:v3` |
+| Colour birthday portrait | Floyd-Steinberg to Spectra 6 | full colour as-is; `color-birthday:v2` |
+| `/skyline` (colour) | Spectra 6 dither, caption rows mapped by nearest colour (#64) | full colour as-is; `skyline:v4` |
+| `/skyline-bw` | grey → tone curve → 4 greys | full colour as-is (its prompts are still the BW styles); `skyline:v4…:bw` |
+
+- One path for all of them: `jpegToRGB()` (`src/image-color.ts`) crops and resizes the AI image to
+  800x480 with Cloudflare Images; the caption is laid over it in solid black and white
+  (`burnCaption()` in `src/image.ts` reuses the grey caption layouts through a mask; the skyline
+  draws its bar in RGB); `encodePNGRGB()` writes it. No AI, prompt or style changed.
+- **`/fact` now inlines its picture.** It used to point an `<img>` at `/fact.png`; at ~30 KB that
+  loaded inside the renderer's one-second window, but a full-colour PNG is 600-850 KB and would
+  risk a white frame (#65). It now runs the `/fact.png` handler and inlines the bytes, like the
+  skyline pages.
+- Removed as unused: `quantize4Level`, `ditherPictureKeepCaption` (and its test, replaced by a test
+  of `burnCaption`), the skyline's grey decode and grey caption, Pipeline A's grey FLUX decode, the
+  export of `applyToneCurve` (still used inside the 1-bit converter). `dither-spectra6.ts` stays
+  for the World Cup flag generator (#61). `/fact1.png` is unchanged: 1-bit by design and on no
+  panel.
+
+### Measured on deploy (2026-10-15, version e796b80a)
+
+All four pages regenerated today's pictures in the background and now serve them inline as
+800x480 RGB PNGs: `/fact` 845 KB, `/color/moment` 715 KB, `/skyline` 593 KB, `/skyline-bw`
+968 KB (HTML, base64 included), each in 0.5-1.6 s. The regeneration cost three FLUX images; the
+day ended at 8,325 of 10,000 neurons. CPU is lower than before: the old Spectra 6 step searched
+the palette and diffused error at every pixel, the new one is a single filter pass plus native
+compression.
+
+### Caveats and how to revert
+
+- **Judged by the owner on the panels**, not by us. If a page looks worse, revert that pipeline
+  from this commit's parent and bump its cache key again. The stale fallbacks resolve by prefix
+  (#58), so either format keeps serving through a bump.
+- KV entries are now ~0.5-1 MB each instead of 10-70 KB: far inside KV's 25 MB value limit, and
+  the number of writes per day is unchanged.
+- The colour moment prompts still carry the palette suffix written for our dithering ("limited
+  palette, large flat colour regions…"). It was left alone so the art is unchanged; with the panel
+  converting, it could be dropped for richer pictures if the owner wants.

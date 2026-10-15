@@ -91,38 +91,25 @@ test("getTodayEvents fetches the requested date, not today's", async () => {
   }
 });
 
-// --- Colour skyline caption survives dithering (DECISIONS #64) ---
+// --- Full-colour pictures keep a solid black-and-white caption (DECISIONS #81) ---
 
-test("caption rows stay solid black/white while the picture is dithered", () => {
-  const { ditherPictureKeepCaption } = fromBuild("src/skyline-image.js");
-  const { ditherFloydSteinberg } = fromBuild("src/dither-spectra6.js");
-  const { SPECTRA6_PALETTE } = fromBuild("src/spectra6.js");
-  const W = 800, H = 480, BAR = 24;
-
-  // Bright, slightly off-palette "sky" (this is what dumps error into the bar), then a
-  // black bar with a white text block in it.
+test("burnCaption lays the caption over the picture in exact black and white, nothing else", () => {
+  const { burnCaption } = fromBuild("src/image.js");
+  const W = 800, H = 480;
   const rgb = new Uint8Array(W * H * 3);
-  for (let i = 0; i < (H - BAR) * W; i++) { rgb[i * 3] = 250; rgb[i * 3 + 1] = 235; rgb[i * 3 + 2] = 120; }
-  for (let y = H - BAR; y < H; y++) for (let x = 0; x < W; x++) {
-    const white = y >= H - 16 && y < H - 8 && x >= 8 && x < 40;
-    const o = (y * W + x) * 3; rgb[o] = rgb[o + 1] = rgb[o + 2] = white ? 255 : 0;
+  for (let i = 0; i < W * H; i++) { rgb[i * 3] = 250; rgb[i * 3 + 1] = 235; rgb[i * 3 + 2] = 120; }
+  const before = rgb.slice();
+  // A bar on the last 24 rows with one white block, the way the caption drawers write.
+  burnCaption(rgb, (mask) => {
+    for (let y = H - 24; y < H; y++) for (let x = 0; x < W; x++) mask[y * W + x] = 0;
+    for (let y = H - 16; y < H - 8; y++) for (let x = 8; x < 40; x++) mask[y * W + x] = 255;
+  });
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const o = (y * W + x) * 3;
+    const want = y < H - 24 ? [before[o], before[o + 1], before[o + 2]]
+      : (y >= H - 16 && y < H - 8 && x >= 8 && x < 40) ? [255, 255, 255] : [0, 0, 0];
+    if (rgb[o] !== want[0] || rgb[o + 1] !== want[1] || rgb[o + 2] !== want[2]) {
+      assert.fail(`pixel ${x},${y} is ${rgb[o]},${rgb[o + 1]},${rgb[o + 2]}, expected ${want}`);
+    }
   }
-
-  const fixed = ditherPictureKeepCaption(rgb);
-  const naive = ditherFloydSteinberg(rgb, W, H, SPECTRA6_PALETTE);
-
-  let fixedBad = 0, naiveBad = 0, whiteOk = 0;
-  for (let y = H - BAR; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = y * W + x;
-    const expect = (y >= H - 16 && y < H - 8 && x >= 8 && x < 40) ? 1 : 0;
-    if (fixed[i] !== expect) fixedBad++;
-    if (naive[i] !== expect) naiveBad++;
-    if (expect === 1 && fixed[i] === 1) whiteOk++;
-  }
-  assert.equal(fixedBad, 0, "caption rows must map exactly to black/white");
-  assert.equal(whiteOk, 8 * 32);
-  assert.ok(naiveBad > 1000, `plain FS should corrupt the bar (got ${naiveBad}) — otherwise this test proves nothing`);
-  // Picture rows still dithered (not a single flat colour).
-  const pic = new Set(fixed.subarray(0, (H - BAR) * W));
-  assert.ok(pic.size >= 2);
 });

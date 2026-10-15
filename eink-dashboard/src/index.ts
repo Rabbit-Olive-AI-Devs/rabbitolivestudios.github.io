@@ -1247,7 +1247,7 @@ export default {
       case "/weather":
         return handleWeatherPageV2(env, url, ctx);
       case "/fact":
-        return handleFactPage(env);
+        return handleFactPage(env, () => handleFactImage(env, ctx));
       case "/color/weather":
         return handleColorWeatherPage(env, url, ctx);
       case "/color/moment":

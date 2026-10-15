@@ -3,15 +3,13 @@
  *
  * Provides tone curve, histogram-based threshold, 8x8 Bayer dithering,
  * black ratio measurement, and a stabilization+guardrail conversion pipeline.
- *
- * Also exports applyToneCurve for Pipeline A usage.
  */
 
 import type { OneBitStyleSpec } from "./styles-1bit";
 
 // --- Tone curve (shared by both pipelines) ---
 
-export function applyToneCurve(gray: Uint8Array, contrast: number, gamma: number): void {
+function applyToneCurve(gray: Uint8Array, contrast: number, gamma: number): void {
   for (let i = 0; i < gray.length; i++) {
     let x = (gray[i] - 128) * contrast + 128;
     if (x < 0) x = 0;

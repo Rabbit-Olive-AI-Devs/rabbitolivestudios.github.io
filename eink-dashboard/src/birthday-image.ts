@@ -5,20 +5,17 @@
  * Produces a 4-level grayscale 800x480 PNG with birthday caption.
  */
 
-import { encodePNGGray8 } from "./png";
-import { decodePNG } from "./png-decode";
+import { encodePNGRGB } from "./png";
 import { measureText } from "./font";
 import {
   WIDTH, HEIGHT,
-  resizeGray, centerCropGray, drawText,
-  quantize4Level,
+  burnCaption, drawText,
 } from "./image";
-import { applyToneCurve } from "./convert-1bit";
+import { jpegToRGB } from "./image-color";
 import { getArtStyle } from "./birthday";
 import { isNeuronBudgetError } from "./cache-guard";
 import type { BirthdayPerson } from "./birthday";
 import type { Env } from "./types";
-import { bytesToImageStream } from "./images-input";
 
 const FLUX_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
 const FLUX_WIDTH = 1024;
@@ -72,25 +69,10 @@ export async function generateBirthdayImage(
     throw new Error("FLUX.2 portrait generation failed");
   }
 
-  // JPEG → PNG via Cloudflare Images
-  const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
-  const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
-  const decoded = await decodePNG(pngBytes);
-
-  // Grayscale → center-crop → resize to 800x480
-  const cropped = centerCropGray(decoded.gray, decoded.width, decoded.height, WIDTH, HEIGHT);
-  let gray = (cropped.width === WIDTH && cropped.height === HEIGHT)
-    ? cropped.gray
-    : resizeGray(cropped.gray, cropped.width, cropped.height, WIDTH, HEIGHT);
-
-  // Birthday caption bar (24px black bar at bottom)
-  drawBirthdayCaption(gray, stripAccents(person.name), age, style.name);
-
-  // Tone curve + quantize (same as 4-level pipeline)
-  applyToneCurve(gray, 1.2, 0.95);
-  quantize4Level(gray);
-
-  return encodePNGGray8(gray, WIDTH, HEIGHT);
+  // The portrait untouched in full colour; the caption bar as solid black and white (DECISIONS #81).
+  const rgb = await jpegToRGB(env, jpegBytes);
+  burnCaption(rgb, (mask) => drawBirthdayCaption(mask, stripAccents(person.name), age, style.name));
+  return encodePNGRGB(rgb, WIDTH, HEIGHT);
 }
 
 /** Try to fetch a file from R2 with .jpg or .jpeg extension. */

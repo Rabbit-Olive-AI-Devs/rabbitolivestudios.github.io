@@ -1,8 +1,8 @@
 /**
  * Color "Moment Before" page for reTerminal E1002 (Spectra 6).
  *
- * Generates an AI image dithered to the 6-color Spectra palette,
- * served as HTML with inline base64 PNG.
+ * Generates an AI image and serves it untouched in full colour as HTML with an inline
+ * base64 PNG; the panel converts it to its six colours itself (DECISIONS #81).
  *
  * Route: /color/moment
  * Test:  /color/test-moment?m=7&d=20
@@ -17,18 +17,14 @@ import { getOrGenerateMoment, generateMomentBefore } from "../moment";
 import { getBirthdayToday, getBirthdayByKey, getArtStyle } from "../birthday";
 import type { BirthdayPerson } from "../birthday";
 import { callFluxPortrait, fetchReferencePhotos, ageDescription } from "../birthday-image";
-import { generateAndDecodeColorFlux, generateAndDecodeColor } from "../image-color";
-import { decodePNG } from "../png-decode";
-import { ditherFloydSteinberg } from "../dither-spectra6";
-import { SPECTRA6_PALETTE } from "../spectra6";
-import { encodePNGIndexed, pngToBase64 } from "../png";
+import { generateAndDecodeColorFlux, generateAndDecodeColor, jpegToRGB } from "../image-color";
+import { encodePNGRGB, pngToBase64 } from "../png";
 import { spectra6CSS } from "../spectra6";
 import { WIDTH, HEIGHT } from "../image";
 import { escapeHTML } from "../escape";
 import { htmlResponse } from "../response";
 import { parseMonth, parseDay, parseStyleIdx } from "../validate";
 import { colorBirthdayCacheKey, colorMomentCacheKey } from "../cache-keys";
-import { bytesToImageStream } from "../images-input";
 import {
   assertAiBudgetAvailable,
   getAiBudgetBlock,
@@ -40,7 +36,7 @@ import {
 
 const ANTI_TEXT_SUFFIX = "no text, no words, no letters, no writing, no signage, no captions, no watermark";
 
-/** Art styles optimized for 6-color Floyd-Steinberg dithering on Spectra 6 display. */
+/** Art styles chosen for the Spectra 6 panel (originally for our own 6-colour dithering, retired in #81). */
 export const COLOR_MOMENT_STYLES = [
   {
     id: "gouache",
@@ -79,7 +75,7 @@ export function getColorMomentStyle(dateStr: string): typeof COLOR_MOMENT_STYLES
   return COLOR_MOMENT_STYLES[(dayOfYear - 1) % COLOR_MOMENT_STYLES.length];
 }
 
-/** Generate a color Spectra 6 moment image, returns base64 PNG + styleId. */
+/** Generate the full-colour moment image, returns base64 PNG + styleId. */
 export async function generateColorMoment(
   env: Env,
   moment: MomentBeforeData,
@@ -108,23 +104,9 @@ export async function generateColorMoment(
     rgb = await generateAndDecodeColor(env, prompt);
   }
 
-  // Dither to Spectra 6 palette
-  const indices = ditherFloydSteinberg(rgb, WIDTH, HEIGHT, SPECTRA6_PALETTE);
-  const png = await encodePNGIndexed(indices, WIDTH, HEIGHT, SPECTRA6_PALETTE);
+  // The picture untouched in full colour; the panel converts it itself (DECISIONS #81).
+  const png = await encodePNGRGB(rgb, WIDTH, HEIGHT);
   return { base64: pngToBase64(png), styleId: style.id };
-}
-
-/** Decode JPEG bytes to 800×480 RGB via Cloudflare Images (center-crop + resize). */
-async function jpegToRGB(env: Env, jpegBytes: Uint8Array): Promise<Uint8Array> {
-  const pngResponse = (await env.IMAGES
-    .input(bytesToImageStream(jpegBytes))
-    .transform({ width: WIDTH, height: HEIGHT, fit: "cover" })
-    .output({ format: "image/png" })
-  ).response();
-  const pngBytes = new Uint8Array(await pngResponse.arrayBuffer());
-  const decoded = await decodePNG(pngBytes);
-  if (!decoded.rgb) throw new Error("Expected color PNG but got grayscale");
-  return decoded.rgb;
 }
 
 /** Generate a color birthday portrait, returns base64 PNG. */
@@ -159,9 +141,8 @@ async function generateColorBirthday(
     rgb = await generateAndDecodeColor(env, prompt);
   }
 
-  // Dither to Spectra 6 palette
-  const indices = ditherFloydSteinberg(rgb, WIDTH, HEIGHT, SPECTRA6_PALETTE);
-  const png = await encodePNGIndexed(indices, WIDTH, HEIGHT, SPECTRA6_PALETTE);
+  // The picture untouched in full colour; the panel converts it itself (DECISIONS #81).
+  const png = await encodePNGRGB(rgb, WIDTH, HEIGHT);
   return pngToBase64(png);
 }
 
