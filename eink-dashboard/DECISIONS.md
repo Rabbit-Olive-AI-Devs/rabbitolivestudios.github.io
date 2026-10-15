@@ -3305,6 +3305,9 @@ it "beautiful" and said: "we should not change from that. even for the e1002".
 - **Verified on the E1001 only.** The E1002's own handling of a colour page has not been seen
   yet. If it looks wrong there, the old Spectra 6 conversion is in git history
   (`src/series/convert.ts` before this decision). It would come back for `/color/series` only.
+- **Confirmed on the E1002, 2026-10-15.** The owner put the as-is style test on the office
+  panel and found it "beautiful": the as-is page stays on all three panels and the Spectra 6
+  conversion does not come back.
 - **Old keys are orphaned.** Pages uploaded before this change (`*.png`, `-desk`, `-office`,
   `-home`) are no longer read. Chapters 1–3 of the Prologue were rebuilt and re-uploaded as
   HTML.
