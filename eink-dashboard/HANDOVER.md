@@ -73,6 +73,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/desk/series` | Desk E1001 | The series, black and white: current scene from R2 `eink-series`, pre-built offline (#71) |
 | `/series` | Home E1001 | The series, four greys (#71) |
 | `/color/series` | Office E1002 | The series, six colours (#71) |
+| `/desk/series/test`, `/series/test`, `/color/series/test` | Any (temporary) | A writer's style-test picture as that panel shows it (`?folder=&image=&key=`), uploaded by the watcher (#72) |
 | `/series/proof` | Showrunner | A chapter's scenes and teaser for approval, images from `/series/proof/img`; needs `SERIES_KEY` (#71) |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |

@@ -125,7 +125,15 @@ function handle(file, m) {
       if (!fs.existsSync(dir)) { reply("style-test-missing", `FYI: reply to ${file}\n\nI cannot find style-tests/${msg.folder}/.`); return true; }
       const out = path.join(OUTBOX, "style-tests", msg.folder);
       const r = series(["preview", dir, "--out", out]);
-      reply(`style-test-${msg.folder}`, `FYI: reply to ${file}\n\nEach picture, cropped into a Wide panel and converted as the panels show it, is in from-claude/style-tests/${msg.folder}/ as -desk (black and white), -home (four greys) and -office (six colours).\n\n${r.out}\n\nLook hardest at -desk: fine lines and soft gradients are what get lost there.`);
+      // Also put the previews where the panels can show them: /…/series/test (key needed).
+      const panelPath = { desk: "desk/series/test", home: "series/test", office: "color/series/test" };
+      const links = [];
+      for (const f of fs.readdirSync(out).filter((n) => /-(desk|home|office)\.png$/.test(n)).sort()) {
+        const [, image, panel] = f.match(/^(.*)-(desk|home|office)\.png$/);
+        const put = spawnSync("npx", ["wrangler", "r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "image/png", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+        links.push(put.status === 0 ? `- ${image}, ${panel}: ${SITE}/${panelPath[panel]}?folder=${msg.folder}&image=${image}&key=` : `- ${image}, ${panel}: upload failed`);
+      }
+      reply(`style-test-${msg.folder}`, `FYI: reply to ${file}\n\nEach picture, cropped into a Wide panel and converted as the panels show it, is in from-claude/style-tests/${msg.folder}/ as -desk (black and white), -home (four greys) and -office (six colours).\n\n${r.out}\n\nLook hardest at -desk: fine lines and soft gradients are what get lost there.\n\nTo see them on a real panel, add one of these as a temporary page in SenseCraft (HTML widget, 800x480) with your key at the end, and remove it afterwards:\n${links.join("\n")}`);
       return true;
     }
     case "INVALID":

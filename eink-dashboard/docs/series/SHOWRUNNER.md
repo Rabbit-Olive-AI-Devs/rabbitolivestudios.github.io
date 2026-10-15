@@ -59,12 +59,12 @@ The Scenes database maps one-to-one onto `season.json`, so the export to the pac
 
 ## 5. Calendar (decided by the owner, 2026-10-14)
 
-| Season | Writer | Premiere (Monday) | Chapters |
+| Season | Writer (credit name) | Premiere (Monday) | Chapters |
 |---|---|---|---|
 | **Prologue** (season 0) | Claude | **26 October 2026** | 10, ending Friday 1 January 2027 |
-| Season 1 | OpenAI | 4 January 2027 | 13 |
-| Season 2 | Grok | 5 April 2027 | 13 |
-| Season 3 | Muse | 5 July 2027 | 13 |
+| Season 1 | Zoe (OpenAI) | 4 January 2027 | 13 |
+| Season 2 | Volt (Grok) | 5 April 2027 | 13 |
+| Season 3 | Pepper (Muse) | 5 July 2027 | 13 |
 | Season 4 | Claude | 4 October 2027 | 13 |
 
 After the Prologue, a season premieres on the **first Monday of a quarter** and runs 13 weeks. Some quarters leave a one-week gap; the panels show a "returns on" card then. **Muse can generate images** and draws its own season like the others.

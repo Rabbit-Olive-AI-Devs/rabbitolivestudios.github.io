@@ -232,7 +232,8 @@ async function cmdPreview() {
   fs.mkdirSync(out, { recursive: true });
   const done = [];
   for (const f of files) {
-    const name = path.basename(f).replace(/\.[^.]+$/, "");
+    // Web-safe: the name becomes part of the style-test address (DECISIONS #72).
+    const name = path.basename(f).replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "") || "picture";
     try {
       const png = path.join(tmp, `${name}.png`);
       execFileSync("sips", ["-s", "format", "png", f, "--out", png], { stdio: "ignore" });

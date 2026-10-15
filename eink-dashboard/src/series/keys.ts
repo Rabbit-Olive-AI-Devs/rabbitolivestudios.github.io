@@ -26,3 +26,11 @@ export function slotKey(slot: Slot, panel: PanelId): string | null {
   if (slot.prev !== null) return cardKey(slot.prev, "after", panel);
   return null;
 }
+
+const PLAIN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** A writer's style-test picture converted for one panel (DECISIONS #72); null for unsafe names. */
+export function testKey(folder: string, image: string, panel: PanelId): string | null {
+  if (!PLAIN.test(folder) || !PLAIN.test(image)) return null;
+  return `series/tests/${folder}/${image}-${panel}.png`;
+}

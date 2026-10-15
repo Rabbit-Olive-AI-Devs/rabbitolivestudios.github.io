@@ -622,3 +622,24 @@ test("mailbox: Claude's next chapter is due 19 days before it airs, one at a tim
   const done = { seasons: [{ ...s.seasons[0], approved: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], pending: [] }] };
   assert.equal(mb.dueClaudeChapter(done, "2026-12-20"), null);            // season complete
 });
+
+// --- Style-test address ---
+
+test("style-test pages live under series/tests/ and only take plain names", () => {
+  assert.equal(keys.testKey("trial-zoe-1", "source", "office"), "series/tests/trial-zoe-1/source-office.png");
+  assert.equal(keys.testKey("../x", "source", "desk"), null);
+  assert.equal(keys.testKey("ok", "a/b", "desk"), null);
+});
+
+test("the test address shows a style test inline, only with the key", async () => {
+  const objects = { "series/tests/trial-zoe-1/source-desk.png": PNG };
+  const env = { SERIES: bucket(objects), SERIES_KEY: "k" };
+  const ok = await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=trial-zoe-1&image=source&key=k"), "desk");
+  assert.equal(ok.status, 200);
+  assert.match(await ok.text(), /data:image\/png;base64,iVBORw/);
+  assert.equal((await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=trial-zoe-1&image=source"), "desk")).status, 404);
+  assert.equal((await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=../x&image=source&key=k"), "desk")).status, 404);
+  const missing = await sp.handleSeriesTest(env, new URL("https://x/series/test?folder=trial-zoe-1&image=source&key=k"), "home");
+  assert.equal(missing.status, 200);
+  assert.doesNotMatch(await missing.text(), /data:image/);
+});

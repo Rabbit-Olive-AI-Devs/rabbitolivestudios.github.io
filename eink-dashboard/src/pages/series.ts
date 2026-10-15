@@ -9,7 +9,7 @@ import { hudPageHTML } from "../hud/page";
 import { pngToBase64 } from "../png";
 import { htmlResponse } from "../response";
 import { resolveSlot, seriesSlot } from "../series/clock";
-import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey } from "../series/keys";
+import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey, testKey } from "../series/keys";
 import { isSchedule } from "../series/schedule";
 import type { PanelId, Schedule } from "../series/types";
 import { SCENES_PER_CHAPTER } from "../series/types";
@@ -107,4 +107,22 @@ export async function handleSeriesProofImage(env: Env, url: URL): Promise<Respon
   const obj = await env.SERIES.get(k);
   if (!obj) return notFound();
   return new Response(await obj.arrayBuffer(), { headers: { "Content-Type": "image/png", "Cache-Control": "no-store" } });
+}
+
+/**
+ * A writer's style test as one panel shows it, for judging art on the real device. Keyed:
+ * the watcher uploads every STYLE TEST to series/tests/ (DECISIONS #72).
+ */
+export async function handleSeriesTest(env: Env, url: URL, panel: PanelId): Promise<Response> {
+  if (!keyOk(env, url)) return notFound();
+  const key = testKey(url.searchParams.get("folder") ?? "", url.searchParams.get("image") ?? "", panel);
+  if (!key) return notFound();
+  try {
+    const obj = await env.SERIES.get(key);
+    if (!obj) return textPage("No style test picture with that folder and image name.");
+    return htmlResponse(hudPageHTML("Style Test", pngToBase64(new Uint8Array(await obj.arrayBuffer()))), "no-store");
+  } catch (err) {
+    console.error("series: style test read failed:", err);
+    return textPage("This style test could not be loaded.");
+  }
 }

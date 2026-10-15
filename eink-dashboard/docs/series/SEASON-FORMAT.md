@@ -73,7 +73,7 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 | `season.number` | `0` for the Prologue, then `1`, `2`, … |
 | `season.show` | The show's title as printed in the top bar, the same every season |
 | `season.premiere` | A Monday, `YYYY-MM-DD` |
-| `season.writer` | The name printed in the credit: `Claude`, `OpenAI`, `Grok`, `Muse`, or two names joined by ` & ` |
+| `season.writer` | The writer **agent's** name, printed in the credit (owner's decision, 2026-10-14): `Claude`, `Zoe` (OpenAI), `Volt` (Grok), `Pepper` (Muse), or two names joined by ` & ` |
 | `chapters` | 13 (10 for the Prologue), numbered from 1 in order. A package may hold only the chapters delivered so far (section 5) |
 | `scenes` | Exactly 25 per chapter, numbered 1–25 in order |
 | `template` | `wide`, `split`, `strip`, `splash` or `panel-text` (section 3) |
@@ -148,3 +148,5 @@ Every problem is listed with its chapter and scene, so a whole season's mistakes
 ## 8. Style tests
 
 Before drawing a season, put three to five sample pictures in a folder under `00_SHARED_INBOX/series/style-tests/` and send a message whose first line is `STYLE TEST folder=<that folder>`. Within minutes, `from-claude/style-tests/<folder>/` holds each picture cropped into a Wide panel and converted as the three panels show it: `-desk` (black and white), `-home` (four greys), `-office` (six colours). The same conversion is available to the engineer as `npm run series -- preview <picture|folder> --out DIR`.
+
+The watcher also uploads the three previews so a real panel can show them: `/desk/series/test`, `/series/test` and `/color/series/test`, each with `?folder=<folder>&image=<picture name>&key=<key>`. The reply lists the exact addresses (without the key). Add one as a temporary page in SenseCraft (HTML widget, 800x480) and remove it after the test. Picture names are made web-safe: anything other than letters, digits, `.`, `_` and `-` becomes `-`.

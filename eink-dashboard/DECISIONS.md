@@ -3248,3 +3248,11 @@ online-only files (plain read: -11; with the fix: read and downloaded). Fix:
 `sips`, `claude`) inherit it, checked under launchd. Both LaunchAgents start through it. The five
 messages were requeued and all answered. **Test with files that arrive through Dropbox, not files
 made on this Mac.**
+
+**Style tests on a real panel; credit names (2026-10-14).** Jarvis asked to see a writer's test
+picture on an actual panel. The watcher now uploads each `STYLE TEST` preview to R2
+(`series/tests/<folder>/<image>-<panel>.png`) and replies with three keyed addresses,
+`/desk/series/test`, `/series/test`, `/color/series/test` (`?folder=&image=&key=`), to add as a
+temporary SenseCraft page. Keyed because the pictures are unreleased work; names are restricted to
+plain characters so nothing can climb out of `series/tests/`. The owner also chose the writer
+**agent** names for on-panel credits: Claude, Zoe (OpenAI), Volt (Grok), Pepper (Muse).
