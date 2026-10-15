@@ -414,7 +414,7 @@ eink-dashboard/
     tars-launchd.plist.example — launchd template for the reporter
     series-import.mjs          — Offline series import: build | upload | approve | templates (`npm run series --`, DECISIONS #71)
     materialize-exec.py        — Lets a launchd job read Dropbox online-only (dataless) files: sets the materialize I/O policy, then execs the real program (DECISIONS #72)
-    series-teaser/             — `teaser.py`: the series teaser, frames and score drawn by code (DECISIONS #77, docs/series/TEASER.md); pictures and video stay out of the repo
+    series-teaser/             — `teaser.py`: the series teaser, frames and score drawn by code; `blender/lantern.py`: v2's 3D shots (the ship, the outpost, space), built and rendered in Blender (DECISIONS #77, docs/series/TEASER.md); pictures, video, audio and .blend files stay out of the repo
     series-paint/              — Claude's painting engine (DECISIONS #74): `painter.py` paints a code-drawn underpainting with textured brush strokes (gouache for the Prologue; oil and pixel for style tests), `page-png.py` pulls the picture out of a built page. Python 3 + numpy + PIL, run with `python3 -E -P`
     series-mailbox.mjs         — The mailbox watcher (DECISIONS #72): `run` handles Jarvis's APPROVE/DELIVERY/STYLE TEST by script, other messages via a read-only `claude -p`; `weekly` writes Claude's next due chapter. Prompts in `series-agent/`, LaunchAgents in `launchd/`
     series-set-key.sh          — Owner runs it in a real terminal: choose SERIES_KEY (hidden prompt) → ~/.config/eink/series-key (600) + Cloudflare secret, then checks the proof page

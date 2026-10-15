@@ -3435,3 +3435,14 @@ authors and looks), ominous music, ending with the dates.
   by Jarvis (added to SHOWRUNNER.md's calendar); and, not built yet, a show theme with a variation
   per author, a narrator, a vertical 9:16 cut, and a days-left countdown on the panels' "coming
   soon" card.
+
+**v2 (2026-10-15, the MacBook Pro):** the paintings at the open became 3D shots made in Blender
+through the Blender MCP: a cold-open fly-past, the arrival at the dusk outpost, the jump into the
+title, and a wide shot under the date card. The *Last Lantern* is built from primitives in
+`scripts/series-teaser/blender/lantern.py` after a concept sheet the owner made with ChatGPT (kept
+in Dropbox `teaser/assets/`, not here); the look is toon shading plus a Kuwahara pass, with a
+brush-dab texture added in `teaser.py` so the renders sit with the paintings. The score is a Suno
+track (the owner's account) cut to the timeline, with v1's hits laid on top so every cut still
+lands on one (`teaser.py audio <bed.wav>`). Render: 24 min 21 s for the shots on the MacBook Pro, under a minute more to compose and encode. Why Blender and not more code
+drawing: the owner asked for real camera moves on a real ship, which pans on stills cannot give.
+Details, the prompt and the re-render steps: `docs/series/TEASER.md`.

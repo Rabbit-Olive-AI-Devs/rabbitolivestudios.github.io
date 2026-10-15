@@ -2,6 +2,7 @@
 docs/series/TEASER.md). numpy + PIL; ffmpeg joins the result.
 
   TEASER_DIR=~/series-work/teaser python3 -E -P teaser.py audio     -> score.wav (48 kHz stereo)
+  TEASER_DIR=... python3 -E -P teaser.py audio bed.wav               -> score-v2.wav: the hits over a music track
   TEASER_DIR=~/series-work/teaser python3 -E -P teaser.py frames    -> frames/f00000.jpg ... (1920x1080, 24 fps)
   TEASER_DIR=~/series-work/teaser python3 -E -P teaser.py still 21  -> still.jpg at 21 s, to check a moment
   ffmpeg -framerate 24 -i frames/f%05d.jpg -i score.wav -c:v libx264 -b:v 7M -maxrate 10M -bufsize 14M \
@@ -9,6 +10,10 @@ docs/series/TEASER.md). numpy + PIL; ffmpeg joins the result.
 
 The pictures are not in this repo: TEASER_DIR/assets/ holds them (a copy is in the Dropbox series
 folder, teaser/assets/). Only story-free pictures: style tests and the non-canon test scene.
+
+v2: if TEASER_DIR/shots/ holds the 3D shots rendered by blender/lantern.py (shots/<name>/f0001.png
+...), they replace the paintings in the cold open, the arrival and the jump, and sit under the date
+card. Without them the cut is v1's.
 """
 import math
 import os
@@ -24,6 +29,9 @@ A = os.path.join(HERE, "assets")
 W, H, FPS, DUR = 1920, 1080, 24, 60.0
 BAR = 138                      # letterbox: 2.39:1 picture area
 PH = H - 2 * BAR
+SHOTS = os.path.join(HERE, "shots")
+SHOT3D = {"cold": (0.0, 252), "arrival": (9.2, 226), "jump": (18.6, 30), "wide": (52.5, 180)}  # start s, frames
+V2 = all(os.path.exists(os.path.join(SHOTS, k, "f0001.png")) for k in SHOT3D)
 OPTIMA = "/System/Library/Fonts/Optima.ttc"
 AVENIR = "/System/Library/Fonts/Avenir Next Condensed.ttc"
 
@@ -124,6 +132,15 @@ def init():
     n = np.asarray(nebimg, np.float32) / 255
     G["nebula"] = np.clip((n - 0.45) * 1.6, 0, 1) * np.array([0.30, 0.12, 0.10], np.float32) + np.clip((n[..., ::-1] - 0.5) * 1.4, 0, 1) * np.array([0.05, 0.12, 0.22], np.float32)
     G["grain"] = [rng.normal(0, 0.035, (H // 2, W // 2)).astype(np.float32) for _ in range(6)]
+    # Brush dabs for the 3D shots: short horizontal strokes plus canvas tooth, three versions that
+    # boil on twos, so the renders sit with the painted pictures.
+    G["brush"] = []
+    for _ in range(3):
+        dabs = Image.fromarray((rng.random((PH // 11, W // 44)) * 255).astype(np.uint8)).resize((W, PH), Image.BICUBIC)
+        tooth = rng.normal(0, 1, (PH // 2, W // 2)).astype(np.float32)
+        tooth = np.repeat(np.repeat(tooth, 2, 0), 2, 1)
+        b = (np.asarray(dabs, np.float32) / 255 - 0.5) * 0.11 + tooth * 0.008
+        G["brush"].append((1 + b)[..., None].astype(np.float32))
     y, x = np.mgrid[0:H, 0:W]
     G["vignette"] = (1 - 0.55 * (((x - W / 2) / (W / 2)) ** 2 + ((y - H / 2) / (H / 2)) ** 2) ** 1.4).clip(0.25, 1).astype(np.float32)[..., None]
     T = lambda lines, size, **k: text_layer(lines, OPTIMA, size, **k)
@@ -176,6 +193,17 @@ def picture(canvas, key, p, z0, z1, c0, c1, opacity):
     canvas[BAR:BAR + PH] = canvas[BAR:BAR + PH] * (1 - opacity) + img * opacity
 
 
+def shot3d(canvas, name, t, opacity):
+    """Frame of a Blender shot at teaser time t, with the brush pass, into the picture area."""
+    if opacity <= 0.001:
+        return
+    start, n = SHOT3D[name]
+    i = min(n, max(1, int((t - start) * FPS + 1e-6) + 1))
+    img = np.asarray(Image.open(os.path.join(SHOTS, name, f"f{i:04d}.png")).convert("RGB"), np.float32) / 255
+    img = np.clip(img * G["brush"][(int(t * FPS) // 2) % 3], 0, 1)
+    canvas[BAR:BAR + PH] = canvas[BAR:BAR + PH] * (1 - opacity) + img * opacity
+
+
 # ---------------------------------------------------------------- the cut
 
 AUTHORS = [  # start, picture, name, line, drift
@@ -188,8 +216,8 @@ MONTAGE = ["claude-oil", "pepper", "volt", "claude-pixel", "zoe", "muse", "claud
 MONTAGE_T = [43.6 + 4.6 * (1 - (1 - i / len(MONTAGE)) ** 1.6) for i in range(len(MONTAGE) + 1)]  # cuts quicken
 
 
-def frame(t):
-    c = np.zeros((H, W, 3), np.float32)
+def frame_v1_open(c, t):
+    """0-19.5 s in v1: stars, then the two paintings."""
     tx = G["txt"]
     mid = H / 2
     # 0-9: space.
@@ -210,6 +238,35 @@ def frame(t):
         picture(c, "claude-gouache", (t - 15.6) / 3.9, 1.35, 1.5, (0.33, 0.72), (0.45, 0.72), o * 0.85)
         for i, k in enumerate(["crew1", "crew2", "crew3"]):
             paste(c, tx[k], W / 2, BAR + 110 + i * 70, env(t, 16.0 + i * 0.9, 19.3, 0.5, 0.4))
+
+
+def frame_v2_open(c, t):
+    """0-19.6 s in v2: the Blender shots. Same words; the ship crosses between the two opening lines."""
+    tx = G["txt"]
+    mid = H / 2
+    if t < 10.5:
+        shot3d(c, "cold", t, env(t, 0.0, 10.5, 2.5, 1.3))
+        paste(c, tx["after"], W / 2, mid, env(t, 1.6, 4.8, 0.9, 0.9))
+        paste(c, tx["rim"], W / 2, mid, env(t, 5.4, 8.8, 0.9, 1.0))
+    o = env(t, 9.2, 18.6, 1.3, 0.0)
+    if o:
+        shot3d(c, "arrival", t, o)
+        paste(c, tx["ship"], W / 2, H - BAR - 90, env(t, 10.4, 12.2, 0.6, 0.5))
+        paste(c, tx["lantern"], W / 2, H - BAR - 90, env(t, 12.6, 15.4, 0.6, 0.4))
+    if 18.6 <= t < 19.75:
+        shot3d(c, "jump", t, env(t, 18.6, 19.75, 0.0, 0.15))
+    for i, k in enumerate(["crew1", "crew2", "crew3"]):
+        paste(c, tx[k], W / 2, H - BAR - 210 + i * 64, env(t, 15.9 + i * 0.7, 18.55, 0.5, 0.3))
+
+
+def frame(t):
+    c = np.zeros((H, W, 3), np.float32)
+    tx = G["txt"]
+    mid = H / 2
+    if V2:
+        frame_v2_open(c, t)
+    else:
+        frame_v1_open(c, t)
     # 19.6-23.4: the title.
     o = env(t, 19.6, 23.5, 0.08, 0.8)
     if o:
@@ -246,7 +303,10 @@ def frame(t):
     # 52.5-60: the date.
     o = env(t, 52.5, 59.6, 0.06, 1.4)
     if o:
-        stars(c, t, 0.45 * o, drift=3)
+        if V2:
+            shot3d(c, "wide", t, 0.8 * o)
+        else:
+            stars(c, t, 0.45 * o, drift=3)
         paste(c, tx["small"], W / 2, mid - 150, o)
         paste(c, tx["prem"], W / 2, mid - 40, env(t, 52.9, 59.6, 0.5, 1.4))
         paste(c, tx["date"], W / 2, mid + 50, env(t, 53.4, 59.6, 0.5, 1.4))
@@ -276,7 +336,10 @@ def render(i):
 SR = 48000
 
 
-def score():
+def score(bed=None):
+    """v1: the whole score in code -> score.wav. v2 (bed = a music track, e.g. the Suno one): only
+    the hits, risers and the quiet tone are drawn here, mixed over the track cut to the timeline
+    (its 0-52.5 s, then its climax from 62 s under the final hit) -> score-v2.wav."""
     n = int(SR * DUR)
     t = np.arange(n) / SR
     rng = np.random.default_rng(3)
@@ -308,11 +371,12 @@ def score():
     for f, g in ((36.71, 1.0), (73.42, 0.55), (110.0, 0.25), (55.0, 0.2)):
         dr += g * np.sin(2 * np.pi * f * t + 0.3 * np.sin(2 * np.pi * 0.07 * t))
     shape = np.interp(t, [0, 3, 19.4, 19.6, 23.5, 27, 43, 48.3, 48.6, 52.4, 56, 60], [0, 0.35, 0.8, 0.3, 0.35, 0.45, 0.6, 0.25, 0.25, 0.4, 0.5, 0])
-    L += dr * shape * 0.32
-    R += dr * shape * 0.32
-    wind = lowpass(rng.normal(0, 1, n), 380) * np.interp(t, [0, 4, 10, 15, 60], [0, 0.5, 0.35, 0.15, 0.1])
-    L += wind * 0.6
-    R += np.roll(wind, 900) * 0.6
+    if bed is None:
+        L += dr * shape * 0.32
+        R += dr * shape * 0.32
+        wind = lowpass(rng.normal(0, 1, n), 380) * np.interp(t, [0, 4, 10, 15, 60], [0, 0.5, 0.35, 0.15, 0.1])
+        L += wind * 0.6
+        R += np.roll(wind, 900) * 0.6
 
     def thud(f0=58, f1=32, dur=1.4):
         tt = np.arange(int(SR * dur)) / SR
@@ -320,7 +384,7 @@ def score():
         ph = 2 * np.pi * np.cumsum(f) / SR
         return np.sin(ph) * np.exp(-tt * 3.2) + 0.25 * lowpass(rng.normal(0, 1, len(tt)), 900) * np.exp(-tt * 18)
 
-    for s in [6.0, 8.6, 11.0, 13.0, 14.8, 16.3, 17.5, 18.4, 19.0]:
+    for s in ([6.0, 8.6, 11.0, 13.0, 14.8, 16.3, 17.5, 18.4, 19.0] if bed is None else []):
         add(thud(), s, gain=0.9)
 
     def braam(dur=5.0):
@@ -356,7 +420,7 @@ def score():
     beat = 0.25
     k = 0
     s = 23.5
-    while s < 48.2:
+    while s < 48.2 and bed is None:
         lvl = np.interp(s, [23.5, 27.5, 43.5, 48.2], [0.18, 0.32, 0.42, 0.55])
         add(plucks[notes[k % 8]], s, pan=0.25 * (-1) ** k, gain=lvl)
         if s >= 43.5:  # double time in the montage
@@ -367,7 +431,7 @@ def score():
         add(thud(66, 34, 1.8), s, gain=1.0)
         add(braam(2.4) * 0.5, s, gain=0.55)
     add(riser(4.6), 43.6, gain=0.9)
-    for s in MONTAGE_T[:-1]:
+    for s in (MONTAGE_T[:-1] if bed is None else []):
         add(thud(90, 45, 0.5), s, gain=0.45)
 
     # The quiet: a high tense tone over the screens.
@@ -393,9 +457,30 @@ def score():
         return np.fft.irfft(np.fft.rfft(x, size) * np.fft.rfft(h, size), size)[:n]
     L, R = L + conv(L, ir(11)) * 0.9, R + conv(R, ir(12)) * 0.9
     fade = np.interp(t, [0, 0.05, 59.0, 60.0], [0, 1, 1, 0])
-    out = np.stack([L, R], 1) * fade[:, None]
+    out = np.stack([L, R], 1)
+    name = "score.wav"
+    if bed is not None:
+        with wave.open(bed) as w:
+            assert w.getframerate() == SR and w.getnchannels() == 2, "bed must be 48 kHz stereo"
+            music = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, 2) / 32768
+        cut = int(52.5 * SR)
+        track = np.zeros((n, 2))
+        track[:cut] = music[:cut]
+        tail = music[int(62.0 * SR):int(62.0 * SR) + n - cut]
+        track[cut:cut + len(tail)] = tail
+        xf = int(0.03 * SR)  # a short crossfade, hidden under the final hit
+        track[cut - xf:cut] *= np.linspace(1, 0, xf)[:, None]
+        track[cut - xf:cut] += music[int(62.0 * SR) - xf:int(62.0 * SR)] * np.linspace(0, 1, xf)[:, None]
+        # Dip the track for the quiet beat over the screens, so the high tone and riser carry it.
+        duck = np.interp(t, [0, 48.0, 48.6, 52.3, 52.5, 60], [1, 1, 0.28, 0.28, 1, 1])
+        # And on every cut hit: a breath before, then the track recovers under the hit.
+        for h in (19.6, 27.5, 31.5, 35.5, 39.5):
+            duck *= 1 - 0.55 * np.interp(t, [h - 0.25, h - 0.05, h + 0.15, h + 1.2], [0, 1, 1, 0])
+        out = track * duck[:, None] / max(np.abs(track).max(), 1e-6) * 0.7 + out / np.abs(out).max() * 0.8
+        name = "score-v2.wav"
+    out = out * fade[:, None]
     out = np.tanh(out / (np.abs(out).max() * 0.55)) * 0.92
-    with wave.open(os.path.join(HERE, "score.wav"), "wb") as w:
+    with wave.open(os.path.join(HERE, name), "wb") as w:
         w.setnchannels(2)
         w.setsampwidth(2)
         w.setframerate(SR)
@@ -412,4 +497,4 @@ if __name__ == "__main__":
         with Pool(9, initializer=init) as pool:
             pool.map(render, range(int(DUR * FPS)), chunksize=8)
     elif what == "audio":
-        score()
+        score(sys.argv[2] if len(sys.argv) > 2 else None)
