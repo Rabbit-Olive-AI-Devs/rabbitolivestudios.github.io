@@ -145,7 +145,7 @@ export interface SkylineStyle {
 }
 
 export const SKYLINE_STYLES: readonly SkylineStyle[] = [
-  // --- BW styles (6) — bold, high-contrast only (pencil/etching/pen_ink removed: too many mid-tones for 4-level grayscale) ---
+  // --- BW styles (6) — bold, high-contrast (pencil/etching/pen_ink were removed for our old 4-level grayscale; the panel converts since #81) ---
   {
     key: "woodcut_hero_bw",
     label: "Woodcut",
@@ -157,7 +157,7 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     key: "noir_silhouette_bw",
     label: "Noir Silhouette",
     promptPrefix:
-      "dramatic film noir silhouette, stark black and white, bold shadow shapes, cinematic contrast, no halftones",
+      "dramatic film noir silhouette, stark black and white, bold shadow shapes, cinematic contrast",
     colorMode: "bw",
   },
   {
@@ -171,7 +171,7 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     key: "comic_ink_bw",
     label: "Comic Ink",
     promptPrefix:
-      "bold comic book ink illustration, thick outlines, large solid black areas, dynamic composition, high contrast, no halftone dots",
+      "bold comic book ink illustration, thick outlines, large solid black areas, dynamic composition, high contrast",
     colorMode: "bw",
   },
   {
@@ -185,7 +185,7 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     key: "charcoal_bw",
     label: "Dark Charcoal",
     promptPrefix:
-      "bold charcoal drawing, heavy black strokes, stark contrast, large solid dark masses, minimal mid-tones, dramatic shadows, no subtle gradients, no speckled noise",
+      "bold charcoal drawing, heavy black strokes, stark contrast, large solid dark masses, dramatic shadows",
     colorMode: "bw",
   },
   // --- Color styles (9) ---
@@ -334,23 +334,14 @@ export function buildSkylinePrompt(city: SkylineCity, style: SkylineStyle): stri
 
   const lighting =
     style.colorMode === "color"
-      ? "golden-hour sunset or late afternoon daylight, soft warm sky, clean flat color bands, no gradients"
-      : "clear daylight with high readability, no busy sky texture";
+      ? "golden-hour sunset or late afternoon daylight, soft warm sky"
+      : "clear daylight";
 
   const atmosphere =
-    "include ONE simple sun disc or moon disc as a solid shape, 2 to 4 birds as tiny silhouettes, and 1 to 3 large soft cloud shapes; avoid starfields; avoid detailed cloud texture";
+    "include ONE simple sun disc or moon disc as a solid shape, 2 to 4 birds as tiny silhouettes, and 1 to 3 large soft cloud shapes";
 
-  const constraints =
-    "avoid tiny window grids, avoid dense micro-detail, avoid noisy textures, avoid photographic realism";
-
-  const paletteHint =
-    style.colorMode === "color"
-      ? "limited palette, large flat color regions, poster-like, high contrast, avoid tiny details"
-      : "";
-
-  const parts: string[] = [style.promptPrefix, sceneBase, lighting, atmosphere, constraints];
-  if (paletteHint) parts.push(paletteHint);
-  parts.push(ANTI_TEXT_SUFFIX);
+  // No palette or detail limits: they were for our own dithering, retired in #81.
+  const parts: string[] = [style.promptPrefix, sceneBase, lighting, atmosphere, "avoid photographic realism", ANTI_TEXT_SUFFIX];
 
   return parts.join(", ");
 }
@@ -368,19 +359,9 @@ export function buildSkylineRefPrompt(city: SkylineCity, style: SkylineStyle): s
   const lighting =
     style.colorMode === "color"
       ? "golden-hour sunset or late afternoon daylight, soft warm sky"
-      : "clear daylight with high readability";
+      : "clear daylight";
 
-  const constraints =
-    "avoid tiny window grids, avoid dense micro-detail, avoid photographic realism";
-
-  const paletteHint =
-    style.colorMode === "color"
-      ? "limited palette, large flat color regions, poster-like, high contrast"
-      : "";
-
-  const parts: string[] = [style.promptPrefix, scene, lighting, constraints];
-  if (paletteHint) parts.push(paletteHint);
-  parts.push(ANTI_TEXT_SUFFIX);
+  const parts: string[] = [style.promptPrefix, scene, lighting, "avoid photographic realism", ANTI_TEXT_SUFFIX];
 
   return parts.join(", ");
 }

@@ -3646,3 +3646,21 @@ picture without the suffix is the next date's, made by the 04:35 Chicago warm. T
 themselves keep their own technique words (woodblock's "limited color palette" is the technique,
 not a dithering aid). The skyline's colour styles still carry similar hints (`src/skyline.ts`);
 untouched.
+
+**Addendum 2 (owner: "do the same for the skyline and all others"):** the same clean-up everywhere
+a panel converts the picture. Skyline (both builders): no palette hint, no "flat colour bands, no
+gradients", no "avoid tiny window grids / micro-detail / noisy textures / starfields / detailed
+cloud texture", no "high readability"; kept the composition (horizon, open sky for the caption,
+sun disc, birds) and "avoid photographic realism". Skyline BW styles: dropped "minimal mid-tones",
+"no subtle gradients, no speckled noise" and the "no halftone(s)" negatives. Pipeline A woodcut:
+dropped "with minimal midtones". Birthday styles had no such hints. **Not touched:** Pipeline B
+(`/fact1.png`, still our own 1-bit) and the shared LLM scene prompt's "strong silhouette
+separation, simple background" (`moment.ts`), because Pipeline B still needs it and changing it
+would cross-contaminate. Keys again not bumped (same budget reason); the 16 Oct warm is the first.
+
+Text pages were checked too: `/weather`, `/color/weather` and `/color/headlines` are live HTML that
+the panel screenshots, and nothing of ours dithers them. Their "pure black, no grey" rule is for
+legibility of thin text, not for a conversion of ours, so it stands. The desk pages (`/desk/*`) are
+1-bit images by design (#67); only the crest (`hud/crest.ts`) and the planet (`hud/planet-draw.ts`)
+use our ordered dither inside them. The retired World Cup B&W page was a 1-bit screenshot; on revival
+(#61) try it as-is first.

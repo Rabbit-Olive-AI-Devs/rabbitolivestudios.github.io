@@ -47,7 +47,7 @@ const FLUX_HEIGHT = 768;
 const SCENE_STYLES = [
   {
     name: "Woodcut",
-    prompt: "hand-carved woodcut print, bold U-gouge marks, high contrast black and white, sweeping curved gouge strokes, large solid black ink areas with minimal midtones",
+    prompt: "hand-carved woodcut print, bold U-gouge marks, high contrast black and white, sweeping curved gouge strokes, large solid black ink areas",
   },
   {
     name: "Pencil Sketch",
