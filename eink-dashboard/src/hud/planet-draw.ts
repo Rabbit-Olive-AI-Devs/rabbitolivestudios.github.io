@@ -5,14 +5,15 @@
  * decides how it is lit, and the name seeds the pattern so the same planet
  * always looks the same and no two look alike.
  *
- * The sphere is shaded in grey tones that go to the panel untouched; the panel
- * converts them, as every picture does since DECISIONS #81 (until then this was
- * our own ordered dither to black and white).
+ * The sphere is shaded in full colour, each kind of world in its own (lava red,
+ * oceans blue with green land, ice pale blue, giants in tan or blue bands), and goes
+ * to the panel untouched; the panel converts it, as every picture does since
+ * DECISIONS #81 (until then this was our own ordered dither to black and white).
  */
 
 import type { Planet } from "../planet";
 import type { Canvas } from "./canvas";
-import { setTone } from "./canvas";
+import { setColor } from "./canvas";
 
 export type PlanetKind = "lava" | "rock" | "ocean" | "ice" | "neptune" | "gas";
 
@@ -93,39 +94,62 @@ const RING = { inner: 1.3, outer: 1.75, tilt: 0.28 };
 const RINGED_SCALE = 0.62;
 const MAX_RADIUS = 400;
 
-/** How bright the surface is at a point on the disc (nx, ny in -1..1), and whether it glows. */
-function surface(look: PlanetLook, nx: number, ny: number, nz: number): { albedo: number; glow: boolean } {
+type RGB = [number, number, number];
+
+const TINT = {
+  gasLight: [222, 196, 156] as RGB,
+  gasDark: [168, 112, 72] as RGB,
+  storm: [196, 84, 52] as RGB,
+  neptune: [96, 152, 214] as RGB,
+  neptuneSpot: [40, 70, 140] as RGB,
+  crust: [120, 56, 40] as RGB,
+  lava: [255, 150, 40] as RGB,
+  sea: [40, 92, 176] as RGB,
+  land: [116, 146, 84] as RGB,
+  cloud: [255, 255, 255] as RGB,
+  ice: [222, 236, 248] as RGB,
+  crack: [110, 150, 196] as RGB,
+  rock: [176, 146, 116] as RGB,
+  ring: [206, 192, 168] as RGB,
+};
+
+/** How bright and what colour the surface is at a point on the disc (nx, ny in -1..1), and whether it glows. */
+function surface(look: PlanetLook, nx: number, ny: number, nz: number): { albedo: number; glow: boolean; tint: RGB } {
   const s = look.seed;
   const u = Math.atan2(nx, nz) * 2 + s;
   const v = ny * 3;
   switch (look.kind) {
     case "gas": {
       const lat = ny + 0.05 * Math.sin(nx * 6 + s);
-      let albedo = 0.7 + 0.3 * Math.sin(lat * look.bands + 1.2 * noise(u * 1.5, v * 4, s));
+      const band = Math.sin(lat * look.bands + 1.2 * noise(u * 1.5, v * 4, s));
+      let albedo = 0.7 + 0.3 * band;
+      let tint = mix(TINT.gasDark, TINT.gasLight, (band + 1) / 2);
       if (look.spot) {
         const dx = (nx - 0.25) / 0.22, dy = (ny - 0.3) / 0.11;
-        if (dx * dx + dy * dy < 1) albedo *= 0.45;
+        if (dx * dx + dy * dy < 1) { albedo *= 0.8; tint = TINT.storm; }
       }
-      return { albedo, glow: false };
+      return { albedo, glow: false, tint };
     }
     case "neptune": {
       let albedo = 0.8 + 0.12 * Math.sin(ny * (5 + (s % 4)) + 0.6 * noise(u, v * 3, s));
       const dx = (nx + 0.2) / 0.2, dy = (ny - 0.25) / 0.1;
-      if (look.spot && dx * dx + dy * dy < 1) albedo *= 0.5;
-      return { albedo, glow: false };
+      const spot = look.spot && dx * dx + dy * dy < 1;
+      if (spot) albedo *= 0.8;
+      return { albedo, glow: false, tint: spot ? TINT.neptuneSpot : TINT.neptune };
     }
     case "lava":
-      return { albedo: 0.32 + 0.25 * fbm(u * 2, v * 2, s), glow: Math.abs(fbm(u * 2.6, v * 2.6, s + 9) - 0.5) < 0.022 };
+      return { albedo: 0.5 + 0.35 * fbm(u * 2, v * 2, s), glow: Math.abs(fbm(u * 2.6, v * 2.6, s + 9) - 0.5) < 0.022, tint: TINT.crust };
     case "ocean": {
       const land = fbm(u * 1.4, v * 1.4, s) > 0.53;
-      let albedo = land ? 0.75 + 0.25 * noise(u * 6, v * 6, s) : 0.38;
-      if (noise(u * 1.2 + 3, v * 5, s + 5) > 0.72) albedo = 1.1; // cloud streaks
-      if (Math.abs(ny) > 0.86) albedo = 1.15; // polar caps
-      return { albedo, glow: false };
+      let albedo = land ? 0.8 + 0.2 * noise(u * 6, v * 6, s) : 0.85;
+      let tint = land ? TINT.land : TINT.sea;
+      if (noise(u * 1.2 + 3, v * 5, s + 5) > 0.72) { albedo = 1.1; tint = TINT.cloud; } // cloud streaks
+      if (Math.abs(ny) > 0.86) { albedo = 1.15; tint = TINT.cloud; } // polar caps
+      return { albedo, glow: false, tint };
     }
     case "ice": {
       const crack = Math.abs(fbm(u * 3, v * 3, s + 4) - 0.5) < 0.012;
-      return { albedo: crack ? 0.45 : 1.02 - 0.12 * fbm(u * 2, v * 2, s), glow: false };
+      return { albedo: crack ? 0.8 : 1.02 - 0.12 * fbm(u * 2, v * 2, s), glow: false, tint: crack ? TINT.crack : TINT.ice };
     }
     case "rock": {
       let albedo = 0.5 + 0.6 * fbm(u * 1.7, v * 1.7, s);
@@ -135,9 +159,13 @@ function surface(look: PlanetLook, nx: number, ny: number, nz: number): { albedo
         if (d < cr) albedo *= 0.6;
         else if (d < cr + 0.02) albedo *= 1.35;
       }
-      return { albedo, glow: false };
+      return { albedo, glow: false, tint: TINT.rock };
     }
   }
+}
+
+function mix(a: RGB, b: RGB, t: number): RGB {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
 /** Draw the planet centred on (cx, cy) inside radius `r`. Work is bounded whatever `r` is. */
@@ -146,8 +174,9 @@ export function drawPlanet(c: Canvas, cx: number, cy: number, r: number, p: Plan
   const look = planetLook(p);
   const R = Math.round(Math.min(r, MAX_RADIUS) * (look.ring ? RINGED_SCALE : 1));
   const span = look.ring ? Math.ceil(R * RING.outer) + 1 : R;
-  const put = (x: number, y: number, brightness: number) => {
-    setTone(c, x, y, Math.max(0, Math.min(1, brightness)) * 255);
+  const put = (x: number, y: number, brightness: number, tint: RGB = [255, 255, 255]) => {
+    const k = Math.max(0, Math.min(1, brightness));
+    setColor(c, x, y, tint[0] * k, tint[1] * k, tint[2] * k);
   };
 
   for (let y = -span; y <= span; y++) {
@@ -160,7 +189,7 @@ export function drawPlanet(c: Canvas, cx: number, cy: number, r: number, p: Plan
         const onRing = band >= 0 && band <= 1 && !(band > 0.45 && band < 0.55);
         // the far half of the ring is hidden behind the planet
         if (onRing && (!onDisc || y > 0)) {
-          put(cx + x, cy + y, 0.42 + 0.2 * rand(Math.round(rd * 40), 1, look.seed));
+          put(cx + x, cy + y, 0.6 + 0.3 * rand(Math.round(rd * 40), 1, look.seed), TINT.ring);
           continue;
         }
       }
@@ -168,8 +197,9 @@ export function drawPlanet(c: Canvas, cx: number, cy: number, r: number, p: Plan
       const nx = x / R, ny = y / R, nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
       let lit = 0;
       for (const l of look.lights) lit = Math.max(lit, nx * l[0] + ny * l[1] + nz * l[2]);
-      const { albedo, glow } = surface(look, nx, ny, nz);
-      put(cx + x, cy + y, glow ? 1 : Math.min(1, 0.04 + Math.max(0, lit) * albedo * 1.05));
+      const { albedo, glow, tint } = surface(look, nx, ny, nz);
+      if (glow) put(cx + x, cy + y, 1, TINT.lava);
+      else put(cx + x, cy + y, Math.min(1, 0.04 + Math.max(0, lit) * albedo * 1.05), tint);
       if (d2 > (R - 1) * (R - 1)) put(cx + x, cy + y, 0); // limb
     }
   }

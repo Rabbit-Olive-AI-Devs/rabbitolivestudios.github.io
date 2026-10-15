@@ -2,7 +2,7 @@
  * Desk panel Flamengo board: the league table, the next match, the last result
  * and recent form, read from ESPN's public keyless feeds (DECISIONS #70).
  *
- * Everything the page shows lives in one KV entry, `flamengo:v2:state`. A panel
+ * Everything the page shows lives in one KV entry, `flamengo:v3:state`. A panel
  * request always draws from that entry and refreshes it in the background when
  * it has aged: every six hours on a quiet day, every half hour from kickoff
  * until four hours after, so a result lands soon after the whistle. That is at
@@ -11,14 +11,14 @@
  * ESPN's table does not say which places qualify for what, so the zone lines
  * come from FotMob's table legend, the one feed here that is not ESPN's.
  *
- * Club crests are fetched at refresh time and kept in the same entry as grey
- * tones (hud/crest.ts). They are never committed to the repository.
+ * Club crests are fetched at refresh time and kept in the same entry as RGB
+ * (hud/crest.ts). They are never committed to the repository.
  */
 
 import type { Env } from "./types";
 import { flamengoCacheKey } from "./cache-keys";
 import { fetchWithTimeout } from "./fetch-timeout";
-import { crestTones } from "./hud/crest";
+import { crestColors } from "./hud/crest";
 import { withBudget } from "./with-budget";
 
 export const FLAMENGO_ID = "819";
@@ -80,7 +80,7 @@ export interface FlaState {
   zones: number[];
   /** A club's place in its own league, as ESPN words it, by team id. */
   standing: Record<string, string>;
-  /** 96x96 grey crests by team id (see hud/crest.ts). */
+  /** 96x96 RGB crests by team id (see hud/crest.ts). */
   crests: Record<string, string>;
 }
 
@@ -189,7 +189,7 @@ export function parseZones(json: unknown, clubs: number): number[] | null {
 export interface FlaSources {
   /** Parsed JSON, or null when the feed could not be read. */
   json: (url: string) => Promise<unknown>;
-  /** A club's crest as grey tones, or null. */
+  /** A club's crest as RGB, or null. */
   crest: (teamId: string) => Promise<string | null>;
 }
 
@@ -208,7 +208,7 @@ const live: FlaSources = {
   async crest(teamId) {
     try {
       const res = await fetchWithTimeout(crestUrl(teamId), undefined, 8000);
-      return res.ok ? await crestTones(new Uint8Array(await res.arrayBuffer())) : null;
+      return res.ok ? await crestColors(new Uint8Array(await res.arrayBuffer())) : null;
     } catch (err) {
       console.error(`Flamengo: crest ${teamId} failed:`, err);
       return null;

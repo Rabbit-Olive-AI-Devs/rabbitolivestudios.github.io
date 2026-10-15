@@ -1,11 +1,12 @@
 /**
- * 1-bit drawing surface for the desk panel pages (DECISIONS #66). Text is drawn by
+ * Drawing surface for the desk panel pages (DECISIONS #66). Text is drawn by
  * type.ts from pre-rendered glyph bitmaps of real fonts (DECISIONS #67).
  *
- * Values: 0 = black, 1 = white (as encodePNG1Bit), and 2..254 a grey tone, which only
- * pictures use (the crest and the planet, `setTone`): the panel converts those itself,
- * like every other picture since DECISIONS #81. Lines and text stay pure black and
- * white. A canvas with no tone is still encoded as 1-bit (page.ts). Every primitive clips to
+ * Values: 0 = black, 1 = white (as encodePNG1Bit), and COLOR = a full-colour pixel
+ * whose RGB lives in `rgb`. Only pictures use colour (the crest and the planet,
+ * `setColor`); the panel converts them itself, like every other picture since
+ * DECISIONS #81, so the same page suits a mono or a colour panel. Lines and text stay
+ * pure black and white. A canvas with no colour is still encoded as 1-bit (page.ts). Every primitive clips to
  * the buffer, so callers never need to bounds-check and a miscalculated layout
  * degrades to a cut-off shape instead of an exception or a wrapped row.
  */
@@ -17,7 +18,12 @@ export interface Canvas {
   w: number;
   h: number;
   px: Uint8Array;
+  /** RGB of the COLOR pixels, 3 bytes each; created by the first `setColor`. */
+  rgb?: Uint8Array;
 }
+
+/** px value of a pixel whose colour is in `rgb`. */
+export const COLOR = 2;
 
 export function createCanvas(w: number = PANEL_W, h: number = PANEL_H): Canvas {
   return { w, h, px: new Uint8Array(w * h).fill(1) };
@@ -30,19 +36,34 @@ export function setPixel(c: Canvas, x: number, y: number, v: number = 0): void {
   c.px[yi * c.w + xi] = v;
 }
 
-/** Grey level 0 (black) to 255 (white), stored so pure black and white stay 0 and 1. */
-export function toneValue(g: number): number {
-  const v = Math.round(g);
-  return v <= 1 ? 0 : v >= 255 ? 1 : v;
+/** A colour pixel (channels 0..255, clamped). Pure black and white are stored as 0 and 1. */
+export function setColor(c: Canvas, x: number, y: number, r: number, g: number, b: number): void {
+  const xi = Math.round(x);
+  const yi = Math.round(y);
+  if (xi < 0 || yi < 0 || xi >= c.w || yi >= c.h) return;
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  const [R, G, B] = [ch(r), ch(g), ch(b)];
+  const i = yi * c.w + xi;
+  if (R === G && G === B && (R === 0 || R === 255)) {
+    c.px[i] = R ? 1 : 0;
+    return;
+  }
+  c.rgb ??= new Uint8Array(c.w * c.h * 3);
+  c.px[i] = COLOR;
+  c.rgb.set([R, G, B], i * 3);
 }
 
-/** Brightness 0..255 of a stored value. */
-export function toneOf(v: number): number {
-  return v === 0 ? 0 : v === 1 ? 255 : v;
+/** The RGB of any pixel. */
+export function colorAt(c: Canvas, i: number): [number, number, number] {
+  const v = c.px[i];
+  if (v === COLOR && c.rgb) return [c.rgb[i * 3], c.rgb[i * 3 + 1], c.rgb[i * 3 + 2]];
+  return v === 0 ? [0, 0, 0] : [255, 255, 255];
 }
 
-export function setTone(c: Canvas, x: number, y: number, g: number): void {
-  setPixel(c, x, y, toneValue(g));
+/** Brightness 0..255 of any pixel. */
+export function lumaAt(c: Canvas, i: number): number {
+  const [r, g, b] = colorAt(c, i);
+  return (r * 77 + g * 150 + b * 29) >> 8;
 }
 
 export function fillRect(c: Canvas, x: number, y: number, w: number, h: number, v: number = 0): void {
@@ -78,7 +99,11 @@ export function invertRect(c: Canvas, x: number, y: number, w: number, h: number
   for (let yy = y0; yy < y1; yy++) {
     for (let xx = x0; xx < x1; xx++) {
       const i = yy * c.w + xx;
-      c.px[i] = toneValue(255 - toneOf(c.px[i]));
+      if (c.px[i] === COLOR && c.rgb) {
+        for (let k = i * 3; k < i * 3 + 3; k++) c.rgb[k] = 255 - c.rgb[k];
+      } else {
+        c.px[i] ^= 1;
+      }
     }
   }
 }
@@ -109,10 +134,10 @@ export function line(c: Canvas, x0: number, y0: number, x1: number, y1: number, 
   }
 }
 
-/** How much ink the canvas carries, in pixels: black counts 1, a grey its share. */
+/** How much ink the canvas carries, in pixels: black counts 1, a colour its darkness. */
 export function inkCoverage(c: Canvas): number {
   let n = 0;
-  for (let i = 0; i < c.px.length; i++) n += 1 - toneOf(c.px[i]) / 255;
+  for (let i = 0; i < c.px.length; i++) n += 1 - lumaAt(c, i) / 255;
   return n;
 }
 

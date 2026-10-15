@@ -1,19 +1,21 @@
 /**
  * Turn a drawn canvas into what the panel loads: one HTML document with the
- * PNG inlined as a data URI: 1-bit, or 8-bit grey when a picture on it has tones. SenseCraft screenshots about a second after
+ * PNG inlined as a data URI: 1-bit, or full-colour RGB when a picture on it has colour. SenseCraft screenshots about a second after
  * the document arrives and cancels any sub-resource still loading, so a panel
  * page must be a single request (DECISIONS #65).
  */
 
 import type { Canvas } from "./canvas";
-import { toneOf } from "./canvas";
-import { encodePNG1Bit, encodePNGGray8, pngToBase64 } from "../png";
+import { COLOR, colorAt } from "./canvas";
+import { encodePNG1Bit, encodePNGRGB, pngToBase64 } from "../png";
 import { htmlResponse } from "../response";
 import { unavailableHTML } from "../pages/unavailable";
 
 export function canvasToPng(c: Canvas): Promise<Uint8Array> {
-  if (!c.px.some((v) => v > 1)) return encodePNG1Bit(c.px, c.w, c.h);
-  return encodePNGGray8(c.px.map(toneOf), c.w, c.h);
+  if (!c.px.includes(COLOR)) return encodePNG1Bit(c.px, c.w, c.h);
+  const rgb = new Uint8Array(c.w * c.h * 3);
+  for (let i = 0; i < c.px.length; i++) rgb.set(colorAt(c, i), i * 3);
+  return encodePNGRGB(rgb, c.w, c.h);
 }
 
 export function hudPageHTML(title: string, base64: string): string {

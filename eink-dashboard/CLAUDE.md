@@ -54,7 +54,7 @@ Every session must begin with these steps:
 | Changing how a panel picture is converted (`/fact`, `/color/moment`, `/skyline*`, birthdays) | Since 2026-10-15 every one goes to the panel **as-is**: the AI image cropped to 800x480 in full colour, untouched, caption burned in as solid black and white (`burnCaption` in `src/image.ts`); the panel converts it (DECISIONS #81, after the series #73). Do not add our own quantise/dither step back without the owner seeing both on the panels. A page that inlines such a picture must stay one request (~0.6-1 MB PNG) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
-| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as an image, never with live HTML text: text and lines pure black and white, pictures (crest, planet) as grey tones the panel converts (`setTone`, DECISIONS #81); a page with no tone stays a 1-bit PNG. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters, and **never smaller than `plex11m`**, the owner's minimum on the panel (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep them free of AI, and of KV unless the page truly needs outside data: then one write a day, warmed by the cron, with an older value and a built-in fallback (`src/planet.ts`, DECISIONS #68). The Flamengo board is the costed exception: one entry refreshed by age, 4 to 12 writes a day (`src/flamengo.ts`, DECISIONS #70). Club crests are fetched at run time and never committed |
+| Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as an image, never with live HTML text: text and lines pure black and white, pictures (crest, planet) in full colour the panel converts (`setColor`, DECISIONS #81), so the same page suits the mono and the colour panels; a page with no colour stays a 1-bit PNG. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters, and **never smaller than `plex11m`**, the owner's minimum on the panel (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep them free of AI, and of KV unless the page truly needs outside data: then one write a day, warmed by the cron, with an older value and a built-in fallback (`src/planet.ts`, DECISIONS #68). The Flamengo board is the costed exception: one entry refreshed by age, 4 to 12 writes a day (`src/flamengo.ts`, DECISIONS #70). Club crests are fetched at run time and never committed |
 
 ---
 
@@ -327,7 +327,7 @@ eink-dashboard/
     styles-1bit.ts        — Pipeline B style table, picker, hash
     birthday.ts           — Birthday data + detection
     tars.ts               — Desk panel TARS: cleans and merges the Macs' reports into KV `tars:v1:state`, builds the page's view (DECISIONS #69)
-    flamengo.ts           — Desk panel Flamengo board: ESPN's public feeds (table, results, fixtures, crests) + FotMob's legend for the zone lines, in KV `flamengo:v2:state`, refreshed by age; builds the page's view (DECISIONS #70)
+    flamengo.ts           — Desk panel Flamengo board: ESPN's public feeds (table, results, fixtures, crests) + FotMob's legend for the zone lines, in KV `flamengo:v3:state`, refreshed by age; builds the page's view (DECISIONS #70)
     series/               — The series (DECISIONS #71): pure TS used by the offline import and the routes
       types.ts            — package, schedule and slot types; plannedChapters()
       clock.ts            — Chicago story clock → slot; resolveSlot() for unapproved chapters; scene time labels
@@ -386,10 +386,10 @@ eink-dashboard/
       aurebesh-words.ts   — word list (180), themes, letter names, date-to-word picker, special days, ?word=/?date= cleaning
       aurebesh-pronounce.ts — hand-written "how to say it" respelling for every word
       aurebesh-page.ts    — layout of the Aurebesh word-of-the-day page
-      planet-draw.ts      — draws a planet from its data: class, surface, lighting, name-seeded pattern, in grey tones (DECISIONS #68, #81)
+      planet-draw.ts      — draws a planet from its data: class, surface, lighting, name-seeded pattern, in full colour by kind of world (DECISIONS #68, #81)
       planet-page.ts      — layout of the planet-of-the-day page + number formatting
       tars-page.ts        — layout of the TARS page (machines, quota table, cards)
-      crest.ts            — a club crest PNG → 96x96 grey tones (transparency as paper; the panel converts, #81), and drawing it
+      crest.ts            — a club crest PNG → 96x96 RGB (transparency as paper; the panel converts, #81), and drawing it
       flamengo-page.ts    — layout of the Flamengo board (table, next match, cards) + fitting names to their places
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)

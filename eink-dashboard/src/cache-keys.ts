@@ -54,7 +54,7 @@ export function planetCacheKey(dateStr: string): string {
   return `planet:${PLANET_CACHE_VERSION}:${dateStr}`;
 }
 
-export const FLAMENGO_CACHE_VERSION = "v2"; // v2: crests as grey tones, not 1-bit (#81)
+export const FLAMENGO_CACHE_VERSION = "v3"; // v3: crests in full colour (v2 grey, v1 1-bit) (#81)
 
 /** Desk panel Flamengo board: one entry, rewritten as matches are played (DECISIONS #70). */
 export function flamengoCacheKey(): string {

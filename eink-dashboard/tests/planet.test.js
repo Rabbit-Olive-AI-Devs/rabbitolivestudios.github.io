@@ -161,7 +161,7 @@ test("a planet with two suns is lit from two sides", () => {
 });
 
 test("the same planet always draws the same, and different planets draw differently", () => {
-  const render = (p) => { const c = cv.createCanvas(260, 260); draw.drawPlanet(c, 130, 130, 96, p); return Buffer.from(c.px).toString("base64"); };
+  const render = (p) => { const c = cv.createCanvas(260, 260); draw.drawPlanet(c, 130, 130, 96, p); return Buffer.from(c.px).toString("base64") + Buffer.from(c.rgb ?? []).toString("base64"); };
   const a = P({ name: "Kepler-10 b", radius: 1.4, tempK: 2100 });
   assert.equal(render(a), render(a));
   assert.notEqual(render(a), render(P({ name: "Kepler-11 b", radius: 1.4, tempK: 2100 })), "the name sets the pattern");
@@ -171,7 +171,7 @@ test("the same planet always draws the same, and different planets draw differen
 test("the planet is a shaded disc: lit on one side, dark on the other, nothing outside its box", () => {
   const c = cv.createCanvas(300, 300);
   draw.drawPlanet(c, 150, 150, 96, P({ radius: 0.9, tempK: 600, name: "Test b" }));
-  const black = (x0, y0, x1, y1) => { let n = 0; for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) n += 1 - cv.toneOf(c.px[y * 300 + x]) / 255; return n / ((x1 - x0) * (y1 - y0)); };
+  const black = (x0, y0, x1, y1) => { let n = 0; for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) n += 1 - cv.lumaAt(c, y * 300 + x) / 255; return n / ((x1 - x0) * (y1 - y0)); };
   assert.ok(black(90, 90, 130, 130) < black(170, 170, 210, 210) - 0.25, "upper left is lit, lower right is in shadow");
   assert.equal(black(0, 0, 300, 40), 0, "nothing above the planet");
   assert.equal(black(0, 0, 40, 300), 0, "nothing left of it");
@@ -233,7 +233,7 @@ test("the planet page is a full panel for small, huge, long-named and sparse pla
 
 test("a tag changes the page", async () => {
   const base = await pl.loadPlanet("2026-10-12", archive());
-  const b64 = (c) => Buffer.from(c.px).toString("base64");
+  const b64 = (c) => Buffer.from(c.px).toString("base64") + Buffer.from(c.rgb ?? []).toString("base64");
   assert.notEqual(b64(pp.drawPlanetPage(base, "2026-10-12")), b64(pp.drawPlanetPage({ ...base, tag: "REAL-LIFE TATOOINE" }, "2026-10-12")));
 });
 

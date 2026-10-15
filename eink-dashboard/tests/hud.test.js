@@ -56,17 +56,23 @@ test("invertRect flips black and white inside the area only", () => {
   assert.equal(cv.countBlack(c), 50);
 });
 
-test("grey tones keep pure black and white exact, and a page with tones is encoded as 8-bit grey", async () => {
+test("colour keeps pure black and white exact, and a page with colour is encoded as RGB", async () => {
   const pg = fromBuild("src/hud/page.js");
   const c = cv.createCanvas(8, 2);
-  assert.equal((await pg.canvasToPng(c))[24], 1, "no tone: 1-bit PNG");
-  cv.setTone(c, 0, 0, 0);
-  cv.setTone(c, 1, 0, 255);
-  cv.setTone(c, 2, 0, 128);
-  assert.deepEqual([at(c, 0, 0), at(c, 1, 0), at(c, 2, 0)], [0, 1, 128]);
-  assert.equal((await pg.canvasToPng(c))[24], 8, "a tone: 8-bit PNG");
+  const png = await pg.canvasToPng(c);
+  assert.deepEqual([png[24], png[25]], [1, 0], "no colour: 1-bit grey PNG");
+  cv.setColor(c, 0, 0, 0, 0, 0);
+  cv.setColor(c, 1, 0, 255, 255, 255);
+  cv.setColor(c, 2, 0, 200, 40, 10);
+  assert.deepEqual([at(c, 0, 0), at(c, 1, 0), at(c, 2, 0)], [0, 1, cv.COLOR]);
+  assert.deepEqual(cv.colorAt(c, 2), [200, 40, 10]);
+  const rgb = await pg.canvasToPng(c);
+  assert.deepEqual([rgb[24], rgb[25]], [8, 2], "colour: 8-bit RGB PNG");
   cv.invertRect(c, 0, 0, 3, 1);
-  assert.deepEqual([at(c, 0, 0), at(c, 1, 0), at(c, 2, 0)], [1, 0, 127]);
+  assert.deepEqual([at(c, 0, 0), at(c, 1, 0)], [1, 0]);
+  assert.deepEqual(cv.colorAt(c, 2), [55, 215, 245]);
+  cv.setPixel(c, 2, 0, 0);
+  assert.deepEqual(cv.colorAt(c, 2), [0, 0, 0], "black drawn over colour wins");
 });
 
 test("line joins its endpoints and thickness widens it", () => {
