@@ -7,11 +7,12 @@
  */
 
 import { shiftDateStr } from "../date-utils";
+import { REVISION } from "./proof";
 import type { Schedule } from "./types";
 import { plannedChapters } from "./types";
 
 export type Message =
-  | { kind: "APPROVE"; season: number; chapters: number[] }
+  | { kind: "APPROVE"; season: number; chapters: number[]; revisions: string[] }
   | { kind: "DELIVERY"; package: string; replaceApproved: boolean }
   | { kind: "STYLE TEST"; folder: string }
   | { kind: "QUESTION" | "FYI" | "OTHER" }
@@ -30,7 +31,13 @@ export function parseMessage(text: string): Message {
     const list = param("chapters") ?? param("chapter");
     if (season === undefined || !/^\d+$/.test(season)) return { kind: "INVALID", reason: "APPROVE needs season=N on its first line" };
     if (!list || !/^\d+(,\d+)*$/.test(list)) return { kind: "INVALID", reason: "APPROVE needs chapter=N (or chapters=N,M) on its first line" };
-    return { kind: "APPROVE", season: Number(season), chapters: list.split(",").map(Number) };
+    // The revision of the proof export reviewed (DECISIONS #78): pages changed since then are not approved.
+    const revs = (param("revisions") ?? param("revision"))?.toLowerCase().split(",") ?? [];
+    const chapters = list.split(",").map(Number);
+    if (revs.length !== chapters.length || !revs.every((r) => REVISION.test(r))) {
+      return { kind: "INVALID", reason: "APPROVE needs revision=<16 hex> from the proof export (revisions=A,B for chapters=N,M, in the same order)" };
+    }
+    return { kind: "APPROVE", season: Number(season), chapters, revisions: revs };
   }
   if (upper.startsWith("DELIVERY")) {
     const pkg = param("package");

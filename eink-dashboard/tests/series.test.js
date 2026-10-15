@@ -554,8 +554,8 @@ test("review: uploading does not replace approved chapters unless asked", () => 
 const mb = fromBuild("src/series/mailbox.js");
 
 test("mailbox: APPROVE, DELIVERY and STYLE TEST first lines are parsed", () => {
-  assert.deepEqual(mb.parseMessage("APPROVE season=0 chapter=1\n\nLooks good."), { kind: "APPROVE", season: 0, chapters: [1] });
-  assert.deepEqual(mb.parseMessage("\napprove season=0 chapters=1,2"), { kind: "APPROVE", season: 0, chapters: [1, 2] });
+  assert.deepEqual(mb.parseMessage("APPROVE season=0 chapter=1 revision=0123456789abcdef\n\nLooks good."), { kind: "APPROVE", season: 0, chapters: [1], revisions: ["0123456789abcdef"] });
+  assert.deepEqual(mb.parseMessage("\napprove season=0 chapters=1,2 revisions=0123456789ABCDEF,fedcba9876543210"), { kind: "APPROVE", season: 0, chapters: [1, 2], revisions: ["0123456789abcdef", "fedcba9876543210"] });
   assert.deepEqual(mb.parseMessage("DELIVERY package=season-01-chapter-01.zip\nnotes"), { kind: "DELIVERY", package: "season-01-chapter-01.zip", replaceApproved: false });
   assert.deepEqual(mb.parseMessage("DELIVERY package=s01.zip replace-approved"), { kind: "DELIVERY", package: "s01.zip", replaceApproved: true });
   assert.deepEqual(mb.parseMessage("STYLE TEST folder=openai-1"), { kind: "STYLE TEST", folder: "openai-1" });
@@ -566,6 +566,9 @@ test("mailbox: other kinds go to Claude, broken commands are explained", () => {
   assert.deepEqual(mb.parseMessage("FYI\n# Notion ready"), { kind: "FYI" });
   assert.deepEqual(mb.parseMessage("Hello Claude"), { kind: "OTHER" });
   assert.match(mb.parseMessage("APPROVE chapter=1").reason, /season=/);
+  assert.match(mb.parseMessage("APPROVE season=0 chapter=1").reason, /revision=/);
+  assert.match(mb.parseMessage("APPROVE season=0 chapters=1,2 revision=0123456789abcdef").reason, /same order/);
+  assert.match(mb.parseMessage("APPROVE season=0 chapter=1 revision=xyz").reason, /16 hex/);
   assert.match(mb.parseMessage("DELIVERY\nzip is in packages").reason, /package=/);
   assert.match(mb.parseMessage("DELIVERY package=../../etc/passwd").reason, /file name/);
   assert.match(mb.parseMessage("STYLE TEST folder=a/b").reason, /folder name/);
@@ -621,4 +624,36 @@ test("full-colour PNG round trip (the as-is series pages)", async () => {
   assert.equal(d.width, w);
   assert.equal(d.height, h);
   assert.deepEqual([...d.rgb], [...rgb]);
+});
+
+// --- Proof export (DECISIONS #78) ---
+
+const proof = fromBuild("src/series/proof.js");
+
+test("proof: a chapter is 25 scenes, 25 replays and the teaser", () => {
+  const k = proof.chapterPageKeys(0, 1);
+  assert.equal(k.length, 51);
+  assert.equal(k[0], "series/s00/c01/s01.html");
+  assert.equal(k[25], "series/s00/c01/r01.html");
+  assert.equal(k[50], "series/s00/c01/teaser.html");
+  assert.equal(new Set(k).size, 51);
+});
+
+test("proof: the inlined PNG comes out of a page byte for byte, with its size", () => {
+  const hud = fromBuild("src/hud/page.js");
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 3, 32, 0, 0, 1, 224, 8, 2]);
+  const html = hud.hudPageHTML("The Series", Buffer.from(png).toString("base64"));
+  assert.deepEqual(proof.pagePNG(html), png);
+  assert.deepEqual(proof.pngSize(png), { width: 800, height: 480 });
+  assert.equal(proof.pagePNG("<html>no picture</html>"), null);
+  assert.equal(proof.pngSize(new Uint8Array(30)), null);
+});
+
+test("proof: the revision follows the page bytes, not their order", async () => {
+  const a = [{ key: "a", sha256: "1" }, { key: "b", sha256: "2" }];
+  const r = await proof.revisionOf(a);
+  assert.match(r, proof.REVISION);
+  assert.equal(await proof.revisionOf([...a].reverse()), r);
+  assert.notEqual(await proof.revisionOf([{ key: "a", sha256: "1" }, { key: "b", sha256: "3" }]), r);
+  assert.equal(await proof.sha256Hex(new TextEncoder().encode("abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
 });

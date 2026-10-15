@@ -6,7 +6,8 @@
  *
  *   npm run series -- build <package.zip|dir> [--chapter N] [--out DIR]
  *   npm run series -- upload <out-dir>
- *   npm run series -- approve --season S --chapter C
+ *   npm run series -- approve --season S --chapter C --revision R
+ *   npm run series -- export --season S --chapter C [--to DIR]   (the proof export for Jarvis, from R2)
  *   npm run series -- templates
  *   npm run series -- preview <picture|folder> --out DIR   (a writer's style test on all three panels)
  *
@@ -22,6 +23,8 @@ const require = createRequire(import.meta.url);
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const BUCKET = "eink-series";
 const SCHEDULE_KEY = "series/schedule.json";
+// Jarvis's spoiler review folder (DECISIONS #78): outside the shared series mailbox.
+const PROOFS = process.env.SERIES_PROOFS ?? "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_JARVIS_SPOILERS/series-proofs";
 
 function compile() {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "series-build-"));
@@ -30,7 +33,7 @@ function compile() {
   return {
     pkgv: load("src/series/package.js"), build: load("src/series/build.js"), art: load("src/series/art.js"),
     tpl: load("src/series/templates.js"), types: load("src/series/types.js"), dec: load("src/png-decode.js"),
-    schedule: load("src/series/schedule.js"), page: load("src/hud/page.js"),
+    schedule: load("src/series/schedule.js"), page: load("src/hud/page.js"), proof: load("src/series/proof.js"),
     hud: { canvas: load("src/hud/canvas.js"), type: load("src/hud/type.js"), parts: load("src/hud/parts.js") },
     png: load("src/png.js"),
   };
@@ -185,13 +188,129 @@ async function cmdUpload() {
   if (failed) { console.error(`${failed} uploads failed; schedule not changed. Re-run upload.`); process.exit(1); }
   writeSchedule(plan.schedule);
   console.log(`uploaded ${keys.length} pages; chapters ${plan.upload.join(", ")} uploaded (new ones pending approval)`);
+  // Jarvis reviews what R2 now holds, not this build folder; a failed export leaves the upload standing.
+  for (const c of plan.upload) {
+    try {
+      const e = await exportChapter(m, meta.season.number, c, PROOFS);
+      console.log(`proof export: season ${meta.season.number} chapter ${c} revision ${e.revision} in ${e.dir}`);
+    } catch (err) {
+      console.error(`proof export FAILED: season ${meta.season.number} chapter ${c}: ${err.message}`);
+    }
+  }
 }
 
-function cmdApprove() {
+/** One R2 object as bytes, tried three times. */
+function r2Get(key) {
+  return new Promise((resolve, reject) => {
+    const tryOnce = (attempt) => {
+      const p = spawn("npx", ["wrangler", "r2", "object", "get", `${BUCKET}/${key}`, "--pipe", "--remote"], { cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
+      const chunks = [], err = [];
+      p.stdout.on("data", (d) => chunks.push(d));
+      p.stderr.on("data", (d) => err.push(d));
+      p.on("exit", (code) => {
+        if (code === 0) return resolve(Buffer.concat(chunks));
+        const msg = Buffer.concat(err).toString();
+        if (/does not exist|NoSuchKey|not found/i.test(msg)) return reject(new Error(`missing in R2: ${key}`));
+        if (attempt < 3) return setTimeout(() => tryOnce(attempt + 1), attempt * 3000);
+        reject(new Error(`could not read ${key}: ${msg.slice(-300)}`));
+      });
+    };
+    tryOnce(1);
+  });
+}
+
+/** Every page of a chapter from R2, hashed, and the chapter's revision. Refuses an incomplete set. */
+async function readChapter(m, season, chapter) {
+  if (!process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("set CLOUDFLARE_ACCOUNT_ID inline");
+  const keys = m.proof.chapterPageKeys(season, chapter);
+  const pages = new Array(keys.length);
+  const missing = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < keys.length) {
+      const i = next++;
+      try {
+        const bytes = await r2Get(keys[i]);
+        pages[i] = { key: keys[i], bytes, sha256: await m.proof.sha256Hex(bytes) };
+      } catch (err) { missing.push(err.message); }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  if (missing.length) throw new Error(`chapter ${chapter} is incomplete in R2:\n  ${missing.join("\n  ")}`);
+  return { pages, revision: await m.proof.revisionOf(pages) };
+}
+
+const sha256File = (m, f) => m.proof.sha256Hex(new Uint8Array(fs.readFileSync(f)));
+
+/**
+ * Copy one uploaded chapter's exact pages into the proof folder as an immutable revision:
+ * html/ (the bytes in R2), png/ (the picture inside each, to look at), MANIFEST.json, and
+ * READY written last, after every file has been read back and checked against the manifest.
+ */
+async function exportChapter(m, season, chapter, root) {
+  const s = readSchedule(m).seasons.find((x) => x.number === season);
+  const status = s?.approved.includes(chapter) ? "approved" : s?.pending.includes(chapter) ? "pending" : null;
+  if (!status) throw new Error(`season ${season} chapter ${chapter} is not uploaded`);
+  const { pages, revision } = await readChapter(m, season, chapter);
+  const pad = (n) => String(n).padStart(2, "0");
+  const chapterDir = path.join(root, `s${pad(season)}-c${pad(chapter)}`);
+  const dir = path.join(chapterDir, `rev-${revision}`);
+  const current = () => fs.writeFileSync(path.join(chapterDir, "CURRENT.txt"), `${revision}\n`);
+  if (fs.existsSync(path.join(dir, "READY"))) { current(); return { revision, dir, reused: true }; }
+
+  const staging = path.join(chapterDir, `.staging-${revision}-${process.pid}`);
+  fs.rmSync(staging, { recursive: true, force: true });
+  fs.mkdirSync(path.join(staging, "html"), { recursive: true });
+  fs.mkdirSync(path.join(staging, "png"), { recursive: true });
+  const files = [];
+  for (const p of pages) {
+    const name = path.basename(p.key, ".html");
+    const png = m.proof.pagePNG(p.bytes.toString("utf8"));
+    const size = png && m.proof.pngSize(png);
+    if (!size) throw new Error(`${p.key} carries no PNG`);
+    fs.writeFileSync(path.join(staging, "html", `${name}.html`), p.bytes);
+    fs.writeFileSync(path.join(staging, "png", `${name}.png`), png);
+    files.push({
+      r2Key: p.key, page: name, kind: name === "teaser" ? "teaser" : name.startsWith("r") ? "replay" : "scene",
+      html: { path: `html/${name}.html`, bytes: p.bytes.length, sha256: p.sha256 },
+      png: { path: `png/${name}.png`, bytes: png.length, sha256: await m.proof.sha256Hex(png), width: size.width, height: size.height },
+    });
+  }
+  const manifest = {
+    season, chapter, revision, scheduleStatus: status, exportedAt: new Date().toISOString(),
+    source: `R2 bucket ${BUCKET}, read back at export time: these are the bytes the panels are served`,
+    revisionRule: "first 16 hex of SHA-256 over the sorted lines \"<r2Key> <html sha256>\\n\"",
+    expected: { scenes: 25, replays: 25, teaser: 1, total: 51 }, count: files.length, files,
+  };
+  fs.writeFileSync(path.join(staging, "MANIFEST.json"), JSON.stringify(manifest, null, 2) + "\n");
+  // Read every file back before READY: what we claim is what is on disk.
+  for (const f of files) for (const part of [f.html, f.png]) {
+    if ((await sha256File(m, path.join(staging, part.path))) !== part.sha256) throw new Error(`${part.path} did not write correctly`);
+  }
+  fs.renameSync(staging, dir);
+  const manifestSha = await sha256File(m, path.join(dir, "MANIFEST.json"));
+  fs.writeFileSync(path.join(dir, "READY"), `revision ${revision}\nfiles ${files.length * 2 + 1} (51 html, 51 png, MANIFEST.json)\nmanifest sha256 ${manifestSha}\nwritten ${new Date().toISOString()}\n`);
+  current();
+  return { revision, dir, reused: false };
+}
+
+async function cmdExport() {
   const season = Number(arg("--season")), chapter = Number(arg("--chapter"));
-  const s = readSchedule(compile());
+  if (!Number.isInteger(season) || !Number.isInteger(chapter)) { console.error("export needs --season S --chapter C"); process.exit(2); }
+  const e = await exportChapter(compile(), season, chapter, path.resolve(arg("--to", PROOFS)));
+  console.log(`proof export: season ${season} chapter ${chapter} revision ${e.revision} in ${e.dir}${e.reused ? " (already exported)" : ""}`);
+}
+
+async function cmdApprove() {
+  const season = Number(arg("--season")), chapter = Number(arg("--chapter")), revision = String(arg("--revision", "")).toLowerCase();
+  const m = compile();
+  if (!m.proof.REVISION.test(revision)) { console.error("approve needs --revision: the proof export revision that was reviewed"); process.exit(1); }
+  const s = readSchedule(m);
   const e = s.seasons.find((x) => x.number === season);
   if (!e || !(e.pending.includes(chapter) || e.approved.includes(chapter))) { console.error("that chapter is not uploaded"); process.exit(1); }
+  // The pages on air must be the ones reviewed: recompute the revision from R2 itself.
+  const now = (await readChapter(m, season, chapter)).revision;
+  if (now !== revision) { console.error(`the pages changed since revision ${revision}; R2 now holds revision ${now}. Review that export first`); process.exit(1); }
   e.pending = e.pending.filter((c) => c !== chapter);
   if (!e.approved.includes(chapter)) e.approved.push(chapter);
   e.approved.sort((a, b) => a - b);
@@ -261,6 +380,6 @@ async function cmdPreview() {
   console.log(done.join("\n"));
 }
 
-const run = { build: cmdBuild, upload: cmdUpload, approve: cmdApprove, templates: cmdTemplates, preview: cmdPreview }[cmd];
-if (!run) { console.error("usage: series-import.mjs build|upload|approve|templates|preview"); process.exit(2); }
+const run = { build: cmdBuild, upload: cmdUpload, approve: cmdApprove, export: cmdExport, templates: cmdTemplates, preview: cmdPreview }[cmd];
+if (!run) { console.error("usage: series-import.mjs build|upload|approve|export|templates|preview"); process.exit(2); }
 await run();

@@ -3449,3 +3449,49 @@ track (the owner's account) cut to the timeline, with v1's hits laid on top so e
 lands on one (`teaser.py audio <bed.wav>`). Render: 24 min 21 s for the shots on the MacBook Pro, under a minute more to compose and encode. Why Blender and not more code
 drawing: the owner asked for real camera moves on a real ship, which pans on stills cannot give.
 Details, the prompt and the re-render steps: `docs/series/TEASER.md`.
+
+---
+
+## 78. Jarvis Reviews a Keyless Proof Export, and Approves One Exact Revision (2026-10-15)
+
+### Problem
+
+The proof page (`/series/proof`) accepts `SERIES_KEY` only as `?key=` in the URL. Jarvis holds
+secrets in a Vault that can fill website passwords but cannot put a secret into a URL, so he could
+not open the proofs at all, and Prologue chapter 1 must be approved by Sun 18 Oct for the
+Mon 26 Oct premiere. Jarvis's acceptance list: the exact rendered bytes, every scene, a hashed
+manifest tied to what is in production, READY only when complete, a new immutable revision on any
+change, and an approval bound to the revision reviewed. No key in any file, and no auth change.
+
+### Decision
+
+- **Export from R2, not from a build folder.** `npm run series -- export --season S --chapter C`
+  reads the chapter's 51 pages back from R2 (25 scenes, 25 replays, teaser), so what Jarvis checks
+  is what the panels are served, whichever local build was uploaded. `upload` runs it for every
+  chapter it uploads; a failed export leaves the upload standing and flags a session.
+- **Layout:** `sNN-cNN/rev-<revision>/` with `html/` (the R2 bytes), `png/` (the picture inside
+  each page, byte for byte), `MANIFEST.json` (status, sizes, dimensions, SHA-256 of every file) and
+  `READY`, written last after every file is read back and checked. Files are written to a staging
+  folder and renamed into place. `CURRENT.txt` names the revision now in R2. A revision folder is
+  never rewritten.
+- **Revision** = first 16 hex of SHA-256 over the sorted `"<r2Key> <html sha256>\n"` lines
+  (`src/series/proof.ts`). Any change to art, lettering or render changes it.
+- **Approval names the revision.** `APPROVE season=S chapter=C revision=R` (or
+  `chapters=C,D revisions=R1,R2`); a missing or malformed revision is refused. `approve` re-reads
+  the pages from R2 and refuses if they no longer hash to R, so a re-upload after review can never
+  air on an old approval. The CLI needs `--revision` too.
+- **Where:** Dropbox `00_JARVIS_SPOILERS/series-proofs/`, outside the shared series mailbox, by
+  the owner's choice ("separate folder only for Jarvis"), with a README for Jarvis.
+
+### Caveats
+
+- **Not an access control.** Checked with the Dropbox API on 2026-10-15: neither
+  `00_SHARED_INBOX` nor the new folder is a separately shared folder; both live in the owner's
+  personal account root, and the series folder has no shared links. Anything with access to the
+  whole account can read the proofs. A real lock would need Jarvis's reader scoped to that folder
+  (an app-folder app, or a separate account it is shared with).
+- **Dropbox sync order is not guaranteed**, so READY can reach Jarvis before a picture does. The
+  README tells him to check every hash against the manifest before trusting the set.
+- First exports, 2026-10-15: Prologue ch1 `bfc25eee39c73b5d`, ch2 `f1aecd8abab50554`, ch3
+  `00d92e799de3a0c7`; all pending, 51 pages each, every PNG 800x480. About 17 s per chapter.
+- The keyed proof page and URL auth are unchanged.

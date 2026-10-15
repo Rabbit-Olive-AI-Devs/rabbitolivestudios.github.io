@@ -94,9 +94,9 @@ function handle(file, m) {
   const msg = m.mailbox.parseMessage(text);
   switch (msg.kind) {
     case "APPROVE": {
-      const lines = msg.chapters.map((c) => {
-        const r = series(["approve", "--season", String(msg.season), "--chapter", String(c)]);
-        return `- Season ${msg.season} chapter ${c}: ${r.ok ? "approved; it airs on its Monday at 08:00." : `NOT approved: ${r.out.split("\n").pop()}`}`;
+      const lines = msg.chapters.map((c, i) => {
+        const r = series(["approve", "--season", String(msg.season), "--chapter", String(c), "--revision", msg.revisions[i]]);
+        return `- Season ${msg.season} chapter ${c} (revision ${msg.revisions[i]}): ${r.ok ? "approved; it airs on its Monday at 08:00." : `NOT approved: ${r.out.split("\n").pop()}`}`;
       });
       reply(`approved-s${msg.season}`, `FYI: reply to ${file}\n\n${lines.join("\n")}`);
       return true;
@@ -115,9 +115,10 @@ function handle(file, m) {
       const meta = JSON.parse(fs.readFileSync(path.join(out, "season.json"), "utf8"));
       const links = meta.chapters.map((c) => `- Chapter ${c}: ${SITE}/series/proof?season=${meta.season.number}&chapter=${c}&key=`).join("\n");
       reply(u.ok ? "delivery-uploaded" : "delivery-upload-failed", u.ok
-        ? `FYI: reply to ${file}\n\n${msg.package} passed every check and is uploaded. ${u.out.split("\n").filter((l) => /uploaded|not replaced/.test(l)).join(" ")}\n\nProof pages (add your key):\n${links}\n\nSend APPROVE season=${meta.season.number} chapter=N when you are happy.`
+        ? `FYI: reply to ${file}\n\n${msg.package} passed every check and is uploaded. ${u.out.split("\n").filter((l) => /uploaded|not replaced/.test(l)).join(" ")}\n\n${exportLines(u.out)}\n\nProof pages (add your key):\n${links}\n\nSend APPROVE season=${meta.season.number} chapter=N revision=R when you have reviewed that revision.`
         : `FYI: reply to ${file}\n\n${msg.package} passed the checks but the upload failed. Nothing changed on air. Thiago needs to ask Claude to look:\n\n${u.out.slice(-2000)}`);
       if (!u.ok) note(`Upload of ${msg.package} failed; see ~/Library/Logs/eink-series/mailbox.log`);
+      if (/proof export FAILED/.test(u.out)) note(`The proof export for ${msg.package} failed, so Jarvis cannot review it yet. Please open a session.`);
       return true;
     }
     case "STYLE TEST": {
@@ -136,13 +137,21 @@ function handle(file, m) {
       return true;
     }
     case "INVALID":
-      reply("format-problem", `FYI: reply to ${file}\n\n${msg.reason}. Nothing was done. The first line formats are:\n\n    APPROVE season=0 chapter=3\n    DELIVERY package=season-01-chapter-01.zip [replace-approved]\n    STYLE TEST folder=openai-1\n    QUESTION | FYI`);
+      reply("format-problem", `FYI: reply to ${file}\n\n${msg.reason}. Nothing was done. The first line formats are:\n\n    APPROVE season=0 chapter=3 revision=<16 hex from the proof export>\n    DELIVERY package=season-01-chapter-01.zip [replace-approved]\n    STYLE TEST folder=openai-1\n    QUESTION | FYI`);
       return true;
     default: {
       const read = ["Read", "Glob", "Grep"];
       return claude("message.md", { MESSAGE: path.join(INBOX, file), MAILBOX, OUTBOX, STAMP: stamp().file }, [...read, ...writeTo(OUTBOX)], `message-${file.replace(/\.md$/, "")}`);
     }
   }
+}
+
+/** The upload's proof-export lines, for Jarvis (DECISIONS #78). */
+function exportLines(out) {
+  const lines = out.split("\n").filter((l) => /^proof export/.test(l));
+  return lines.length
+    ? `Proof export for review (no key needed; check READY and MANIFEST.json first):\n${lines.map((l) => `- ${l}`).join("\n")}`
+    : "The proof export did not run; Thiago has been asked to open a session.";
 }
 
 /** A spoiler-free line for Thiago, relayed by Jarvis. */
@@ -218,11 +227,12 @@ function cmdWeekly() {
   }
   const u = series(["upload", out]);
   if (!u.ok) { note(`Chapter ${due.chapter} built but the upload failed. Please open a session.`); log(`weekly upload failed: ${u.out.slice(-500)}`); return; }
+  if (/proof export FAILED/.test(u.out)) note(`Chapter ${due.chapter} is uploaded but its proof export failed, so Jarvis cannot review it yet. Please open a session.`);
   for (const f of ["bible-notes.md", "handover-notes.md"]) {
     const src = path.join(pkg, f);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(OUTBOX, f === "bible-notes.md" ? "bible-notes-prologue.md" : "SPOILERS-prologue-outline.md"));
   }
-  reply(`proof-s${pad(due.season)}-c${pad(due.chapter)}`, `DELIVERY: season ${due.season} chapter ${due.chapter} is uploaded and waiting for your approval.\n\n- Proof page (add your key): ${SITE}/series/proof?season=${due.season}&chapter=${due.chapter}&key=\n- It airs ${due.airs} at 08:00. Please approve at least 8 days before.\n- bible-notes-prologue.md and SPOILERS-prologue-outline.md are updated. Keep the spoiler file away from Thiago.`);
+  reply(`proof-s${pad(due.season)}-c${pad(due.chapter)}`, `DELIVERY: season ${due.season} chapter ${due.chapter} is uploaded and waiting for your approval.\n\n${exportLines(u.out)}\n\n- Approve with: APPROVE season=${due.season} chapter=${due.chapter} revision=R (R from the export above)\n- Proof page (add your key): ${SITE}/series/proof?season=${due.season}&chapter=${due.chapter}&key=\n- It airs ${due.airs} at 08:00. Please approve at least 8 days before.\n- bible-notes-prologue.md and SPOILERS-prologue-outline.md are updated. Keep the spoiler file away from Thiago.`);
   log(`weekly: chapter ${due.chapter} uploaded`);
 }
 

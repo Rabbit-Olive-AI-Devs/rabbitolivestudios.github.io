@@ -339,7 +339,8 @@ eink-dashboard/
       render.ts           — compose scene pages (+ replay) in full colour, untouched art (#73); teasers, before/after cards; encode PNGs
       build.ts            — one chapter: hold, crop, map anchors, render → R2 key → PNG
       watch.ts            — alert problems and /health-detailed snapshot for the series
-      mailbox.ts          — parses mailbox first-line commands; dueClaudeChapter() for the weekly run (DECISIONS #72); CALENDAR + heartbeat() for the Monday note (#76)
+      proof.ts            — proof export helpers: a chapter's 51 R2 keys, the PNG inside a page, SHA-256, the revision digest (DECISIONS #78)
+      mailbox.ts          — parses mailbox first-line commands (APPROVE needs the export revision); dueClaudeChapter() for the weekly run (DECISIONS #72); CALENDAR + heartbeat() for the Monday note (#76)
     planet.ts             — Desk panel planet of the day: NASA Exoplanet Archive queries + daily KV cache `planet:v1:DATE` (DECISIONS #68)
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
     images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)
@@ -412,7 +413,7 @@ eink-dashboard/
     upload-skyline-photos.sh   — Upload skyline photos to R2
     tars-report.sh             — Runs on each Mac every 30 min (launchd): posts disk/memory/uptime + CodexBar snapshot to /desk/tars; key from the Keychain (DECISIONS #69)
     tars-launchd.plist.example — launchd template for the reporter
-    series-import.mjs          — Offline series import: build | upload | approve | templates (`npm run series --`, DECISIONS #71)
+    series-import.mjs          — Offline series import: build | upload | approve | export | templates | preview (`npm run series --`, DECISIONS #71). `upload` also writes the proof export for Jarvis to Dropbox `00_JARVIS_SPOILERS/`; `approve` needs the reviewed `--revision` (#78)
     materialize-exec.py        — Lets a launchd job read Dropbox online-only (dataless) files: sets the materialize I/O policy, then execs the real program (DECISIONS #72)
     series-teaser/             — `teaser.py`: the series teaser, frames and score drawn by code; `blender/lantern.py`: v2's 3D shots (the ship, the outpost, space), built and rendered in Blender (DECISIONS #77, docs/series/TEASER.md); pictures, video, audio and .blend files stay out of the repo
     series-paint/              — Claude's painting engine (DECISIONS #74): `painter.py` paints a code-drawn underpainting with textured brush strokes (gouache for the Prologue; oil and pixel for style tests), `page-png.py` pulls the picture out of a built page. Python 3 + numpy + PIL, run with `python3 -E -P`
