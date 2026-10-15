@@ -414,6 +414,7 @@ eink-dashboard/
     tars-report.sh             — Runs on each Mac every 30 min (launchd): posts disk/memory/uptime + CodexBar snapshot to /desk/tars; key from the Keychain (DECISIONS #69)
     tars-launchd.plist.example — launchd template for the reporter
     series-import.mjs          — Offline series import: build | upload | approve | templates (`npm run series --`, DECISIONS #71)
+    materialize-exec.py        — Lets a launchd job read Dropbox online-only (dataless) files: sets the materialize I/O policy, then execs the real program (DECISIONS #72)
     series-mailbox.mjs         — The mailbox watcher (DECISIONS #72): `run` handles Jarvis's APPROVE/DELIVERY/STYLE TEST by script, other messages via a read-only `claude -p`; `weekly` writes Claude's next due chapter. Prompts in `series-agent/`, LaunchAgents in `launchd/`
     series-set-key.sh          — Owner runs it in a real terminal: choose SERIES_KEY (hidden prompt) → ~/.config/eink/series-key (600) + Cloudflare secret, then checks the proof page
     generate-desk-fonts.mjs    — Offline: rasterise fonts/desk/ into src/hud/fonts-data.ts (`npm run desk-fonts`, DECISIONS #67)

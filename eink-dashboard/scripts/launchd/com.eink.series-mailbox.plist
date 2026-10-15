@@ -6,12 +6,15 @@
   Run now: launchctl kickstart gui/$(id -u)/com.eink.series-mailbox
   Stop:    launchctl bootout gui/$(id -u)/com.eink.series-mailbox
   Logs:    ~/Library/Logs/eink-series/
+  Started through materialize-exec.py so it can read Dropbox online-only files (DECISIONS #72).
 -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.eink.series-mailbox</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/materialize-exec.py</string>
     <string>/opt/homebrew/bin/node</string>
     <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/series-mailbox.mjs</string>
     <string>run</string>

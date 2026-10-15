@@ -3235,3 +3235,16 @@ The first weekly run (started early with `SERIES_TODAY=2026-10-21`) wrote, drew,
 uploaded Prologue chapter 3 unattended in about 17 minutes, with the repo left clean. It also
 showed that one shared lock made the mailbox skip messages while a chapter was being written; each
 job now has its own lock (`.mailbox-run.lock`, `.mailbox-weekly.lock` in `~/series-work/`).
+
+**Online-only Dropbox files (fixed the same evening).** The owner's Dropbox keeps files online-only
+(APFS *dataless* files on the SSD). A program started from Terminal downloads them on first read,
+but a launchd job is not allowed to: every read of a message Jarvis wrote failed with `EDEADLK`
+(Node prints "Unknown system error -11"), five messages were given up after three tries, and Jarvis
+got "could not handle" notices. The engineer's own test messages had been created on the Mac, so
+they were never dataless and the tests passed. Reproduced under launchd with two existing
+online-only files (plain read: -11; with the fix: read and downloaded). Fix:
+`scripts/materialize-exec.py` sets the process I/O policy
+`IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES` to on and then execs node; children (the import tool,
+`sips`, `claude`) inherit it, checked under launchd. Both LaunchAgents start through it. The five
+messages were requeued and all answered. **Test with files that arrive through Dropbox, not files
+made on this Mac.**
