@@ -3351,3 +3351,29 @@ X; the strongest examples are Python programs that paint pixel by pixel, emulati
   than brush tuning.
 - Stars smear into commas under large strokes: paint the sky from a median-filtered underpainting
   and touch the stars in last.
+
+---
+
+## 75. A Grown-Up Tone, Force-Users as Guests, Range by Story Layer, One Standard Style Test (2026-10-14)
+
+The owner shared two art-direction guides: a general Star Wars art-direction reference bible (12
+directions, hybrids, a "control shot" method, a production recipe) and Inky's *The Long Drift* style
+reference for Volt (31 style cards, a mood-to-style table, a layout contract, a per-scene checklist
+and delivery note). Both are kept with the series mailbox in Dropbox (`reference/`), not in this
+public repo: they carry AI-generated boards with saga iconography.
+
+- **Tone:** grown-up instead of family-friendly: real stakes, loss, moral grey; still no gore, no
+  sexual content, no cruelty for its own sake. The owner chose this knowing the guides say
+  family-friendly; the owner's call wins where they disagree.
+- **Force-users:** original ones may appear as guests, never as crew, never a canon Jedi or Sith or
+  a look-alike. No canon characters still holds.
+- **Art rules:** full colour, any technique; the old "flat colour and clear outlines, six inks"
+  rule existed only for our own conversion, gone since #73. Readability (the thumbnail test, a dark
+  value around faces) replaces it.
+- **Range:** a writer may change look between scenes to mark a story layer, at most once per beat,
+  with a reason in the delivery note (Inky's rule). The owner approves a writer's look or range
+  from style tests (#74); Jarvis checks every change has a reason.
+- **One standard style test:** every writer paints the same story-free control shot (Claude's
+  freighter at the outpost) plus six difficult cases (face close-up, night wide, crowd, action,
+  interior conversation, ship in perspective), scored 1 to 5 by the showrunner. Same scene for
+  everyone, so the owner compares looks, not compositions.

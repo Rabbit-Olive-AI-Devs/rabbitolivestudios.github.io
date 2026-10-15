@@ -121,11 +121,11 @@ The import measures every line with the real panel font, so these are guides, no
 - **Size:** at least as large as the panel, any shape. It is shrunk and **cropped to fill** the panel around `focus` (or the centre). Plan the composition for the crop: a 3:2 picture loses about a third of its height in a `wide` panel. Give `anchor`, `clear` and `focus` in the art file's own pixels; the importer maps them through the crop, and refuses a scene whose anchor ends up cropped away.
 - **At least one new picture every weekday** (among each day's five scenes); the others may `hold`.
 - **No words in the picture:** no lettering, signs, labels, logos or speech balloons. We add every word.
-- **Flat colour and clear dark outlines.** The pictures become black and white on the two E1001 panels and six colours on the third. Flat areas survive all three; soft gradients, fine textures and thin pale lines turn into noise.
-- **Colours that convert best:** black, white, red, yellow, green and blue (the colour panel's six inks). An inked style with a limited palette works very well (Muse's red-sky test picture, mockup round 4); greys come out as black-and-white texture on the colour panel, and only clearly coloured areas use the coloured inks.
+- **Full colour, any technique.** Every panel receives the picture untouched and converts it itself (DECISIONS #73); the six-ink limit is lifted. What still matters is **readability**: shrink the picture to thumbnail size and check you can tell who, where and what in two seconds. Keep one dark value around faces; very low-contrast pictures fade on e-ink.
+- **Range, chosen on purpose.** A writer may change look between scenes to mark a story layer (for example noir for the present, stained glass for a legend, watercolour for a memory), at most once per beat, and must say why in the delivery note. The style cards, the mood-to-style table and the per-scene checklist are in the shared reference guides in `00_SHARED_INBOX/series/reference/` (`long-drift-style-reference.pdf`, `art-direction-reference-bible.pdf`). Borrow treatments, never characters or insignia.
 - **Keep the calm zones calm** (section 3).
 - **Stay on model:** draw the crew and ship from your own `sheets/`, every time.
-- **No canon characters and no likenesses of real people.**
+- **No canon characters and no likenesses of real people.** Original Force-users may appear as guests (section 9 of SHOWRUNNER.md).
 
 ## 5. Delivering in parts
 
@@ -147,7 +147,15 @@ Every problem is listed with its chapter and scene, so a whole season's mistakes
 
 ## 8. Style tests
 
-**The owner sets the art direction.** No writer draws a scene until the owner has approved their style from a style test. Style tests must carry **no story**: no plot, no scene from the season, nothing the owner should not see before it airs. Use the setting and, at most, the crew standing still. On every proof sheet, the showrunner checks that the pages still match the approved style.
+**The owner sets the art direction.** No writer draws a scene until the owner has approved their look (or their range of looks) from a style test. Style tests must carry **no story**: no plot, no scene from the season, nothing the owner should not see before it airs. On every proof sheet, the showrunner checks that the pages still match what was approved and that every change of look has a stated reason.
+
+**The standard style test** (so the writers can be compared fairly):
+
+1. **The control shot:** the same scene for every writer, painted in the look they propose: a freighter on the landing pad of a desert outpost at dusk, two moons in the sky, a cloaked figure and a small droid at the foot of the ramp. Same positions, same camera.
+2. **The difficult cases**, one picture each, all story-free: a face close-up; a night wide shot; a crowd; fast action; an interior conversation between two figures; a ship in perspective.
+3. **The score:** the showrunner rates each 1 to 5 for character consistency, readability on a panel (thumbnail test), distinctiveness (does it look like nobody else's generic AI art?), cinematic power, and fit with the writer's season. Send the scores with the test.
+
+Claude's control shot is in `style-tests/claude-styles/` as a reference for the scene.
 
 Before drawing a season, put three to five sample pictures in a folder under `00_SHARED_INBOX/series/style-tests/` and send a message whose first line is `STYLE TEST folder=<that folder>`. Within minutes, `from-claude/style-tests/<folder>/` holds each picture as the panels will get it: untouched, only cropped to fill the 800x480 screen (`.png` to look at, `.html` as uploaded). The series sends every panel the full-colour picture and each panel converts it itself, the E1001s to black and white and the E1002 to its six colours (DECISIONS #73), so a style test is best judged on a real panel. The engineer can make the same pages with `npm run series -- preview <picture|folder> --out DIR`.
 

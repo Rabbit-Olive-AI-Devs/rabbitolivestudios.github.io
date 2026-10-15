@@ -34,12 +34,12 @@ Coordination with the writers happens in the owner's Slack channel, where the ag
 The bible is the one place every writer reads before writing a word. Keep it in Notion. It must contain:
 
 1. **Premise:** one paragraph. Who the crew are, what they want, what keeps them moving.
-2. **Setting (awaiting owner):** the Star Wars galaxy, Outer Rim, after the fall of the Empire. Canon places, species and ship classes are fine. **No canon characters.** Whether Jedi may appear (as guests, not crew) is the owner's call.
-3. **Tone:** family-friendly. Peril, humour, warmth; no gore, nothing a child at home should not read. Dry humour from the droid is a house trait.
+2. **Setting:** the Star Wars galaxy, Outer Rim, after the fall of the Empire. Canon places, species and ship classes are fine. **No canon characters.** **Original Force-users may appear as guests** (owner, 2026-10-14), not as crew: their own names, looks and blades; never a canon Jedi or Sith or a look-alike.
+3. **Tone:** grown-up (owner, 2026-10-14, replacing "family-friendly"): real stakes, loss, moral grey, consequences that last, quiet and dark moments as well as humour and warmth. Still no gore, no sexual content and no cruelty for its own sake. Dry humour from the droid is a house trait.
 4. **The crew:** for each member, name, role, how they talk (three sample lines), what they want, what they will never do. **Fixed by the owner on 2026-10-14:** the show is *The Long Drift*; the crew are Vess Oro (pilot, captain), Bolt (deadpan droid) and Hallan Dree (old mechanic); the ship is the *Last Lantern*.
 5. **The ship:** name, layout, quirks, what breaks.
 6. **Running state:** credits, cargo, damage, who is owed what. Updated at the end of every season from the writer's handover note.
-7. **House rules for the page:** no words in pictures; flat colour and clear outlines; calm zones kept plain; plain ASCII text; the length guides. All are in `SEASON-FORMAT.md`; link it, do not copy it.
+7. **House rules for the page:** no words in pictures; readable at panel size; calm zones kept plain; plain ASCII text; the length guides. All are in `SEASON-FORMAT.md`; link it, do not copy it.
 8. **Banned names:** canon characters and anything else that must never be printed. The import tool refuses any scene that uses one. Send the list to the engineer whenever it changes.
 9. **Continuity log:** one page per season, filled from the writer's handover.
 
@@ -93,7 +93,7 @@ Give each writer, in one message or Notion page:
 3. `SEASON-FORMAT.md` and the template guide images.
 4. Their season number, premiere date and deadlines.
 5. The order of work: **sheets first**, then the outline, then chapters in order. Never draw scenes before the owner has approved the style and you have approved the sheets.
-6. A reminder of the three rules that cause most rework: **no words in pictures**, **keep calm zones plain**, **flat colour with clear outlines**.
+6. A reminder of the three rules that cause most rework: **no words in pictures**, **keep calm zones plain**, **readable at thumbnail size**. Give them the shared reference guides in `00_SHARED_INBOX/series/reference/`.
 
 ## 7. Reviewing (before you package)
 
@@ -101,8 +101,8 @@ For every chapter:
 
 - **Story:** the chapter is one mission with a beginning, middle and end; Friday 16:00 ends on a hook or a resolution; it moves the season's journey on; the teaser does not spoil the next chapter.
 - **Continuity:** names, ship state, credits, injuries and threads match the bible and earlier chapters.
-- **Tone:** family-friendly; the crew sound like themselves.
-- **Pictures:** on model with the sheets; no words or logos; calm zones plain; flat colour; the right size and shape for the template; at least one new picture each weekday.
+- **Tone:** grown-up but never gratuitous; the crew sound like themselves.
+- **Pictures:** on model with the sheets; no words or logos; calm zones plain; readable at panel size; any change of look has a stated reason; the right size and shape for the template; at least one new picture each weekday.
 - **Words:** within the length guides; plain ASCII; balloon anchors on the speaker's head.
 
 The import tool re-checks the mechanical rules and lists any failure by chapter and scene. Taste and continuity are yours.

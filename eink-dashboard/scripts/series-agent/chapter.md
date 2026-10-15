@@ -17,11 +17,15 @@ Continue exactly where the season stands:
   /Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_SHARED_INBOX/series/JARVIS-BRIEF.md: 25 scenes,
   scene 1 a splash title card, a hook or resolution at scene 25, a non-spoiling teaser, printable
   ASCII only, at least one new picture each weekday, no words in pictures, calm zones kept plain,
-  no canon characters, family-friendly, no Jedi.
+  no canon characters, grown-up tone without gore (SHOWRUNNER.md), original Force-users only as guests.
 - Draw in the look Thiago approved for the Prologue: GOUACHE. Each picture is drawn by your code as
   an underpainting (flat shapes, light and shadow, as in the existing scripts), then painted with
   the engine: `python3 -E -P {{REPO}}/scripts/series-paint/painter.py <underpainting.png> auto gouache <picture.png>`.
-  The painted picture is what goes in the package. Keep compositions so anchors and keep-clear
+  The painted picture is what goes in the package. Gouache is the Prologue's base look; a scene
+  may change look to mark a story layer (a memory, a legend, a dream), at most once per beat and
+  with a reason, following the reference guides in
+  /Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_SHARED_INBOX/series/reference/. The engine also
+  has `oil` and `pixel` manners. Keep compositions so anchors and keep-clear
   boxes still match. Keep the art lessons in bible-notes.md that still apply (contrast between
   garments, keep-clear boxes on bodies and key objects, readable faces).
 
