@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-15 · **Describes:** v3.21.0 at `b9466f6` (the proof export #78, Season 1 rules #79, the live countdown card #80, deployed 2026-10-15 as c85f6fce) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-15 · **Describes:** v3.21.0 after `0232403` (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 and the colour moment's palette suffix dropped, deployed 2026-10-15) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 

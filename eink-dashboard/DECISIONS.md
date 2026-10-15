@@ -3637,3 +3637,12 @@ compression.
 - The colour moment prompts still carry the palette suffix written for our dithering ("limited
   palette, large flat colour regions…"). It was left alone so the art is unchanged; with the panel
   converting, it could be dropped for richer pictures if the owner wants.
+
+**Addendum (same day, after the owner saw the panels: "it looks much better now!!!"):** the palette
+suffix is dropped. The colour moment prompt is now style + scene + the anti-text suffix only. The
+cache key was deliberately **not** bumped: today's picture was already regenerated as-is and the day
+stood at 8,325 of 10,000 neurons, so a forced FLUX call would have run close to the cap. The first
+picture without the suffix is the next date's, made by the 04:35 Chicago warm. The style prompts
+themselves keep their own technique words (woodblock's "limited color palette" is the technique,
+not a dithering aid). The skyline's colour styles still carry similar hints (`src/skyline.ts`);
+untouched.

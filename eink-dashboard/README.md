@@ -269,7 +269,7 @@ Shared Moment (from KV cache or LLM)
 Pick daily style (Gouache / Oil Painting / Graphic Novel / Ink+Wash / Woodblock)
         │
         ▼
-Prepend style prompt + color palette suffix + anti-text suffix
+Prepend style prompt + anti-text suffix (the old palette suffix for our dithering was dropped, DECISIONS #81)
         │
         ▼
 FLUX.2 klein-9b → JPEG  [fallback: SDXL]

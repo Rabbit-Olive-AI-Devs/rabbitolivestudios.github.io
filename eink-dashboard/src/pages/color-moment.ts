@@ -65,8 +65,6 @@ export const COLOR_MOMENT_STYLES = [
   },
 ] as const;
 
-const COLOR_PALETTE_SUFFIX = "limited palette, large flat color regions, bold saturated reds blues yellows greens, no gradients, avoid tiny details, high contrast";
-
 /** Get the color moment style for a given Chicago-timezone date string. */
 export function getColorMomentStyle(dateStr: string): typeof COLOR_MOMENT_STYLES[number] {
   const d = new Date(dateStr + "T12:00:00Z");
@@ -86,7 +84,7 @@ export async function generateColorMoment(
     ? (COLOR_MOMENT_STYLES.find(s => s.id === forceStyleId) ?? getColorMomentStyle(dateStr))
     : getColorMomentStyle(dateStr);
   console.log(`Color moment style: ${style.name} (${style.id})`);
-  const prompt = `${style.prompt}, ${moment.imagePrompt}, ${COLOR_PALETTE_SUFFIX}, ${ANTI_TEXT_SUFFIX}`;
+  const prompt = `${style.prompt}, ${moment.imagePrompt}, ${ANTI_TEXT_SUFFIX}`;
 
   let rgb: Uint8Array | null = null;
 
