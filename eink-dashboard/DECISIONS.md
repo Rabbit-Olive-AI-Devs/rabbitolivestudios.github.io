@@ -3403,3 +3403,7 @@ Zoe, Volt or Pepper on a schedule: they are chat agents and act when Jarvis mess
 - **Jarvis owns the rhythm (owner, same day).** The showrunner sets the cadence for the writers and
   nudges them on his own schedule; the heartbeat is only the engineering status board he works from
   (what is uploaded, approved, late, due), and can be switched off if he runs his own.
+- **The uploader retries (2026-10-15).** `npm run series -- upload` tried each page once, and an
+  occasional failed `wrangler r2 object put` cost a whole re-run (chapter 1 took several). Each
+  page is now tried three times, 3 s and 6 s apart, before it counts as failed; the schedule still
+  changes only when every page is up. First real run: two pages failed once and went up on retry.

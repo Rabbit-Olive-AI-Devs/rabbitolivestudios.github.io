@@ -163,14 +163,22 @@ async function cmdUpload() {
   const skip = new Set(plan.skipped.map((c) => `series/s${pad(meta.season.number)}/c${pad(c)}/`));
   const keys = execFileSync("find", ["series", "-name", "*.html"], { cwd: out }).toString().trim().split("\n").filter(Boolean)
     .filter((k) => ![...skip].some((prefix) => k.startsWith(prefix)));
+  const put = (k) => new Promise((res) => {
+    const p = spawn("npx", ["wrangler", "r2", "object", "put", `${BUCKET}/${k}`, "--file", path.join(out, k), "--content-type", "text/html; charset=utf-8", "--remote"], { cwd: REPO, stdio: "ignore" });
+    p.on("exit", (code) => res(code === 0));
+  });
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
   let next = 0, failed = 0;
   const worker = async () => {
     while (next < keys.length) {
       const k = keys[next++];
-      await new Promise((res) => {
-        const p = spawn("npx", ["wrangler", "r2", "object", "put", `${BUCKET}/${k}`, "--file", path.join(out, k), "--content-type", "text/html; charset=utf-8", "--remote"], { cwd: REPO, stdio: "ignore" });
-        p.on("exit", (code) => { if (code !== 0) { failed++; console.error(`failed: ${k}`); } res(); });
-      });
+      // A put fails now and then on the network; try each page three times before giving up.
+      let ok = false;
+      for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
+        ok = await put(k);
+        if (!ok && attempt < 3) { console.error(`retrying (${attempt}/2): ${k}`); await sleep(attempt * 3000); }
+      }
+      if (!ok) { failed++; console.error(`failed: ${k}`); }
     }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
