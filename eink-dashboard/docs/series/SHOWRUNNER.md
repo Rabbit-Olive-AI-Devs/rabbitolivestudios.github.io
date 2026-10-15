@@ -79,7 +79,7 @@ After the Prologue, a season premieres on the **first Monday of a quarter** and 
 | 8 weeks before | **Style test approved by the owner** (section 8 of SEASON-FORMAT.md); character and ship sheets reviewed and approved |
 | 7 weeks before | Season outline (13 chapter titles, one paragraph each) approved |
 | 4 weeks before | Chapters 1–4 scripted, drawn and reviewed |
-| **3 weeks before** | **First delivery to the engineer:** at least chapters 1 and 2 |
+| **3 weeks before** | **First delivery to the engineer:** at least chapters 1 and 2; and **6 to 8 story-free key frames for the season teaser** (`TEASER.md`) |
 | Every chapter after | Delivered **at least 12 days before it airs**, approved **at least 8 days before** (the alert emails the owner from 7 days before an unapproved chapter airs) |
 
 For Season 1: brief Zoe by 2 November 2026; first delivery by 14 December 2026. These are deadlines, not start dates: style tests, and after an approved look the sheets and outline, may start any time (owner, 2026-10-14).

@@ -347,7 +347,8 @@ The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `
 - **Writers:** one AI per three-month season, writing and drawing in its own style (Prologue: Claude, from 26 October 2026; then OpenAI, Grok, Muse). The owner's agent **Jarvis** is showrunner and approves every chapter; the owner watches unspoiled.
 - **Pipeline:** writers deliver pictures without words; `scripts/series-import.mjs` on the Mac mini validates the package, crops, letters every caption and balloon (sized, placed and checked by pixel) over the untouched full-colour picture, and uploads each finished one-request HTML page to the private R2 bucket `eink-series`. The Worker passes one stored page through per request: no image work, no AI, no KV. The panels convert the colour page themselves (DECISIONS #73).
 - **Mailbox:** Jarvis and the engineer talk through Dropbox `00_SHARED_INBOX/series/`; a LaunchAgent handles `APPROVE`, `DELIVERY` and `STYLE TEST` by script within minutes and hands other messages to a read-only unattended Claude.
-- **Docs:** `docs/series/SHOWRUNNER.md`, `docs/series/SEASON-FORMAT.md`, template guides in `docs/series/templates/`.
+- **Docs:** `docs/series/SHOWRUNNER.md`, `docs/series/SEASON-FORMAT.md`, `docs/series/TEASER.md` (the teaser and how to make the next ones), template guides in `docs/series/templates/`.
+- **Teaser:** a 60-second trailer drawn and scored by code (`scripts/series-teaser/teaser.py`, DECISIONS #77); the video lives in Dropbox, never in the repo.
 - **Never commit** scripts, pictures, packages or build output: the repo is public and they are spoilers.
 
 ## Architecture

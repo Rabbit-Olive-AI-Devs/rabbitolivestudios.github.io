@@ -3407,3 +3407,31 @@ Zoe, Volt or Pepper on a schedule: they are chat agents and act when Jarvis mess
   occasional failed `wrangler r2 object put` cost a whole re-run (chapter 1 took several). Each
   page is now tried three times, 3 s and 6 s apart, before it counts as failed; the schedule still
   changes only when every page is up. First real run: two pages failed once and went up on retry.
+
+---
+
+## 77. A Series Teaser Drawn and Scored by Code; One per Season (2026-10-14)
+
+The owner asked for a one-minute cinematic teaser: what the series is, how it is made (different
+authors and looks), ominous music, ending with the dates.
+
+- **Made by code**, the way the Opus 5.5 examples are: `scripts/series-teaser/teaser.py` renders
+  1,440 frames (1920x1080, 24 fps, 2.39:1 letterbox, Ken Burns moves, a three-depth starfield,
+  film grain, vignette, tracked Optima titles with a glow and a dark halo) and synthesises the score
+  (a drone in D, heartbeat thuds, braams from detuned saws through a filter sweep, a plucked
+  ostinato in D minor, risers, convolution reverb, a soft limiter); ffmpeg joins them (installed
+  with Homebrew for this, owner's go-ahead). Renders in about 30 s on the Mac mini.
+- **Spoiler-free by construction:** only the setting, crew archetypes, the authors with their
+  style-test pictures and the non-canon test scene every author drew, the format and the dates.
+- **Where things are:** the video, its assets and the score in the Dropbox `series/teaser/`
+  folder; only code in the repo (the repo is public). Handover: `docs/series/TEASER.md`.
+- **What did not work at first:** the title at 150 px ran into the frame edges, and light text was
+  unreadable over bright pictures; every caption now carries a soft dark halo.
+- **Limits:** the score was checked by its levels and loudness (about -16 LUFS), not by ear. Slow
+  pans on still paintings are the weakest part.
+- **Next (owner liked all of these):** v2 with real 3D shots made in Blender on the MacBook Pro (the
+  Blender MCP is there, not on the Mac mini); a teaser per season, assembled by Claude from 6 to 8
+  story-free key frames the author delivers three weeks before the premiere, checked for spoilers
+  by Jarvis (added to SHOWRUNNER.md's calendar); and, not built yet, a show theme with a variation
+  per author, a narrator, a vertical 9:16 cut, and a days-left countdown on the panels' "coming
+  soon" card.
