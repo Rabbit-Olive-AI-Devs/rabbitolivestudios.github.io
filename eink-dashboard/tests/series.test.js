@@ -652,3 +652,11 @@ test("the colour test address can send the original picture as-is (original=1)",
   const html = await (await sp.handleSeriesTest(env, new URL("https://x/color/series/test?folder=trial-zoe-1&image=source&original=1&key=k"), "office")).text();
   assert.match(html, /data:image\/jpeg;base64,\/9j\//);
 });
+
+test("the test address can also send the four-grey version (grey=1), for comparing on a real E1001", async () => {
+  assert.equal(keys.testGreyKey("trial-zoe-1", "source"), "series/tests/trial-zoe-1/source-grey.png");
+  assert.equal(keys.testGreyKey("a/b", "source"), null);
+  const env = { SERIES: bucket({ "series/tests/trial-zoe-1/source-grey.png": PNG }), SERIES_KEY: "k" };
+  const html = await (await sp.handleSeriesTest(env, new URL("https://x/desk/series/test?folder=trial-zoe-1&image=source&grey=1&key=k"), "desk")).text();
+  assert.match(html, /data:image\/png;base64,iVBORw/);
+});

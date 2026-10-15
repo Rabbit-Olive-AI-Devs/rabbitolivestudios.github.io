@@ -40,3 +40,9 @@ export function testOriginalKey(folder: string, image: string): string | null {
   if (!PLAIN.test(folder) || !PLAIN.test(image)) return null;
   return `series/tests/${folder}/${image}-original.jpg`;
 }
+
+/** The same picture in four flat greys, for comparing with the 1-bit version on a real E1001. */
+export function testGreyKey(folder: string, image: string): string | null {
+  if (!PLAIN.test(folder) || !PLAIN.test(image)) return null;
+  return `series/tests/${folder}/${image}-grey.png`;
+}

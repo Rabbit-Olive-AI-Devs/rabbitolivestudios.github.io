@@ -9,7 +9,7 @@ import { hudPageHTML } from "../hud/page";
 import { pngToBase64 } from "../png";
 import { htmlResponse } from "../response";
 import { resolveSlot, seriesSlot } from "../series/clock";
-import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey, testKey, testOriginalKey } from "../series/keys";
+import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey, testGreyKey, testKey, testOriginalKey } from "../series/keys";
 import { isSchedule } from "../series/schedule";
 import type { PanelId, Schedule } from "../series/types";
 import { SCENES_PER_CHAPTER } from "../series/types";
@@ -117,8 +117,10 @@ export async function handleSeriesTest(env: Env, url: URL, panel: PanelId): Prom
   if (!keyOk(env, url)) return notFound();
   const folder = url.searchParams.get("folder") ?? "", image = url.searchParams.get("image") ?? "";
   // original=1 sends the writer's picture unconverted, leaving the panel's own processing to it.
+  // grey=1 sends the four-grey version, for comparing with the 1-bit one on a real E1001.
   const original = url.searchParams.get("original") === "1";
-  const key = original ? testOriginalKey(folder, image) : testKey(folder, image, panel);
+  const grey = url.searchParams.get("grey") === "1";
+  const key = original ? testOriginalKey(folder, image) : grey ? testGreyKey(folder, image) : testKey(folder, image, panel);
   if (!key) return notFound();
   try {
     const obj = await env.SERIES.get(key);
