@@ -200,6 +200,7 @@ function cmdWeekly() {
   log(`weekly: writing season ${due.season} chapter ${due.chapter} (airs ${due.airs})`);
   const ok = claude("chapter.md", { SEASON: String(due.season), CHAPTER: String(due.chapter), AIRS: due.airs, PACKAGE: pkg, OUT: out, REPO }, [
     "Read", "Glob", "Grep", ...writeTo(WORK), `Bash(node:*)`, `Bash(npm --prefix ${REPO} run series -- build:*)`,
+    `Bash(python3 -E -P ${REPO}/scripts/series-paint/:*)`,
   ], `chapter-s${due.season}-c${due.chapter}`);
   // Story must never reach the public repo: any change there stops the weekly run cold.
   const dirty = execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" }).trim();

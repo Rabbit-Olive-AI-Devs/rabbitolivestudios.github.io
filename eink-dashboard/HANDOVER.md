@@ -130,7 +130,7 @@ Facts that have each cost real debugging time:
 - **One FLUX attempt, then fall back. No retry loops.** When changing a retry or budget pattern, grep every call site; a past fix missed four of five (#38).
 - Floyd–Steinberg is right for the colour panel and wrong for the mono panel, where Bayer 8x8 or a histogram threshold is used (#4, #14).
 - Captions are drawn **after** dithering, or mapped by nearest colour, so diffused error cannot corrupt them (#64).
-- **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped and lettered by `scripts/series-import.mjs` on the Mac mini and stored in R2 as finished one-request HTML pages, the picture untouched in full colour. Every panel gets the same page and converts it itself; the series does no dithering of its own (#73). The Worker only passes one stored page through per request. Never move that work onto the request path.
+- **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped and lettered by `scripts/series-import.mjs` on the Mac mini and stored in R2 as finished one-request HTML pages, the picture untouched in full colour. Every panel gets the same page and converts it itself; the series does no dithering of its own (#73). The Worker only passes one stored page through per request. Never move that work onto the request path. Claude paints its own pictures with `scripts/series-paint/painter.py` (gouache over a code-drawn underpainting, #74); the owner approves every writer's look from story-free style tests.
 - Workers cannot run native image libraries; the PNG encoder and decoder are hand-written (`png.ts`, `png-decode.ts`) and the caption font is an 8x8 bitmap.
 
 ## 6. Caching

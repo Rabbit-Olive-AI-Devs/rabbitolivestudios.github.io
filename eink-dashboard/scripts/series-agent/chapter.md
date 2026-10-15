@@ -18,8 +18,12 @@ Continue exactly where the season stands:
   scene 1 a splash title card, a hook or resolution at scene 25, a non-spoiling teaser, printable
   ASCII only, at least one new picture each weekday, no words in pictures, calm zones kept plain,
   no canon characters, family-friendly, no Jedi.
-- Keep the art lessons in bible-notes.md (pure black space, pure white light walls, no tinted
-  near-blacks, cream skin, contrast between garments, keep-clear boxes on bodies and key objects).
+- Draw in the look Thiago approved for the Prologue: GOUACHE. Each picture is drawn by your code as
+  an underpainting (flat shapes, light and shadow, as in the existing scripts), then painted with
+  the engine: `python3 -E -P {{REPO}}/scripts/series-paint/painter.py <underpainting.png> auto gouache <picture.png>`.
+  The painted picture is what goes in the package. Keep compositions so anchors and keep-clear
+  boxes still match. Keep the art lessons in bible-notes.md that still apply (contrast between
+  garments, keep-clear boxes on bodies and key objects, readable faces).
 
 How to run things (your shell access is limited on purpose):
 - One command per call, with absolute paths, no `cd` and no `&&`. Generator scripts must resolve
@@ -28,8 +32,10 @@ How to run things (your shell access is limited on purpose):
 - Build only this chapter with:
   `npm --prefix {{REPO}} run series -- build {{PACKAGE}} --chapter {{CHAPTER}} --out {{OUT}}`
   Fix every listed problem and rerun until it prints "... pages for chapters {{CHAPTER}} written".
-- Then LOOK at all 25 scenes in {{OUT}}/series/ on the colour (*-office.png) and black-and-white
-  (*-desk.png) versions and a sample of the grey (*-home.png), and fix anything that reads badly.
+- Then LOOK at all 25 scenes: each page in {{OUT}}/series/ is an HTML file with the picture inside;
+  pull it out with `python3 -E -P {{REPO}}/scripts/series-paint/page-png.py <page.html> <out.png>`
+  (write the png under {{OUT}}) and read it. Every panel gets this same full-colour page and
+  converts it itself (DECISIONS #73). Fix anything that reads badly.
 
 Finally update {{PACKAGE}}/handover-notes.md (what happened and the state after this chapter) and
 {{PACKAGE}}/bible-notes.md (anything new: places, characters, props; no plot). Your final answer

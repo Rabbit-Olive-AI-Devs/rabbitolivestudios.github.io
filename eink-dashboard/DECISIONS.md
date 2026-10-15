@@ -3311,3 +3311,43 @@ it "beautiful" and said: "we should not change from that. even for the e1002".
 - **Pages are heavier:** about 500–700 KB each instead of a few tens of KB. The renderer waits
   for the document itself (#65), so this is a download-time cost, not a blank-frame risk. A
   scene that shows white on a panel is the first thing to check against this.
+
+---
+
+## 74. Claude Paints Its Pictures Stroke by Stroke; the Owner Approves Every Writer's Look (2026-10-14)
+
+### What happened
+
+The owner did not like Claude's drawings for the Prologue: flat vector shapes drawn by code. Each
+writer had chosen its own look and nobody had signed it off. The owner pointed to Opus 5.5 art on
+X; the strongest examples are Python programs that paint pixel by pixel, emulating brushwork
+(about 7,500 lines in Jake Eaton's case, no image model, no reference pictures).
+
+### Decision
+
+- **The owner is the art director.** Every writer's look is approved by the owner from a style test
+  with no story in it, before any scene is drawn; Jarvis checks each proof against it
+  (`docs/series/SHOWRUNNER.md`, `SEASON-FORMAT.md` section 8).
+- **Claude's pictures are painted.** `scripts/series-paint/painter.py` lays textured, bristled
+  strokes over a code-drawn underpainting, coarse to fine (after Hertzmann's painterly rendering):
+  strokes follow the edges of shapes, stop at region borders (a drawn region map, or `auto`: the
+  underpainting's main colour areas by k-means), and take their colour from the underpainting with
+  small jitter. Three manners: `oil` (thick paint with impasto shading), `gouache` (matte, crisp),
+  `pixel` (400x240, a k-means palette, ordered dither only in skies and ground, selective outlines).
+  numpy + PIL only, a few seconds per picture, run offline.
+- **The Prologue is gouache.** The owner loved all three style tests and left the choice to Claude:
+  gouache keeps faces and gestures readable under balloons and converts most cleanly to black and
+  white on the E1001s. One look for the whole season.
+- **The weekly chapter run paints too.** `scripts/series-agent/chapter.md` tells it to paint every
+  picture with the engine, and the watcher allows it to run `python3 -E -P` on
+  `scripts/series-paint/` only (read-only: the run cannot write to the repo).
+
+### What did not work
+
+- A Cezanne imitation (short parallel strokes in patches) read as noise at panel size, and an ink
+  and watercolour manner looked flat and out of focus. Both were dropped.
+- The painting can only be as good as the underpainting: the first round painted flat shapes and
+  stayed flat. Modelled light (gradients on the ship, rim light, haze, clouds, rocks) mattered more
+  than brush tuning.
+- Stars smear into commas under large strokes: paint the sky from a median-filtered underpainting
+  and touch the stars in last.
