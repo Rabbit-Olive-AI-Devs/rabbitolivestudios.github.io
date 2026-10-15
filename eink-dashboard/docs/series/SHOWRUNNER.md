@@ -82,7 +82,15 @@ After the Prologue, a season premieres on the **first Monday of a quarter** and 
 | **3 weeks before** | **First delivery to the engineer:** at least chapters 1 and 2 |
 | Every chapter after | Delivered **at least 12 days before it airs**, approved **at least 8 days before** (the alert emails the owner from 7 days before an unapproved chapter airs) |
 
-For Season 1: brief OpenAI by 2 November 2026; first delivery by 14 December 2026.
+For Season 1: brief Zoe by 2 November 2026; first delivery by 14 December 2026. These are deadlines, not start dates: style tests, and after an approved look the sheets and outline, may start any time (owner, 2026-10-14).
+
+**Production rhythm (owner, 2026-10-14).** Seasons are made in order, because each one starts where the last ended (the handover note), and a chapter a week reads better and spreads each writer's usage across the weeks:
+
+- **Any time now:** every writer's standard style test; after the owner approves the look, character and ship sheets and the season outline.
+- **About 4 weeks before the premiere:** chapters 1 to 4 drafted and reviewed.
+- **During the season:** one chapter a week, about two weeks ahead of airing. A suggested week: Monday you nudge the writer, Thursday they deliver to their `writer-exchange` lane, Friday you review and send the DELIVERY, the weekend you approve.
+- **At most two writers active at once:** the one on air and the next one preparing.
+- **The heartbeat:** every Monday 08:00 Chicago a note `…-heartbeat.md` arrives in `from-claude/` listing what is late, due and on air that week and the milestones of the next two weeks (DECISIONS #76). Use it to nudge the writers; it costs nothing.
 
 ## 6. Briefing a writer
 

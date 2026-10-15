@@ -339,7 +339,7 @@ eink-dashboard/
       render.ts           — compose scene pages (+ replay) in full colour, untouched art (#73); teasers, before/after cards; encode PNGs
       build.ts            — one chapter: hold, crop, map anchors, render → R2 key → PNG
       watch.ts            — alert problems and /health-detailed snapshot for the series
-      mailbox.ts          — parses mailbox first-line commands; dueClaudeChapter() for the weekly run (DECISIONS #72)
+      mailbox.ts          — parses mailbox first-line commands; dueClaudeChapter() for the weekly run (DECISIONS #72); CALENDAR + heartbeat() for the Monday note (#76)
     planet.ts             — Desk panel planet of the day: NASA Exoplanet Archive queries + daily KV cache `planet:v1:DATE` (DECISIONS #68)
     birthday-image.ts     — Birthday portrait generation (FLUX.2 + R2 photos)
     images-input.ts       — bytesToImageStream(): wraps bytes for env.IMAGES.input(), which rejects byte input (DECISIONS #59)

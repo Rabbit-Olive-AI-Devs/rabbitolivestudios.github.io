@@ -8,6 +8,7 @@
 
 import { shiftDateStr } from "../date-utils";
 import type { Schedule } from "./types";
+import { plannedChapters } from "./types";
 
 export type Message =
   | { kind: "APPROVE"; season: number; chapters: number[] }
@@ -66,4 +67,58 @@ export function dueClaudeChapter(schedule: Schedule, today: string): { season: n
     if (airs <= shiftDateStr(today, LEAD_DAYS)) return { season: s.number, chapter: next, airs };
   }
   return null;
+}
+
+/** The decided calendar (DECISIONS #71): who writes each season and the Monday it premieres. */
+export const CALENDAR: readonly { number: number; writer: string; premiere: string }[] = [
+  { number: 0, writer: "Claude", premiere: "2026-10-26" },
+  { number: 1, writer: "Zoe", premiere: "2027-01-04" },
+  { number: 2, writer: "Volt", premiere: "2027-04-05" },
+  { number: 3, writer: "Pepper", premiere: "2027-07-05" },
+  { number: 4, writer: "Claude", premiere: "2027-10-04" },
+];
+
+/** Production milestones, in days before a premiere (docs/series/SHOWRUNNER.md section 5). */
+const MILESTONES: [number, string][] = [
+  [63, "writer briefed"],
+  [56, "style test approved by Thiago; character and ship sheets approved"],
+  [49, "season outline approved"],
+  [28, "chapters 1-4 scripted, drawn and reviewed"],
+  [21, "first delivery to Claude: chapters 1 and 2"],
+];
+
+const label = (n: number) => (n === 0 ? "Prologue" : `Season ${n}`);
+
+/**
+ * The Monday production heartbeat (DECISIONS #76): what is on air, what must be
+ * delivered or approved this week, what is late, and the milestones of the next two
+ * weeks. Plain text for the mailbox; no AI. `today` is YYYY-MM-DD (Chicago).
+ */
+export function heartbeat(schedule: Schedule, today: string): string {
+  const weekEnd = shiftDateStr(today, 6);
+  const onAir: string[] = [], due: string[] = [], late: string[] = [], soon: string[] = [];
+  for (const cal of CALENDAR) {
+    const s = schedule.seasons.find((x) => x.number === cal.number);
+    const who = `${label(cal.number)} (${cal.writer}${cal.writer === "Claude" ? ", written by the weekly run" : ""})`;
+    const chapters = s?.chapters ?? plannedChapters(cal.number);
+    for (let c = 1; c <= chapters; c++) {
+      const airs = shiftDateStr(cal.premiere, (c - 1) * 7);
+      const deliverBy = c <= 2 && cal.number > 0 ? shiftDateStr(cal.premiere, -21) : shiftDateStr(airs, -12);
+      const approveBy = shiftDateStr(airs, -8);
+      const approved = s?.approved.includes(c) ?? false;
+      const uploaded = approved || (s?.pending.includes(c) ?? false);
+      if (airs >= today && airs <= weekEnd) onAir.push(`${label(cal.number)} chapter ${c} airs Monday ${airs}${approved ? "" : " (NOT APPROVED: it will not air)"}`);
+      if (!uploaded && deliverBy < today && airs >= today) late.push(`${who}: chapter ${c} should have been delivered by ${deliverBy} (airs ${airs})`);
+      else if (!uploaded && deliverBy >= today && deliverBy <= weekEnd) due.push(`${who}: deliver chapter ${c} by ${deliverBy} (airs ${airs})`);
+      if (uploaded && !approved && approveBy < today && airs >= today) late.push(`Jarvis: approve ${label(cal.number)} chapter ${c}, due ${approveBy} (airs ${airs})`);
+      else if (uploaded && !approved && approveBy >= today && approveBy <= weekEnd) due.push(`Jarvis: approve ${label(cal.number)} chapter ${c} by ${approveBy}`);
+    }
+    for (const [days, what] of MILESTONES) {
+      const when = shiftDateStr(cal.premiere, -days);
+      if (when >= today && when <= shiftDateStr(today, 13)) soon.push(`${who}: ${when}, ${what}`);
+    }
+  }
+  const section = (title: string, lines: string[]) => (lines.length ? `${title}\n${lines.map((l) => `- ${l}`).join("\n")}\n` : "");
+  const body = [section("LATE", late), section("Due this week", due), section("On air this week", onAir), section("Milestones in the next two weeks", soon)].filter(Boolean);
+  return `FYI: production heartbeat, week of ${today}\n\nJarvis: this note comes every Monday at 08:00 Chicago. Use it to nudge the writers.\n\n${body.length ? body.join("\n") : "Nothing is due, late or on air this week.\n"}`;
 }

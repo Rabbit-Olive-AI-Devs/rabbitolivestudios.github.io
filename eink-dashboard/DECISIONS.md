@@ -3377,3 +3377,26 @@ public repo: they carry AI-generated boards with saga iconography.
   freighter at the outpost) plus six difficult cases (face close-up, night wide, crowd, action,
   interior conversation, ship in perspective), scored 1 to 5 by the showrunner. Same scene for
   everyone, so the owner compares looks, not compositions.
+
+---
+
+## 76. Seasons Are Made in Order, a Chapter a Week; a Monday Heartbeat Keeps the Rhythm (2026-10-14)
+
+The owner asked whether the writers would be poked on a schedule or produce everything at once.
+What exists: the mailbox watcher reacts within seconds (#72), Claude's weekly run writes its own
+chapters, and Jarvis keeps private per-writer lanes in Dropbox (`writer-exchange/`). Nothing wakes
+Zoe, Volt or Pepper on a schedule: they are chat agents and act when Jarvis messages them.
+
+- **Order, not all at once (owner's choice):** each season starts where the last ended, through the
+  handover note, so a season cannot be written before the previous ending exists. A season
+  contract with fixed start and end states (writing in parallel) was offered and declined.
+- **Rhythm:** style tests now; sheets and outline once a look is approved; chapters 1-4 about four
+  weeks before a premiere; then one chapter a week about two weeks ahead of airing, which spreads
+  every writer's usage across the weeks; at most two writers active at once.
+- **The heartbeat:** `series-mailbox.mjs heartbeat`, run by the LaunchAgent
+  `com.eink.series-heartbeat` every Monday 08:00, reads the schedule from R2 and writes a note for
+  Jarvis: late items, deliveries and approvals due that week, chapters on air (flagging any not
+  approved), and the calendar milestones of the next two weeks. Pure logic in
+  `src/series/mailbox.ts` (`CALENDAR`, `heartbeat()`, tested); no AI, no Worker change, no KV.
+  It gives Jarvis a reliable weekly prompt whether or not he has a scheduler of his own; the
+  Worker's alert still emails the owner 7 days before an unapproved chapter airs.

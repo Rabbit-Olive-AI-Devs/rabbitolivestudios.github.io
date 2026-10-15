@@ -226,14 +226,22 @@ function cmdWeekly() {
   log(`weekly: chapter ${due.chapter} uploaded`);
 }
 
+/** Monday 08:00: the production heartbeat for Jarvis (DECISIONS #76). No AI. */
+function cmdHeartbeat() {
+  if (!fs.existsSync(OUTBOX)) { log("mailbox not mounted; heartbeat skipped"); return; }
+  const m = compile();
+  reply("heartbeat", m.mailbox.heartbeat(readSchedule(), process.env.SERIES_TODAY ?? stamp().date));
+  log("heartbeat: written");
+}
+
 // ----------------------------------------------------------------
 
 const cmd = process.argv[2];
-if (!["run", "weekly"].includes(cmd)) { console.error("usage: series-mailbox.mjs run|weekly"); process.exit(2); }
+if (!["run", "weekly", "heartbeat"].includes(cmd)) { console.error("usage: series-mailbox.mjs run|weekly|heartbeat"); process.exit(2); }
 const LOCK = path.join(WORK, `.mailbox-${cmd}.lock`);
 if (!lock(LOCK)) { log(`${cmd}: another run holds the lock; skipped`); process.exit(0); }
 try {
-  cmd === "run" ? cmdRun() : cmdWeekly();
+  ({ run: cmdRun, weekly: cmdWeekly, heartbeat: cmdHeartbeat })[cmd]();
 } catch (err) {
   log(`${cmd} failed: ${err.stack ?? err}`);
   try { note(`The mailbox watcher hit an error (${cmd}). Please open a session.`); } catch { /* mailbox gone */ }

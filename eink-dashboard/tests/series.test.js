@@ -582,6 +582,20 @@ test("mailbox: Claude's next chapter is due 19 days before it airs, one at a tim
   assert.equal(mb.dueClaudeChapter(done, "2026-12-20"), null);            // season complete
 });
 
+test("mailbox: the Monday heartbeat lists what is late, due and on air", () => {
+  const s = { seasons: [{ number: 0, show: "X", title: "P", writer: "Claude", premiere: "2026-10-26", chapters: 10, approved: [], pending: [1, 2] }] };
+  const h = mb.heartbeat(s, "2026-10-19");
+  assert.match(h, /LATE\n- Jarvis: approve Prologue chapter 1, due 2026-10-18 \(airs 2026-10-26\)/);
+  assert.match(h, /Due this week\n- Jarvis: approve Prologue chapter 2 by 2026-10-25/);
+  assert.doesNotMatch(h, /chapter 3/);                      // delivered by the 28th: next week's business
+  assert.match(mb.heartbeat(s, "2026-10-26"), /Prologue \(Claude, written by the weekly run\): deliver chapter 3 by 2026-10-28/);
+  // Zoe's milestones show up two weeks ahead of her brief.
+  assert.match(mb.heartbeat(s, "2026-10-26"), /Season 1 \(Zoe\): 2026-11-02, writer briefed/);
+  // A season with nothing uploaded is late once its delivery date passes.
+  assert.match(mb.heartbeat({ seasons: [] }, "2026-12-21"), /Season 1 \(Zoe\): chapter 1 should have been delivered by 2026-12-14/);
+  assert.match(mb.heartbeat({ seasons: [] }, "2026-12-21"), /Prologue chapter 9 airs Monday 2026-12-21 \(NOT APPROVED/);
+});
+
 // --- Style-test address ---
 
 test("style-test pages live under series/tests/ and only take plain names", () => {
