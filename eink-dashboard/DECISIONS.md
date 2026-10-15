@@ -3495,6 +3495,14 @@ change, and an approval bound to the revision reviewed. No key in any file, and 
 - First exports, 2026-10-15: Prologue ch1 `bfc25eee39c73b5d`, ch2 `f1aecd8abab50554`, ch3
   `00d92e799de3a0c7`; all pending, 51 pages each, every PNG 800x480. About 17 s per chapter.
 - The keyed proof page and URL auth are unchanged.
+- **Addendum, 2026-10-15 (later the same day).** Jarvis reported every export file as 0 bytes on
+  his Mac (`/Users/quark/Dropbox`). Listing the folder through the Dropbox API showed all 315 files
+  on the server with sizes equal to the Mac mini's copy, each uploaded 5-8 s after it was written:
+  his Dropbox client had not downloaded them (online-only placeholders). Lesson: check the server
+  with the API before suspecting the export; the reader's Mac needs the folder available offline.
+  The Prologue reference sheets (5 PNGs) were also copied, with a README of sizes and SHA-256, to
+  `00_JARVIS_SPOILERS/series-sheets/s00/`. They are the flat-colour sheets of 14 Oct: the chapters
+  were repainted in gouache (#74), the sheets never were; they fix shapes and colours, not the look.
 
 ---
 
@@ -3558,3 +3566,18 @@ whole Chicago calendar days (`daysUntil` in `src/series/clock.ts`).
 - On the premiere day after 08:00 (only possible if chapter 1 is not approved) it falls back to the
   stored card, which says "PREMIERES MONDAY ... 08:00" with no countdown.
 - If drawing fails, the stored card is served, so the page never goes blank.
+
+**Premiere readiness check, 2026-10-15.** Before the Prologue airs, every 15-minute refresh from
+15 Oct to 9 Nov was walked through the real clock code against the live schedule, by page name
+only. Countdown 11 to 1 at each Chicago midnight, TODAY until 08:00 on 26 Oct, then scenes at
+08/10/12/14/16 on weekdays, Friday 16:00 held overnight, replays hourly 08-21 on Saturday and from
+08:00 on Sunday, the "next week" teaser at Sunday 19:00, the clock change on Sun 1 Nov handled. An
+unapproved chapter 1 shows the stored card after 08:00 on the 26th; an unapproved later chapter
+holds the last approved scene. All 102 stored pages needed to 9 Nov, and both cards, are in R2.
+The check is now `scripts/series-timeline.mjs` (`--from`, `--to`, `--approve 1,2` to pretend), to
+re-run before each season. The alert rule (`scheduleProblems`, #71) was run on the same schedule:
+nothing until Mon 19 Oct, then "chapter 1 of the Prologue airs 26/10 and is waiting for approval",
+which the six-hourly check (cron `5 0,6,12,18 * * *` UTC, skipped before 03:00 Chicago) mails at
+about 07:05 Chicago that Monday; nothing if chapter 1 is approved first. No test email was sent:
+the mail path itself was proven end to end on 2026-08-21 (#60).
+
