@@ -79,16 +79,27 @@ export function dueClaudeChapter(schedule: Schedule, today: string): { season: n
 /** The decided calendar (DECISIONS #71): who writes each season and the Monday it premieres. */
 export const CALENDAR: readonly { number: number; writer: string; premiere: string }[] = [
   { number: 0, writer: "Claude", premiere: "2026-10-26" },
-  { number: 1, writer: "Zoe", premiere: "2027-01-04" },
+  { number: 1, writer: "Jarvis", premiere: "2027-01-04" }, // in place of Zoe (owner, 2026-10-15)
   { number: 2, writer: "Volt", premiere: "2027-04-05" },
   { number: 3, writer: "Pepper", premiere: "2027-07-05" },
   { number: 4, writer: "Claude", premiere: "2027-10-04" },
 ];
 
+/** The showrunner, who approves every chapter (DECISIONS #71). */
+export const SHOWRUNNER = "Jarvis";
+
+/**
+ * A season the showrunner writes himself cannot be cleared by him alone: each chapter also
+ * needs Claude's independent PASS for the same proof revision (owner, 2026-10-15; DECISIONS #79).
+ */
+export function needsIndependentReview(season: number): boolean {
+  return CALENDAR.find((c) => c.number === season)?.writer === SHOWRUNNER;
+}
+
 /** Production milestones, in days before a premiere (docs/series/SHOWRUNNER.md section 5). */
 const MILESTONES: [number, string][] = [
   [63, "writer briefed"],
-  [56, "style test approved by Thiago; character and ship sheets approved"],
+  [56, "style test done (the look is the writer's; Jarvis accepts it); character and ship sheets reviewed"],
   [49, "season outline approved"],
   [28, "chapters 1-4 scripted, drawn and reviewed"],
   [21, "first delivery to Claude: chapters 1 and 2"],

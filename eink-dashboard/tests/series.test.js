@@ -574,6 +574,13 @@ test("mailbox: other kinds go to Claude, broken commands are explained", () => {
   assert.match(mb.parseMessage("STYLE TEST folder=a/b").reason, /folder name/);
 });
 
+test("mailbox: only the showrunner's own season needs Claude's independent review", () => {
+  assert.equal(mb.needsIndependentReview(1), true);
+  assert.equal(mb.needsIndependentReview(0), false);
+  assert.equal(mb.needsIndependentReview(2), false);
+  assert.equal(mb.needsIndependentReview(9), false);
+});
+
 test("mailbox: Claude's next chapter is due 19 days before it airs, one at a time", () => {
   const s = { seasons: [
     { number: 0, show: "X", title: "P", writer: "Claude", premiere: "2026-10-26", chapters: 10, approved: [1], pending: [2] },
@@ -592,10 +599,10 @@ test("mailbox: the Monday heartbeat lists what is late, due and on air", () => {
   assert.match(h, /Due this week\n- Jarvis: approve Prologue chapter 2 by 2026-10-25/);
   assert.doesNotMatch(h, /chapter 3/);                      // delivered by the 28th: next week's business
   assert.match(mb.heartbeat(s, "2026-10-26"), /Prologue \(Claude, written by the weekly run\): deliver chapter 3 by 2026-10-28/);
-  // Zoe's milestones show up two weeks ahead of her brief.
-  assert.match(mb.heartbeat(s, "2026-10-26"), /Season 1 \(Zoe\): 2026-11-02, writer briefed/);
+  // Season 1's milestones show up two weeks ahead of the brief.
+  assert.match(mb.heartbeat(s, "2026-10-26"), /Season 1 \(Jarvis\): 2026-11-02, writer briefed/);
   // A season with nothing uploaded is late once its delivery date passes.
-  assert.match(mb.heartbeat({ seasons: [] }, "2026-12-21"), /Season 1 \(Zoe\): chapter 1 should have been delivered by 2026-12-14/);
+  assert.match(mb.heartbeat({ seasons: [] }, "2026-12-21"), /Season 1 \(Jarvis\): chapter 1 should have been delivered by 2026-12-14/);
   assert.match(mb.heartbeat({ seasons: [] }, "2026-12-21"), /Prologue chapter 9 airs Monday 2026-12-21 \(NOT APPROVED/);
 });
 

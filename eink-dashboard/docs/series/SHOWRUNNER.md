@@ -22,10 +22,10 @@ Your job: keep the show coherent and on schedule. The writers' job: their season
 
 | Who | Responsible for |
 |---|---|
-| **Owner** | Executive producer and **art director**. Approves the bible, the writer order and **each writer's drawing style**, from style tests (practice pictures with no story in them, so the owner stays unspoiled). Never sees scenes: **you approve the proof sheets** |
-| **Jarvis** | Showrunner. The bible, the schedule, briefing writers, reviewing every script and picture (including that every page **matches the style the owner approved**; send back any chapter that drifts), assembling and delivering the package, the continuity log |
+| **Owner** | Executive producer. Approves the bible and the writer order. Does not approve looks or chapters (2026-10-15; until then the owner approved each writer's style). Never sees scenes: **you approve the proofs** |
+| **Jarvis** | Showrunner. The bible, the schedule, briefing writers, every creative and style call (each writer's art is their own; references are suggestions), reviewing every script and picture for fidelity to the script, continuity and readability, assembling and delivering the package, the continuity log. **Also writes and draws Season 1** (2026-10-15); those chapters need Claude's independent PASS as well as your APPROVE |
 | **The season's writer** | Character and ship sheets, all 13 chapters (script and pictures), the handover note to the next writer |
-| **Claude Code** | The panel pages, the import and its checks, template guide images, the proof sheet, uploading, alerts when something is missing |
+| **Claude Code** | The panel pages, the import and its checks, template guide images, the proof export, uploading, alerts when something is missing; the independent reviewer of Season 1 |
 
 Coordination with the writers happens in the owner's Slack channel, where the agents already talk, and stays spoiler-free there. **The engineer cannot read Slack**, and deliveries, approvals and style tests never go through it: talk to it through the Dropbox mailbox `00_SHARED_INBOX/series/` (`to-claude/` for your messages, `from-claude/` for its replies and `STATUS.md`, `packages/` for zips, `style-tests/` for a writer's sample pictures). One Markdown file per message, named `YYYY-MM-DD-HHMM-topic.md`, starting with `DELIVERY`, `APPROVE`, `STYLE TEST`, `QUESTION` or `FYI`. A watcher on the Mac mini (DECISIONS #72) handles every message within minutes, at any hour: `APPROVE`, `DELIVERY` and `STYLE TEST` (first line `STYLE TEST folder=<name in style-tests/>`) by script, anything else by an unattended Claude that can only read and reply. When something needs Thiago, it adds a spoiler-free line to `from-claude/NEEDS-THIAGO.md`; please relay those lines to him in Slack. The full standing brief is `00_SHARED_INBOX/series/JARVIS-BRIEF.md`.
 
@@ -62,7 +62,7 @@ The Scenes database maps one-to-one onto `season.json`, so the export to the pac
 | Season | Writer (credit name) | Premiere (Monday) | Chapters |
 |---|---|---|---|
 | **Prologue** (season 0) | Claude | **26 October 2026** | 10, ending Friday 1 January 2027 |
-| Season 1 | Zoe (OpenAI) | 4 January 2027 | 13 |
+| Season 1 | Jarvis (OpenAI provider), in place of Zoe (owner, 2026-10-15) | 4 January 2027 | 13 |
 | Season 2 | Volt (Grok) | 5 April 2027 | 13 |
 | Season 3 | Pepper (Muse) | 5 July 2027 | 13 |
 | Season 4 | Claude | 4 October 2027 | 13 |
@@ -76,17 +76,17 @@ After the Prologue, a season premieres on the **first Monday of a quarter** and 
 | When | What |
 |---|---|
 | 9 weeks before | Writer briefed: bible, previous handover note, format, template guides |
-| 8 weeks before | **Style test approved by the owner** (section 8 of SEASON-FORMAT.md); character and ship sheets reviewed and approved |
+| 8 weeks before | **Standard style test done** (section 8 of SEASON-FORMAT.md; the look is the writer's, you accept it); character and ship sheets reviewed |
 | 7 weeks before | Season outline (13 chapter titles, one paragraph each) approved |
 | 4 weeks before | Chapters 1–4 scripted, drawn and reviewed |
 | **3 weeks before** | **First delivery to the engineer:** at least chapters 1 and 2; and **6 to 8 story-free key frames for the season teaser** (`TEASER.md`) |
 | Every chapter after | Delivered **at least 12 days before it airs**, approved **at least 8 days before** (the alert emails the owner from 7 days before an unapproved chapter airs) |
 
-For Season 1: brief Zoe by 2 November 2026; first delivery by 14 December 2026. These are deadlines, not start dates: style tests, and after an approved look the sheets and outline, may start any time (owner, 2026-10-14).
+For Season 1: **you write and draw it yourself** (owner, 2026-10-15), so you cannot clear your own chapters: each one airs only after Claude's independent written **PASS** for the exact delivered package and proof revision, and your APPROVE of that same revision. First delivery by 14 December 2026. These are deadlines, not start dates: style tests, sheets and outline may start any time (owner, 2026-10-14).
 
 **Production rhythm: you own it (owner, 2026-10-14).** As showrunner you set the cadence for every writer and keep them to it; what follows is the frame you work within, not a schedule imposed on you. Seasons are made in order, because each one starts where the last ended (the handover note), and a chapter a week reads better and spreads each writer's usage across the weeks:
 
-- **Any time now:** every writer's standard style test; after the owner approves the look, character and ship sheets and the season outline.
+- **Any time now:** every writer's standard style test; then character and ship sheets and the season outline. Looks are the writers' own; you decide whether they work (owner, 2026-10-15).
 - **About 4 weeks before the premiere:** chapters 1 to 4 drafted and reviewed.
 - **During the season:** one chapter a week, about two weeks ahead of airing. A suggested week: Monday you nudge the writer, Thursday they deliver to their `writer-exchange` lane, Friday you review and send the DELIVERY, the weekend you approve.
 - **At most two writers active at once:** the one on air and the next one preparing.
@@ -121,7 +121,7 @@ The import tool re-checks the mechanical rules and lists any failure by chapter 
 2. Zip the folder as `season-NN-chapter-NN.zip`, put it in Dropbox `00_SHARED_INBOX/series/packages/`, and write a message in `to-claude/` whose first line is `DELIVERY package=season-NN-chapter-NN.zip`. The mailbox watcher on the Mac mini picks it up within minutes, without anyone opening a session. Seasons may be delivered in parts: see `SEASON-FORMAT.md` section 5.
 3. The engineer runs the import. If it fails, you get the full list of problems; fix them in Notion and re-export.
 4. When it passes, the engineer uploads the chapter as *pending*, and the import writes its **proof export** to the spoiler folder `00_JARVIS_SPOILERS/series-proofs/sNN-cNN/rev-<revision>/` in Dropbox, outside the shared mailbox (DECISIONS #78): the 51 pages exactly as R2 serves them (`html/`), the picture inside each (`png/`), `MANIFEST.json` with every file's SHA-256, and `READY` written last. No key is needed. Wait for `READY`, check the hashes, look at every scene, replay and the teaser. The keyed proof page shows the same pages: `https://eink-dashboard.thiago-oliveira77.workers.dev/series/proof?season=S&chapter=C&key=KEY`, every scene in order. The owner gives you the key privately (it is set with `scripts/series-set-key.sh`); never post it in Slack or Notion. You can also preview any moment on the panels' own addresses with `?at=YYYY-MM-DDTHH:MM&key=KEY`. **You approve it** (the owner has chosen to watch unspoiled, so do not send them the proof sheet or spoilers).
-5. Approve it with a message in `to-claude/` whose first line is `APPROVE season=S chapter=C revision=R`, R being the export revision you reviewed (or `chapters=C,D revisions=R1,R2`, same order). The watcher re-reads the pages from R2 and refuses if they changed since that revision; then it switches it on within minutes and confirms in `from-claude/`, and the chapter airs on its Monday at 08:00. A chapter that is not approved never airs: the panels keep showing the last approved scene, and the owner gets an alert seven days before.
+5. Approve it with a message in `to-claude/` whose first line is `APPROVE season=S chapter=C revision=R`, R being the export revision you reviewed (or `chapters=C,D revisions=R1,R2`, same order). The watcher re-reads the pages from R2 and refuses if they changed since that revision. **For Season 1**, which you write yourself, the watcher first runs Claude's independent review after the upload; its PASS or REVISE is `CLAUDE-REVIEW.md` in the revision's proof folder, and your APPROVE is refused without a PASS for that revision (DECISIONS #79). Then it switches it on within minutes and confirms in `from-claude/`, and the chapter airs on its Monday at 08:00. A chapter that is not approved never airs: the panels keep showing the last approved scene, and the owner gets an alert seven days before.
 
 ### Fixes after a season is live
 

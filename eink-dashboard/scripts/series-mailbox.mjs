@@ -4,6 +4,7 @@
  *
  *   node scripts/series-mailbox.mjs run      — handle Jarvis's messages in to-claude/
  *   node scripts/series-mailbox.mjs weekly   — write Claude's next chapter when it is due
+ *   node scripts/series-mailbox.mjs review S C <package.zip>  — re-run Claude's independent review (#79)
  *
  * Layer 1 (no AI): APPROVE, DELIVERY and STYLE TEST are handled by this script with the
  * import tool. Layer 2: QUESTION, FYI and anything else go to an unattended Claude run that
@@ -15,6 +16,7 @@
  * Nothing here holds story. Logs: ~/Library/Logs/eink-series/.
  */
 import { execFileSync, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -30,6 +32,7 @@ const WORK = path.join(HOME, "series-work");
 const LOGS = path.join(HOME, "Library", "Logs", "eink-series");
 const ATTEMPTS = path.join(WORK, ".mailbox-attempts.json");
 const SITE = "https://eink-dashboard.thiago-oliveira77.workers.dev";
+const PROOFS = process.env.SERIES_PROOFS ?? "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_JARVIS_SPOILERS/series-proofs";
 const MAX_ATTEMPTS = 3;
 
 fs.mkdirSync(LOGS, { recursive: true });
@@ -114,8 +117,9 @@ function handle(file, m) {
       const u = series(["upload", out, ...(msg.replaceApproved ? ["--replace-approved"] : [])]);
       const meta = JSON.parse(fs.readFileSync(path.join(out, "season.json"), "utf8"));
       const links = meta.chapters.map((c) => `- Chapter ${c}: ${SITE}/series/proof?season=${meta.season.number}&chapter=${c}&key=`).join("\n");
+      const reviews = u.ok ? reviewUploaded(m, u.out, zip) : "";
       reply(u.ok ? "delivery-uploaded" : "delivery-upload-failed", u.ok
-        ? `FYI: reply to ${file}\n\n${msg.package} passed every check and is uploaded. ${u.out.split("\n").filter((l) => /uploaded|not replaced/.test(l)).join(" ")}\n\n${exportLines(u.out)}\n\nProof pages (add your key):\n${links}\n\nSend APPROVE season=${meta.season.number} chapter=N revision=R when you have reviewed that revision.`
+        ? `FYI: reply to ${file}\n\n${msg.package} passed every check and is uploaded. ${u.out.split("\n").filter((l) => /uploaded|not replaced/.test(l)).join(" ")}\n\n${exportLines(u.out)}${reviews}\n\nProof pages (add your key):\n${links}\n\nSend APPROVE season=${meta.season.number} chapter=N revision=R when you have reviewed that revision.`
         : `FYI: reply to ${file}\n\n${msg.package} passed the checks but the upload failed. Nothing changed on air. Thiago needs to ask Claude to look:\n\n${u.out.slice(-2000)}`);
       if (!u.ok) note(`Upload of ${msg.package} failed; see ~/Library/Logs/eink-series/mailbox.log`);
       if (/proof export FAILED/.test(u.out)) note(`The proof export for ${msg.package} failed, so Jarvis cannot review it yet. Please open a session.`);
@@ -144,6 +148,54 @@ function handle(file, m) {
       return claude("message.md", { MESSAGE: path.join(INBOX, file), MAILBOX, OUTBOX, STAMP: stamp().file }, [...read, ...writeTo(OUTBOX)], `message-${file.replace(/\.md$/, "")}`);
     }
   }
+}
+
+/**
+ * Claude's independent review of a chapter the showrunner wrote himself (DECISIONS #79). An
+ * unattended run reads every exported page and the package, and writes PASS or REVISE. The
+ * record that `approve` trusts stays in ~/series-work/reviews, where Jarvis cannot write; a copy
+ * of the verdict goes next to the pages in his proof folder. Returns the verdict or null.
+ */
+function review(season, chapter, revision, exportDir, zip) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const base = `s${pad(season)}-c${pad(chapter)}-${revision}`;
+  const dir = path.join(WORK, "reviews");
+  fs.mkdirSync(dir, { recursive: true });
+  const unpacked = path.join(WORK, "review-packages", base);
+  fs.rmSync(unpacked, { recursive: true, force: true });
+  fs.mkdirSync(unpacked, { recursive: true });
+  execFileSync("ditto", ["-x", "-k", zip, unpacked]);
+  const packageSha = crypto.createHash("sha256").update(fs.readFileSync(zip)).digest("hex");
+  const verdictFile = path.join(dir, `${base}.md`);
+  fs.rmSync(verdictFile, { force: true });
+  claude("review.md", {
+    SEASON: String(season), CHAPTER: String(chapter), REVISION: revision, EXPORT: exportDir,
+    PACKAGE: unpacked, PACKAGE_SHA: packageSha, VERDICT: verdictFile, MAILBOX,
+  }, ["Read", "Glob", "Grep", `Edit(/${verdictFile})`], `review-${base}`);
+  const first = fs.existsSync(verdictFile) ? fs.readFileSync(verdictFile, "utf8").split("\n")[0].trim() : "";
+  const verdict = /^(PASS|REVISE)$/.test(first) ? first : null;
+  if (!verdict) return null;
+  const manifestSha = crypto.createHash("sha256").update(fs.readFileSync(path.join(exportDir, "MANIFEST.json"))).digest("hex");
+  fs.writeFileSync(path.join(dir, `${base}.json`), JSON.stringify({
+    season, chapter, revision, verdict, packageSha256: packageSha, manifestSha256: manifestSha, reviewedAt: new Date().toISOString(),
+  }, null, 2) + "\n");
+  fs.copyFileSync(verdictFile, path.join(exportDir, "CLAUDE-REVIEW.md"));
+  return verdict;
+}
+
+/** Review every exported chapter of an upload that needs it; one line per chapter for Jarvis. */
+function reviewUploaded(m, out, zip) {
+  const lines = [];
+  for (const l of out.split("\n")) {
+    const e = l.match(/^proof export: season (\d+) chapter (\d+) revision ([0-9a-f]{16}) in (.+)$/);
+    if (!e || !m.mailbox.needsIndependentReview(Number(e[1]))) continue;
+    const v = review(Number(e[1]), Number(e[2]), e[3], e[4], zip);
+    lines.push(v
+      ? `- Season ${e[1]} chapter ${e[2]} revision ${e[3]}: Claude's independent review says **${v}**. Details: CLAUDE-REVIEW.md in that revision's proof folder.`
+      : `- Season ${e[1]} chapter ${e[2]} revision ${e[3]}: the independent review did not finish; Thiago has been asked to open a session.`);
+    if (!v) note(`Claude's independent review of season ${e[1]} chapter ${e[2]} did not finish. Please open a session.`);
+  }
+  return lines.length ? `\n\nIndependent review (Season 1 rule, DECISIONS #79):\n${lines.join("\n")}` : "";
 }
 
 /** The upload's proof-export lines, for Jarvis (DECISIONS #78). */
@@ -244,14 +296,26 @@ function cmdHeartbeat() {
   log("heartbeat: written");
 }
 
+/** An engineer re-runs the independent review of the revision now in R2 (DECISIONS #79). */
+function cmdReview() {
+  const [season, chapter, zip] = [Number(process.argv[3]), Number(process.argv[4]), process.argv[5]];
+  if (!Number.isInteger(season) || !Number.isInteger(chapter) || !zip || !fs.existsSync(zip)) throw new Error("usage: review S C <package.zip>");
+  const pad = (n) => String(n).padStart(2, "0");
+  const chapterDir = path.join(PROOFS, `s${pad(season)}-c${pad(chapter)}`);
+  const revision = fs.readFileSync(path.join(chapterDir, "CURRENT.txt"), "utf8").trim();
+  const v = review(season, chapter, revision, path.join(chapterDir, `rev-${revision}`), path.resolve(zip));
+  console.log(`season ${season} chapter ${chapter} revision ${revision}: ${v ?? "review did not finish"}`);
+  log(`review s${season} c${chapter} ${revision}: ${v ?? "unfinished"}`);
+}
+
 // ----------------------------------------------------------------
 
 const cmd = process.argv[2];
-if (!["run", "weekly", "heartbeat"].includes(cmd)) { console.error("usage: series-mailbox.mjs run|weekly|heartbeat"); process.exit(2); }
+if (!["run", "weekly", "heartbeat", "review"].includes(cmd)) { console.error("usage: series-mailbox.mjs run|weekly|heartbeat|review"); process.exit(2); }
 const LOCK = path.join(WORK, `.mailbox-${cmd}.lock`);
 if (!lock(LOCK)) { log(`${cmd}: another run holds the lock; skipped`); process.exit(0); }
 try {
-  ({ run: cmdRun, weekly: cmdWeekly, heartbeat: cmdHeartbeat })[cmd]();
+  ({ run: cmdRun, weekly: cmdWeekly, heartbeat: cmdHeartbeat, review: cmdReview })[cmd]();
 } catch (err) {
   log(`${cmd} failed: ${err.stack ?? err}`);
   try { note(`The mailbox watcher hit an error (${cmd}). Please open a session.`); } catch { /* mailbox gone */ }

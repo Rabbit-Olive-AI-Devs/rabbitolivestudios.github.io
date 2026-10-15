@@ -35,7 +35,7 @@ function compile() {
     tpl: load("src/series/templates.js"), types: load("src/series/types.js"), dec: load("src/png-decode.js"),
     schedule: load("src/series/schedule.js"), page: load("src/hud/page.js"), proof: load("src/series/proof.js"),
     hud: { canvas: load("src/hud/canvas.js"), type: load("src/hud/type.js"), parts: load("src/hud/parts.js") },
-    png: load("src/png.js"),
+    png: load("src/png.js"), mailbox: load("src/series/mailbox.js"),
   };
 }
 
@@ -311,6 +311,13 @@ async function cmdApprove() {
   // The pages on air must be the ones reviewed: recompute the revision from R2 itself.
   const now = (await readChapter(m, season, chapter)).revision;
   if (now !== revision) { console.error(`the pages changed since revision ${revision}; R2 now holds revision ${now}. Review that export first`); process.exit(1); }
+  // The showrunner's own season also needs Claude's independent PASS for this revision (#79).
+  if (m.mailbox.needsIndependentReview(season)) {
+    const pad = (n) => String(n).padStart(2, "0");
+    const f = path.join(os.homedir(), "series-work", "reviews", `s${pad(season)}-c${pad(chapter)}-${revision}.json`);
+    const r = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
+    if (r?.verdict !== "PASS" || r.revision !== revision) { console.error(`season ${season} needs Claude's independent PASS for revision ${revision} first${r ? ` (the review said ${r.verdict})` : " (no review yet)"}`); process.exit(1); }
+  }
   e.pending = e.pending.filter((c) => c !== chapter);
   if (!e.approved.includes(chapter)) e.approved.push(chapter);
   e.approved.sort((a, b) => a - b);

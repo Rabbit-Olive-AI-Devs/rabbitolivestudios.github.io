@@ -35,6 +35,8 @@ whoever makes them: a Claude session on the MacBook, on the Mac mini, or anyone 
 | 48.4-52.4 s | Stars | THREE E-INK SCREENS / A NEW SCENE EVERY TWO HOURS | Near silence, a high tense tone |
 | 52.5-60 s | Black, stars | THE LONG DRIFT / THE PROLOGUE / MONDAY 26 OCTOBER 2026 / the four season dates | Final braam, thuds, reverb tail |
 
+**Since 2026-10-15 Season 1 is Jarvis's, not Zoe's** (owner). v1 and v2 still show Zoe's card; the next cut replaces it with a story-free picture from Jarvis's style test and the name JARVIS (`teaser.py`: the `zoe` card and asset).
+
 Integrated loudness is about -16 LUFS. The score was checked by its levels, not by ear: the engineer
 cannot listen. Ask the owner what he hears.
 

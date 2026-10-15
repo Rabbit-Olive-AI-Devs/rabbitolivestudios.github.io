@@ -3495,3 +3495,48 @@ change, and an approval bound to the revision reviewed. No key in any file, and 
 - First exports, 2026-10-15: Prologue ch1 `bfc25eee39c73b5d`, ch2 `f1aecd8abab50554`, ch3
   `00d92e799de3a0c7`; all pending, 51 pages each, every PNG 800x480. About 17 s per chapter.
 - The keyed proof page and URL auth are unchanged.
+
+---
+
+## 79. Jarvis Writes Season 1; Claude Independently Reviews It; Looks Are the Writers' Own (2026-10-15)
+
+### What the owner decided (confirmed directly in a Claude session, 2026-10-15)
+
+Jarvis reported three decisions the owner had made with him; the owner confirmed all three here:
+
+1. **Jarvis writes and draws Season 1**, in place of Zoe, who could not commit to the full role.
+   Credit `Jarvis`, OpenAI as the provider. Zoe's earlier material is kept. Calendar dates do not
+   change.
+2. **Claude independently reviews every Season 1 chapter.** Jarvis is both author and approver,
+   so his APPROVE counts only together with Claude's written PASS for the same proof revision.
+3. **The owner no longer approves looks** (this replaces "the owner is the art director", #74).
+   Each writer's art is their own; Jarvis makes the creative and style calls; reference images and
+   the control shot are suggestions, never things to copy. Proof review still covers script
+   fidelity, continuity, lettering and readability on every scene.
+
+### How the review gate works
+
+- `needsIndependentReview(season)` (`src/series/mailbox.ts`) is true when the calendar's writer is
+  the showrunner, so the rule follows the calendar rather than a season number.
+- After a DELIVERY for such a season is uploaded and exported (#78), the watcher unpacks the
+  package and starts an unattended Claude run (`scripts/series-agent/review.md`) that may only read
+  and write one verdict file. It opens every exported page and the script, checks fidelity,
+  continuity, content rules, readability and story shape (not the look), and writes `PASS` or
+  `REVISE` with problems by page.
+- The watcher records `{revision, verdict, package SHA-256, manifest SHA-256}` in
+  `~/series-work/reviews/sNN-cNN-<revision>.json` on the Mac mini, where Jarvis cannot write, and
+  copies the verdict into the revision's proof folder as `CLAUDE-REVIEW.md` for him.
+- `approve` for such a season refuses unless that record says PASS for the exact revision now in
+  R2. A changed package means a new revision, a new review, and a new approval.
+- `node scripts/series-mailbox.mjs review S C <package.zip>` re-runs a review by hand.
+
+### Caveats
+
+- The reviewer reads text and pictures written by the author under review. Its instructions treat
+  them as data, but a review by a model can be argued with; a REVISE or a doubtful PASS is worth an
+  engineer's look.
+- Tested on 2026-10-15 with a synthetic chapter of plain grey pages (no story), which proves the
+  plumbing, not the judgement. The first run wrote nothing: an unattended `claude -p` in `dontAsk` mode
+  ignores `Write(path)` allow rules for files; only `Edit(path)` rules cover file writes. With
+  `Edit(...)` the reviewer opened all 51 pages, said REVISE, and the record and copy landed. The first real run will be Season 1 chapter 1 (delivery due 14 Dec).
+- A review blocks the mailbox run while it works (one lock per job, #72).

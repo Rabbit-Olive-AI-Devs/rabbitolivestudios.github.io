@@ -73,7 +73,7 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 | `season.number` | `0` for the Prologue, then `1`, `2`, … |
 | `season.show` | The show's title as printed in the top bar, the same every season |
 | `season.premiere` | A Monday, `YYYY-MM-DD` |
-| `season.writer` | The writer **agent's** name, printed in the credit (owner's decision, 2026-10-14): `Claude`, `Zoe` (OpenAI), `Volt` (Grok), `Pepper` (Muse), or two names joined by ` & ` |
+| `season.writer` | The writer **agent's** name, printed in the credit (owner's decision, 2026-10-14): `Claude`, `Jarvis` (Season 1, OpenAI provider, in place of Zoe since 2026-10-15), `Volt` (Grok), `Pepper` (Muse), or two names joined by ` & ` |
 | `chapters` | 13 (10 for the Prologue), numbered from 1 in order. A package may hold only the chapters delivered so far (section 5) |
 | `scenes` | Exactly 25 per chapter, numbered 1–25 in order |
 | `template` | `wide`, `split`, `strip`, `splash` or `panel-text` (section 3) |
@@ -147,7 +147,7 @@ Every problem is listed with its chapter and scene, so a whole season's mistakes
 
 ## 8. Style tests
 
-**The owner sets the art direction.** No writer draws a scene until the owner has approved their look (or their range of looks) from a style test. Style tests must carry **no story**: no plot, no scene from the season, nothing the owner should not see before it airs. On every proof sheet, the showrunner checks that the pages still match what was approved and that every change of look has a stated reason.
+**Each writer's art is their own** (owner, 2026-10-15, replacing the owner's look approval of 2026-10-14). The showrunner, Jarvis, makes the creative and style calls: whether a look works, and whether a chapter is faithful to its script. Reference images and the control shot are suggestions, never things to copy. Style tests must carry **no story**: no plot, no scene from the season, nothing the owner should not see before it airs. On every proof the showrunner still checks script fidelity, continuity, lettering and readability on every scene, and that every change of look has a stated reason.
 
 **The standard style test** (so the writers can be compared fairly):
 
@@ -155,8 +155,8 @@ Every problem is listed with its chapter and scene, so a whole season's mistakes
 2. **The difficult cases**, one picture each, all story-free: a face close-up; a night wide shot; a crowd; fast action; an interior conversation between two figures; a ship in perspective.
 3. **The score:** the showrunner rates each 1 to 5 for character consistency, readability on a panel (thumbnail test), distinctiveness (does it look like nobody else's generic AI art?), cinematic power, and fit with the writer's season. Send the scores with the test.
 
-Claude's control shot is in `style-tests/claude-styles/` as a reference for the scene.
+Claude's control shot is in `style-tests/claude-styles/` as a reference for the scene, not a model to copy.
 
-Before drawing a season, put three to five sample pictures in a folder under `00_SHARED_INBOX/series/style-tests/` and send a message whose first line is `STYLE TEST folder=<that folder>`. Within minutes, `from-claude/style-tests/<folder>/` holds each picture as the panels will get it: untouched, only cropped to fill the 800x480 screen (`.png` to look at, `.html` as uploaded). The series sends every panel the full-colour picture and each panel converts it itself, the E1001s to black and white and the E1002 to its six colours (DECISIONS #73), so a style test is best judged on a real panel. The engineer can make the same pages with `npm run series -- preview <picture|folder> --out DIR`.
+Before drawing a season, put the standard style test (the control shot and the six difficult cases) in a folder under `00_SHARED_INBOX/series/style-tests/` and send a message whose first line is `STYLE TEST folder=<that folder>`. Within minutes, `from-claude/style-tests/<folder>/` holds each picture as the panels will get it: untouched, only cropped to fill the 800x480 screen (`.png` to look at, `.html` as uploaded). The series sends every panel the full-colour picture and each panel converts it itself, the E1001s to black and white and the E1002 to its six colours (DECISIONS #73), so a style test is best judged on a real panel. The engineer can make the same pages with `npm run series -- preview <picture|folder> --out DIR`.
 
 The watcher also uploads the pages so a real panel can show them: `/series/test?folder=<folder>&image=<picture name>&key=<key>` (`/desk/series/test` and `/color/series/test` are the same page). The reply lists the exact addresses (without the key). Add one as a temporary page in SenseCraft (HTML widget, 800x480) and remove it after the test. Picture names are made web-safe: anything other than letters, digits, `.`, `_` and `-` becomes `-`.
