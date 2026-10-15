@@ -56,6 +56,19 @@ test("invertRect flips black and white inside the area only", () => {
   assert.equal(cv.countBlack(c), 50);
 });
 
+test("grey tones keep pure black and white exact, and a page with tones is encoded as 8-bit grey", async () => {
+  const pg = fromBuild("src/hud/page.js");
+  const c = cv.createCanvas(8, 2);
+  assert.equal((await pg.canvasToPng(c))[24], 1, "no tone: 1-bit PNG");
+  cv.setTone(c, 0, 0, 0);
+  cv.setTone(c, 1, 0, 255);
+  cv.setTone(c, 2, 0, 128);
+  assert.deepEqual([at(c, 0, 0), at(c, 1, 0), at(c, 2, 0)], [0, 1, 128]);
+  assert.equal((await pg.canvasToPng(c))[24], 8, "a tone: 8-bit PNG");
+  cv.invertRect(c, 0, 0, 3, 1);
+  assert.deepEqual([at(c, 0, 0), at(c, 1, 0), at(c, 2, 0)], [1, 0, 127]);
+});
+
 test("line joins its endpoints and thickness widens it", () => {
   const c = cv.createCanvas(20, 20);
   cv.line(c, 2, 2, 12, 2);

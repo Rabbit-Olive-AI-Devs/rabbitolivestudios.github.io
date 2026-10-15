@@ -143,7 +143,7 @@ Dates in cache keys are **America/Chicago** dates. Cache versions live in `src/c
 | Alerts, device telemetry | `alerts:{zip}:v1`, `device:{id}:v1` | 5 min | 86400 |
 | Desk planet | `planet:v1:DATE` | 24h | 604800 (7 days) |
 | Desk TARS | `tars:v1:state` (one document, rewritten by each Mac's report) | 75 min per machine, 3 h per provider | 604800 (7 days) |
-| Desk Flamengo | `flamengo:v1:state` (one document: table, results, fixtures, two crests) | 6 h; 30 min from kickoff to four hours after | 604800 (7 days) |
+| Desk Flamengo | `flamengo:v2:state` (one document: table, results, fixtures, two crests) | 6 h; 30 min from kickoff to four hours after | 604800 (7 days) |
 | Guards and bookkeeping | `ai-budget:v1:block`, `gen-lock:v1:*`, `stale-idx:v1:<prefix>`, `alert:v1:last`, `nws-points:{zip}` | — | varies |
 
 Rules:
@@ -205,7 +205,7 @@ Supporting mechanisms:
 - `/weather` and `/color/weather` have only **5–7px of vertical slack**, and `.hourly` absorbs every deficit while `overflow: hidden` hides the clipping. `body.scrollHeight` reports 480 even when cards are cut. Measure the deepest rendered element instead, and test with a banner (`?test-alert=tornado`) (#63).
 - An HTML page whose body is an image needs a text fallback.
 - **The series** (#71, #72): never commit season scripts, pictures, packages or build output (public repo, spoilers); never show the owner an unaired scene, proof page or plot (he watches unspoiled), so write chapters through a background helper or the weekly unattended run, never in the main conversation; a chapter airs only after the showrunner's `APPROVE`.
-- **Desk panel pages (`/desk/*`)** are drawn by the Worker as 1-bit images with `src/hud/`, never as live HTML text. Type is real fonts only, from the generated glyph faces, and never smaller than `plex11m` (11px medium), the owner's minimum on the panel. Show the owner a mockup before building a new page (#66, #67).
+- **Desk panel pages (`/desk/*`)** are drawn by the Worker as images with `src/hud/`, never as live HTML text: text and lines pure black and white, the crest and planet pictures in grey tones the panel converts (#81). Type is real fonts only, from the generated glyph faces, and never smaller than `plex11m` (11px medium), the owner's minimum on the panel. Show the owner a mockup before building a new page (#66, #67).
 
 **For code:**
 

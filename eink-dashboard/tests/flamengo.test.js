@@ -121,7 +121,7 @@ function ctx() {
   return { pending, waitUntil(p) { pending.push(p); } };
 }
 
-const KEY = "flamengo:v1:state";
+const KEY = "flamengo:v2:state";
 
 // --- Reading ESPN ---------------------------------------------------------------
 
@@ -366,18 +366,18 @@ function crestPng(size = 96) {
   ]));
 }
 
-test("a crest becomes a 1-bit bitmap: transparent is paper, however dark it is underneath", async () => {
-  const bits = await crest.crestBits(crestPng());
+test("a crest becomes grey tones: transparent is paper, however dark it is underneath", async () => {
+  const tones = await crest.crestTones(crestPng());
   const c = cv.createCanvas();
-  assert.equal(crest.drawCrest(c, bits, 100, 100), true);
+  assert.equal(crest.drawCrest(c, tones, 100, 100), true);
   assert.equal(cv.countBlack(c), 32 * 32, "only the opaque square is inked");
   assert.equal(c.px[(100 + 40) * c.w + 100 + 40], 0);
   assert.equal(c.px[(100 + 5) * c.w + 100 + 5], 1);
 });
 
 test("anything that is not a usable crest is refused, and drawing nothing draws nothing", async () => {
-  assert.equal(await crest.crestBits(crestPng(64)), null, "wrong size");
-  assert.equal(await crest.crestBits(new Uint8Array([1, 2, 3])), null);
+  assert.equal(await crest.crestTones(crestPng(64)), null, "wrong size");
+  assert.equal(await crest.crestTones(new Uint8Array([1, 2, 3])), null);
   const c = cv.createCanvas();
   for (const bad of [undefined, "", "bits-8", "!!!", btoa("short")]) assert.equal(crest.drawCrest(c, bad, 10, 10), false);
   assert.equal(cv.countBlack(c), 0);
@@ -402,7 +402,7 @@ test("text too long for its place is cut back to whole words, never mid-word or 
 });
 
 test("the page draws all twenty clubs and both crests, and survives having nothing to show", async () => {
-  const state = await fla.loadFlamengo(NOW, null, sources({ crest: await crest.crestBits(crestPng()) }));
+  const state = await fla.loadFlamengo(NOW, null, sources({ crest: await crest.crestTones(crestPng()) }));
   const full = page.drawFlamengoPage(fla.flamengoView(state, NOW), new Date(NOW));
   const row = (i) => { let n = 0; for (let x = 12; x < 330; x++) for (let y = 91 + i * 19; y < 108 + i * 19; y++) n += full.px[y * full.w + x] === 0; return n; };
   for (let i = 0; i < 20; i++) assert.ok(row(i) > 40, `row ${i + 1} is drawn`);

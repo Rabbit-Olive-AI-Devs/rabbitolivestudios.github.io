@@ -3664,3 +3664,16 @@ legibility of thin text, not for a conversion of ours, so it stands. The desk pa
 1-bit images by design (#67); only the crest (`hud/crest.ts`) and the planet (`hud/planet-draw.ts`)
 use our ordered dither inside them. The retired World Cup B&W page was a 1-bit screenshot; on revival
 (#61) try it as-is first.
+
+**Addendum 3 (owner: "try the crest and planet in greyscale"):** done on the live pages, not as a
+side-by-side, same terms as the rest of #81 (revert if it looks worse on the desk panel). The desk
+canvas (`hud/canvas.ts`) keeps 0 = black and 1 = white and now also holds grey tones 2..254, set
+only through `setTone` by pictures: the crest (`hud/crest.ts`, `crestTones`: 96x96 grey bytes,
+transparency as paper, no contrast stretch, no dither) and the planet (`hud/planet-draw.ts`, the
+shaded sphere written as tones; the Bayer matrix is gone). Text, rules and boxes stay pure black and
+white. `canvasToPng` encodes 8-bit grey only when a tone is present, so the Aurebesh, TARS and test
+pages are still 1-bit PNGs. `invertRect` mirrors a tone instead of XOR-ing it. The Flamengo entry
+moves to `flamengo:v2:state` because a refresh reuses the crests it already holds, and v1's are the
+old 1-bit bits (they would fail `drawCrest`'s size check and fall back to the abbreviation). One
+extra refresh of a few ESPN fetches and one write. Checked locally at 800x480: the planet and both
+crests in grey, all type crisp.

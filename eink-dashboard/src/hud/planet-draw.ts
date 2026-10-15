@@ -5,12 +5,14 @@
  * decides how it is lit, and the name seeds the pattern so the same planet
  * always looks the same and no two look alike.
  *
- * The sphere is shaded and then ordered-dithered straight to black and white,
- * so it reaches the panel as dots with no grey (DECISIONS #48, #66).
+ * The sphere is shaded in grey tones that go to the panel untouched; the panel
+ * converts them, as every picture does since DECISIONS #81 (until then this was
+ * our own ordered dither to black and white).
  */
 
 import type { Planet } from "../planet";
 import type { Canvas } from "./canvas";
+import { setTone } from "./canvas";
 
 export type PlanetKind = "lava" | "rock" | "ocean" | "ice" | "neptune" | "gas";
 
@@ -70,22 +72,6 @@ export function planetType(p: Planet): string {
 }
 
 // --- Texture -----------------------------------------------------------------------
-
-const BAYER8: number[][] = (() => {
-  let m = [[0]];
-  for (let n = 0; n < 3; n++) {
-    const k = m.length;
-    const o = Array.from({ length: k * 2 }, () => new Array<number>(k * 2));
-    for (let y = 0; y < k; y++) {
-      for (let x = 0; x < k; x++) {
-        const v = m[y][x] * 4;
-        o[y][x] = v; o[y][x + k] = v + 2; o[y + k][x] = v + 3; o[y + k][x + k] = v + 1;
-      }
-    }
-    m = o;
-  }
-  return m;
-})();
 
 const rand = (x: number, y: number, s: number) => {
   const n = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453;
@@ -161,8 +147,7 @@ export function drawPlanet(c: Canvas, cx: number, cy: number, r: number, p: Plan
   const R = Math.round(Math.min(r, MAX_RADIUS) * (look.ring ? RINGED_SCALE : 1));
   const span = look.ring ? Math.ceil(R * RING.outer) + 1 : R;
   const put = (x: number, y: number, brightness: number) => {
-    if (x < 0 || y < 0 || x >= c.w || y >= c.h) return;
-    c.px[y * c.w + x] = (1 - brightness) * 64 > BAYER8[y & 7][x & 7] + 0.5 ? 0 : 1;
+    setTone(c, x, y, Math.max(0, Math.min(1, brightness)) * 255);
   };
 
   for (let y = -span; y <= span; y++) {
