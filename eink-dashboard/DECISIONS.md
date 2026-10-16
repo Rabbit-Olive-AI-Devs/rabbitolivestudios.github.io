@@ -3697,3 +3697,7 @@ AI pictures made without the dithering hints (colour moment, skyline, fact; `5d0
 are confirmed on the real panels. The as-is pipelines and the hint-free prompts stay; nothing is to
 be reverted. The desk crest and planet in full colour (Addendum 4) were not part of this verdict
 and are still to be judged on the desk panel.
+
+**Addendum 6 (2026-10-16, owner on the desk panel: "Flamengo crest and the other clubs crest are
+also amazing"):** the club crests in full colour (Addendum 4, `crestColors`, `flamengo:v3:state`)
+are confirmed and stay. The planet in colour is the only part of Addendum 4 still to be judged.
