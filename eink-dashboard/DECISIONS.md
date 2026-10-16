@@ -3709,3 +3709,16 @@ and are still to be judged on the desk panel.
 **Addendum 6 (2026-10-16, owner on the desk panel: "Flamengo crest and the other clubs crest are
 also amazing"):** the club crests in full colour (Addendum 4, `crestColors`, `flamengo:v3:state`)
 are confirmed and stay. The planet in colour is the only part of Addendum 4 still to be judged.
+
+## 82. The Headlines Page Is Retired From the Cron, Kept as a Route (2026-10-16)
+
+Reading the E1002's page list in SenseCraft (now possible through Claude in Chrome) showed no
+headlines page. The owner confirmed they had dropped it. The 6-hourly cron was still fetching
+three news sources and writing `headlines:v3:DATE:PERIOD` four times a day for a page nobody saw.
+
+Retired the same way as the World Cup (#61), but lighter: only the cron warm is removed. The
+`/color/headlines` route, `src/headlines.ts`, its page and tests stay, and the route still
+builds and caches on request, so it costs nothing unless someone opens it. About 4 KV writes a
+day and 12 outside fetches saved. Freshness (the news could be stale) stays unsolved and is moot
+while the page is off. To revive: put `getHeadlines(env, dateStr, getCurrentPeriod())` back in the
+6-hourly `Promise.allSettled` in `handleScheduled` (and its label), and add the page in SenseCraft.

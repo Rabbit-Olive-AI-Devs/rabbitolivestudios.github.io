@@ -36,7 +36,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/weather` | 800x480 color HTML weather dashboard (Spectra 6 palette accents, moon phase) | 30 min |
 | `GET /color/weather?test-provider=nws\|fail` | Local test: force the NWS fallback (`nws`) or the no-data path (`fail`) | none |
 | `GET /color/moment` | 800x480 color "Moment Before", the picture untouched in full colour; the E1002 converts it to its 6 colours (#81) | 24 hours |
-| `GET /color/headlines` | Steel/trade headlines page for E1002. Uses deterministic RSS/source ranking, no LLM call. | 6 hours |
+| `GET /color/headlines` | Steel/trade headlines page (retired from the E1002 on 2026-10-16; still builds on request, no longer warmed by the cron, DECISIONS.md #82). Uses deterministic RSS/source ranking, no LLM call. | 6 hours |
 | `GET /color/test-moment?m=MM&d=DD&style=ID&key=KEY` | Generate color moment for any date + optional style override (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
@@ -121,7 +121,7 @@ npm run dry-run
 npx wrangler deploy
 ```
 
-Your worker URL will be printed. Cron schedule: daily at **04:35 and 05:35 UTC** (next-day image warm, DECISIONS.md #64) and every 6 hours (headlines/weather/device data + the failure-alert check). The World Cup `*/15` refresh was removed at retirement (DECISIONS.md #61).
+Your worker URL will be printed. Cron schedule: daily at **04:35 and 05:35 UTC** (next-day image warm, DECISIONS.md #64) and every 6 hours (weather/device data, the desk panel's data + the failure-alert check; headlines no longer, DECISIONS.md #82). The World Cup `*/15` refresh was removed at retirement (DECISIONS.md #61).
 
 > **Why does the daily warm fire before midnight, and twice?** Cache keys are dated in America/Chicago, which rolls over at 05:00 UTC in CDT and 06:00 UTC in CST. Each fire warms the date the panels are *about to ask for*: after noon Chicago that is tomorrow (04:35 UTC = 23:35 CDT / 22:35 CST), after midnight it is today (05:35 UTC = 00:35 CDT, the safety net; 23:35 CST is a no-op). So the keys are already filled when the date rolls and no device poll can ever be the generator. The earlier 05:05/06:05 schedule fired *after* the roll and left a 5–8 minute hole in which a poll generated on the request path, SenseCraft's renderer timed out, and the panel went white (DECISIONS.md #57, #64).
 >
@@ -457,7 +457,7 @@ v3.11.2 adds guardrails around expensive AI generation:
 - **AI budget pause** ends at the next 00:00 UTC — when Workers AI actually resets the free neuron allocation — instead of a fixed 6 hours. A block that lifted early just burned neurons on generations that were never going to be granted (DECISIONS.md #57).
 - **Failure alerting (v3.16.0)**: both August outages were found by looking at a physical panel — the Worker degraded as designed and said nothing. The every-6h cron now checks whether the day's five images are actually in KV and whether the AI budget guard is armed, and emails on a change of state via **Cloudflare Email Routing's `send_email` binding** (no third-party service, API key or account). A KV fingerprint keeps it to one email per distinct problem, at most one reminder per 24h, plus a single recovery notice. The check skips Chicago hours below 3 so it can't race the daily image warm. See DECISIONS.md #60 and **Alert setup** below.
 - **An alert banner costs whitespace, not content (v3.16.3)**: `/weather` and `/color/weather` are a fixed 480px flex column in which `.hourly` is the only flexible item, so it absorbed the entire ~39px an alert/rain banner adds — shrinking the hourly cards below their content height and clipping the temperatures mid-glyph on both panels. The server now tags the body `has-banner` when it renders one, and the stylesheet reclaims 40px from margins and padding, so the cards keep the height they have on a quiet day. **These pages carry only 5-7px of vertical slack**: anything added to them comes out of the hourly cards first, and `overflow: hidden` hides the evidence — verify by measuring the deepest rendered element at 800x480, not `body.scrollHeight` (DECISIONS.md #63).
-- `/color/headlines` is back on without Workers AI; it ranks RSS/scraped sources deterministically and caches results as `headlines:v3:YYYY-MM-DD:PERIOD`.
+- `/color/headlines` is back on without Workers AI; it ranks RSS/scraped sources deterministically and caches results as `headlines:v3:YYYY-MM-DD:PERIOD`. Since 2026-10-16 no panel shows it and the cron no longer warms it (DECISIONS.md #82).
 
 ### Alert Setup
 

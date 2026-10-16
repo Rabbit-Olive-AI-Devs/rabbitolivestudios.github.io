@@ -39,7 +39,6 @@ import {
   withGenerationLock,
 } from "./cache-guard";
 import { runAlertCheck, alertingConfigured, buildAlertEmail, sendAlertEmail } from "./alert";
-import { getHeadlines, getCurrentPeriod } from "./headlines";
 import { pngToBase64 } from "./png";
 import { pickCleanColorIndex, parseCleanColor, renderCleanPNG } from "./clean";
 import {
@@ -816,9 +815,10 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     const monthNum = parseInt(month);
     const dayNum = parseInt(day);
 
-    // --- Every-6h: headlines + weather + device (parallel, independent) ---
+    // --- Every-6h: weather + device + desk data (parallel, independent) ---
+    // Headlines are no longer warmed: the owner dropped them from the E1002 (DECISIONS #82).
+    // /color/headlines still builds on request.
     const sixHourResults = await Promise.allSettled([
-      getHeadlines(env, dateStr, getCurrentPeriod()),
       getWeather(env),
       getWeatherForLocation(env, 41.8781, -87.6298, "60606", "Chicago, IL"),
       fetchDeviceData(env, E1001_DEVICE_ID),
@@ -831,13 +831,13 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       // Desk panel Flamengo board: refreshed only if its entry has aged (DECISIONS #70).
       getFlamengo(env, { budgetMs: 40_000 }),
     ]);
-    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002", "device-desk", "planet-today", "planet-tomorrow", "flamengo"] as const;
+    const labels = ["weather-60540", "weather-60606", "device-E1001", "device-E1002", "device-desk", "planet-today", "planet-tomorrow", "flamengo"] as const;
     for (let i = 0; i < sixHourResults.length; i++) {
       if (sixHourResults[i].status === "rejected") {
         console.error(`Cron: ${labels[i]} warm failed:`, (sixHourResults[i] as PromiseRejectedResult).reason);
       }
     }
-    console.log("Cron: warmed 6h data (headlines, weather, devices)");
+    console.log("Cron: warmed 6h data (weather, devices, desk)");
 
     // Failure alerting — both August outages were found by looking at a panel,
     // not by the system saying anything (DECISIONS #60). runAlertCheck never

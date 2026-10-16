@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the desk-sensor commit (code) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-16 as bbc2b32f) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the headlines-retirement commit (code, #82) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-16 as bbc2b32f) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 81 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 82 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -39,7 +39,7 @@ The headline feature is **"Moment Before"**: every day the Worker picks a famous
 | Resolution | 800x480 | 800x480 |
 | Location | Home, Naperville IL (zip 60540) | Office, Chicago IL (zip 60606) |
 | SenseCraft device ID | `20225290` | `20225358` |
-| Routes it uses | `/fact.png`, `/weather`, `/skyline-bw`, `/series` (added 2026-10-14) | `/color/moment`, `/color/weather`, `/skyline`, `/color/headlines`, `/color/series` (added 2026-10-14) |
+| Routes it uses | `/fact.png`, `/weather`, `/skyline-bw`, `/series` (added 2026-10-14) | `/color/moment`, `/color/weather`, `/skyline`, `/color/series` (added 2026-10-14); `/color/headlines` was dropped by the owner (#82) |
 
 The exact pagelists live in the SenseCraft HMI web app, not in this repo. (Since SenseCraft HMI v1.3.2, February 2026, there is no separate "Web Function" page type: a URL is shown through the **HTML widget** in the Canvas Editor, sized 800x480 at position 0,0. Older notes in this repo still say "Web Function"; they mean the same mechanism.) The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel. **SenseCraft page lists as read on 2026-10-16** (page names, not URLs): home E1001 = weather, fact, skyline bw, Series_Greyscale; E1002 = Skylines Color, Weather Color, Moment Color, Series_Color, so **no headlines page and no duplicate skyline**; desk E1001 = Aurebesh, Planets, TARS, Flamengo, Series_B&W. All three show an orange "Pending" beside their Battery Saver switch, so it is not a sign of one unsent change. Claude can read SenseCraft through Claude in Chrome (signed in); it changes nothing there without the owner's yes.
 
@@ -65,7 +65,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/color/moment` | E1002 | HTML with the Spectra-6 dithered Moment image inlined as base64 |
 | `/skyline`, `/skyline-bw` | E1002, E1001 | HTML with the daily skyline PNG inlined as a `data:` URI |
 | `/skyline.png` | — | The skyline PNG itself (`?bw=1`, `?mode=daily\|rotate\|random`) |
-| `/color/headlines` | E1002 | Steel/trade headlines, ranked without an LLM |
+| `/color/headlines` | none (dropped from the E1002 by the owner; retired 2026-10-16, #82) | Steel/trade headlines, ranked without an LLM; builds on request, not warmed |
 | `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
 | `/desk/planet` | Desk E1001 | Planet of the day from NASA's Exoplanet Archive, drawn from its data; `?date=` (#68) |
 | `/desk/tars` | Desk E1001 | TARS: the owner's Macs and AI allowances. `GET ?key=` shows the page, `POST` with a bearer key takes a report from a Mac (#69) |
@@ -103,7 +103,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 **Cron triggers** (`wrangler.toml`), all in UTC:
 
 - `35 4,5 * * *` — the daily image warm. It fires *before* Chicago midnight and fills the keys for the date the panels are **about to** ask for (`dailyWarmTargetDate()`), so a panel poll is never the thing that triggers generation (#64). It is one expression with two fire times because the account is at the free plan's cap of 5 cron triggers.
-- `5 0,6,12,18 * * *` — refreshes headlines, both weather locations and both devices' telemetry, warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check.
+- `5 0,6,12,18 * * *` — refreshes both weather locations and all three devices' telemetry (no headlines since #82), warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check.
 
 The daily warm runs its pipelines **sequentially in priority order** (Pipeline A or birthday, Pipeline B, colour moment, skyline, skyline BW), skips any key that already exists, and stops at the first neuron-budget error.
 
@@ -343,7 +343,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 - The pagelists in section 2 are inferred from renderer requests, not read from SenseCraft HMI.
 - Decision records #31 and #33 give older skyline style counts (15 and 18). They are history and are left as written; `src/skyline.ts` defines 14 (6 BW + 8 colour).
-- Decision record #38 describes `/color/headlines` as disabled with a redirect to `/skyline`. That was reversed in #39: it is a live page with deterministic, non-LLM ranking, warmed by the 6-hourly cron. Whether it is on a panel's pagelist is a question for the owner.
+- Decision record #38 describes `/color/headlines` as disabled with a redirect to `/skyline`. That was reversed in #39: it is a live page with deterministic, non-LLM ranking, It was warmed by the 6-hourly cron until 2026-10-16, when the owner confirmed they had dropped it from the E1002 and the warm was retired (#82); the route still works on request.
 
 **Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.
 
@@ -370,7 +370,7 @@ This is separate from the Muse firmware experiment above, which concerns the fir
 **Open items the owner has not chosen to act on:**
 
 - The E1002 pagelist may effectively show the skyline twice if it still includes the legacy `/color/apod` entry.
-- Headline freshness: the news shown can be stale; a better source or approach is unsolved.
+- Headline freshness: the news shown can be stale; unsolved, and moot while the page is retired (#82).
 - SDXL has billed 0 neurons for weeks. Unverified whether it is free or unreported, so no model switch has been made on that basis.
 - No persistent logging of weather cold-path or budget events (#43).
 - The alert check does not watch KV operation counts (#62).
