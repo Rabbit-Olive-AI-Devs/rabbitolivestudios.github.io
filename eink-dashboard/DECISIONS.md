@@ -3691,3 +3691,9 @@ orange cracks, ocean blue with green land and white clouds and caps, ice pale bl
 cracks, rock tan with craters, gas giants tan bands with a red storm, Neptune-likes blue, rings
 beige. Shading and patterns are as before. Checked locally on all six kinds and the crests
 (commit `6ea2725`, deployed as 66ffc051).
+
+**Addendum 5 (2026-10-16, owner on the panels: "the new pictures are amazing!!!!!"):** the first
+AI pictures made without the dithering hints (colour moment, skyline, fact; `5d0ffeb`, `ea9c4bc`)
+are confirmed on the real panels. The as-is pipelines and the hint-free prompts stay; nothing is to
+be reverted. The desk crest and planet in full colour (Addendum 4) were not part of this verdict
+and are still to be judged on the desk panel.
