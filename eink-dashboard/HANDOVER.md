@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at `6ea2725` (code; later commits are docs only) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-15 as 66ffc051) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the desk-sensor commit (code) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-15 as 66ffc051) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -43,7 +43,7 @@ The headline feature is **"Moment Before"**: every day the Worker picks a famous
 
 The exact pagelists live in the SenseCraft HMI web app, not in this repo. (Since SenseCraft HMI v1.3.2, February 2026, there is no separate "Web Function" page type: a URL is shown through the **HTML widget** in the Canvas Editor, sized 800x480 at position 0,0. Older notes in this repo still say "Web Function"; they mean the same mechanism.) The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel.
 
-A **third panel**, a second E1001 (mono), sits on the owner's home-office desk and shows the `/desk/*` pages. It was paired in SenseCraft HMI on 2026-10-12; its device ID is not recorded here and no telemetry is fetched for it. The owner added `/desk/series` to it on 2026-10-14.
+A **third panel**, a second E1001 (mono), sits on the owner's home-office desk and shows the `/desk/*` pages. It was paired in SenseCraft HMI on 2026-10-12 as "E1001 - TBO 2"; its device ID is `20238717` (found 2026-10-16: the number at the end of its SenseCraft page address). Unlike the other two it runs firmware v1.2.2 with deep sleep enabled (they run v1.1.4, deep sleep off). The 6-hourly cron reads its sensor, so `/health-detailed` reports it as `device_desk` (stale only after a missed warm, 390 min); no page shows it. The owner added `/desk/series` to it on 2026-10-14.
 
 **The mental model that explains most of this project's rules:** the panel never fetches anything itself. SenseCraft HMI's "Web Function" loads each URL in a **headless Chromium in Seeed's cloud**, screenshots it, quantises the screenshot to the panel's palette, and pushes a finished image to the device. Every page of a pagelist is rendered in one burst about every 15 minutes. Consequences:
 

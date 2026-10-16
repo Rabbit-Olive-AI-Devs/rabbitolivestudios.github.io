@@ -389,7 +389,7 @@ The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `
 `src/device.ts` uses the SenseCraft HMI `API-Key` header for the device data endpoint:
 `https://sensecraft-hmi-api.seeed.cc/api/v1/user/device/iot_data/{DEVICE_ID}`.
 
-**Device IDs:** E1001 = `20225290` (home, Naperville), E1002 = `20225358` (office, Chicago). Each weather page passes its own device ID so telemetry (battery, indoor temp/humidity) matches the physical device.
+**Device IDs:** E1001 = `20225290` (home, Naperville), E1002 = `20225358` (office, Chicago), desk E1001 = `20238717` (home office; SenseCraft card "E1001 - TBO 2"). Each weather page passes its own device ID so telemetry (battery, indoor temp/humidity) matches the physical device. The desk panel has no weather page: the 6-hourly cron reads its sensor so `/health-detailed` can report it (`device_desk`). A device's ID is the number at the end of its page address in SenseCraft HMI (`sensecraft.seeed.cc/hmi/device/<ID>`); the device list shows only serial numbers.
 
 This key is treated as a **public/shared platform key** (not a private project secret). As of **February 16, 2026**, Seeed publishes the same key in official examples and notes it can be obtained from frontend source code:
 

@@ -3,6 +3,9 @@ import type { Env, CachedValue, DeviceData } from "./types";
 
 export const E1001_DEVICE_ID = "20225290"; // Home — Naperville 60540
 export const E1002_DEVICE_ID = "20225358"; // Office — Chicago 60606
+// Desk E1001 — home office, shows the /desk pages (no weather page reads it). Refreshed only
+// by the 6-hourly cron, so its entry is up to 6h old by design.
+export const DESK_E1001_DEVICE_ID = "20238717";
 
 const API_BASE = "https://sensecraft-hmi-api.seeed.cc/api/v1/user/device/iot_data";
 // SenseCraft's API-Key here is a public/shared platform key (not a private project secret).

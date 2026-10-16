@@ -2191,6 +2191,14 @@ Counts come back sampled and rounded to the nearest ten; treat them as close est
 
 ---
 
+**Addendum (2026-10-16): the desk E1001's sensor, +4 writes a day.** The desk panel (`20238717`)
+has no weather page, so nothing read its sensor. The owner wanted it watched (and readable by
+their own family dashboard, which calls SenseCraft directly and costs us nothing). It is read
+only by the 6-hourly cron, never on the request path: 4 writes a day, against the ~410 spare.
+`/health-detailed` reports it as `device_desk` with a 390-minute stale threshold, so stale means
+a missed warm, not a five-minute-old reading. The age measures our fetch, not the panel:
+SenseCraft returns the last reading it holds, with no timestamp.
+
 ## 63. An Alert Banner Must Cost Whitespace, Not Card Content (v3.16.3, 2026-09-01)
 
 A live **Heat Advisory** on 2026-09-01 sliced the bottom row of cards on *both* panels: the

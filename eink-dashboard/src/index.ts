@@ -16,7 +16,7 @@ import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
 import { getBirthdayToday, getBirthdayByKey } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
-import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID } from "./device";
+import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID, DESK_E1001_DEVICE_ID } from "./device";
 import { fetchWithTimeout } from "./fetch-timeout";
 import { getChicagoDateParts, shiftDateStr, getChicagoHour, dailyWarmTargetDate } from "./date-utils";
 import { findMostRecentCached, hasRecentCached } from "./stale-cache";
@@ -724,7 +724,7 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
     fact4Raw, fact1Raw, colorMomentRaw, skylineRaw, skylineBwRaw, momentRaw,
     weatherHomeRaw, weatherOfficeRaw,
     alertsHomeRaw, alertsOfficeRaw,
-    deviceHomeRaw, deviceOfficeRaw,
+    deviceHomeRaw, deviceOfficeRaw, deviceDeskRaw,
   ] = await Promise.all([
     env.CACHE.get(fact4Key),
     env.CACHE.get(fact1Key),
@@ -738,6 +738,7 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
     env.CACHE.get("alerts:60606:v1"),
     env.CACHE.get(`device:${E1001_DEVICE_ID}:v1`),
     env.CACHE.get(`device:${E1002_DEVICE_ID}:v1`),
+    env.CACHE.get(`device:${DESK_E1001_DEVICE_ID}:v1`),
   ]);
 
   return jsonResponse(
@@ -762,6 +763,8 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         alerts_office:  ephemeralStatus(parseEphemeral(alertsOfficeRaw),   5),
         device_home:    ephemeralStatus(parseEphemeral(deviceHomeRaw),     5),
         device_office:  ephemeralStatus(parseEphemeral(deviceOfficeRaw),   5),
+        // Only the 6-hourly cron refreshes the desk entry: stale means a missed warm.
+        device_desk:    ephemeralStatus(parseEphemeral(deviceDeskRaw),     390),
       },
       series: await seriesHealth(env, new Date()),
       config: {
@@ -820,6 +823,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       getWeatherForLocation(env, 41.8781, -87.6298, "60606", "Chicago, IL"),
       fetchDeviceData(env, E1001_DEVICE_ID),
       fetchDeviceData(env, E1002_DEVICE_ID),
+      fetchDeviceData(env, DESK_E1001_DEVICE_ID),
       // Desk panel planet: today's and tomorrow's, so the key is filled hours before
       // the date rolls. A warm key costs one read and no write (DECISIONS #68).
       getPlanetOfDay(env, dateStr, { budgetMs: 40_000 }),
@@ -827,7 +831,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       // Desk panel Flamengo board: refreshed only if its entry has aged (DECISIONS #70).
       getFlamengo(env, { budgetMs: 40_000 }),
     ]);
-    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002", "planet-today", "planet-tomorrow", "flamengo"] as const;
+    const labels = ["headlines", "weather-60540", "weather-60606", "device-E1001", "device-E1002", "device-desk", "planet-today", "planet-tomorrow", "flamengo"] as const;
     for (let i = 0; i < sixHourResults.length; i++) {
       if (sixHourResults[i].status === "rejected") {
         console.error(`Cron: ${labels[i]} warm failed:`, (sixHourResults[i] as PromiseRejectedResult).reason);
