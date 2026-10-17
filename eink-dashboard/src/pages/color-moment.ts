@@ -14,6 +14,8 @@ import { getChicagoDateParts, shiftDateStr } from "../date-utils";
 import { findMostRecentCached } from "../stale-cache";
 import { getTodayEvents } from "../fact";
 import { getOrGenerateMoment, generateMomentBefore } from "../moment";
+import { stylesFor, momentStyleFor } from "../art-styles";
+import type { ArtStyle } from "../art-styles";
 import { getBirthdayToday, getBirthdayByKey, getBirthdayStyle, resolveBirthdayStyle, BIRTHDAY_STYLES } from "../birthday";
 import type { BirthdayPerson } from "../birthday";
 import { callFluxPortrait, fetchReferencePhotos, ageDescription } from "../birthday-image";
@@ -36,110 +38,12 @@ import {
 
 const ANTI_TEXT_SUFFIX = "no text, no words, no letters, no writing, no signage, no captions, no watermark";
 
-/**
- * Every art style the moment rotates through, one per day. The panels convert any picture
- * themselves (#81), so this is no longer limited to what survived our own dithering: it now
- * also carries the mono styles of /fact and /fact1 and the birthday painters (DECISIONS #84).
- */
-export const COLOR_MOMENT_STYLES = [
-  {
-    id: "gouache",
-    name: "Gouache",
-    prompt: "gouache painting, opaque matte pigment, bold flat color fields, visible brush strokes, thick paint application",
-  },
-  {
-    id: "oil_painting",
-    name: "Oil Painting",
-    prompt: "oil painting on canvas, rich saturated colors, visible impasto brush strokes, dramatic lighting, painterly realism",
-  },
-  {
-    id: "graphic_novel",
-    name: "Graphic Novel",
-    prompt: "graphic novel panel illustration, bold ink outlines, flat color fills, cel-shaded, high contrast, comic book art",
-  },
-  {
-    id: "ink_wash",
-    name: "Ink + Wash",
-    prompt: "ink and watercolor wash illustration, black ink outlines with transparent color washes, loose brushwork, visible paper texture",
-  },
-  {
-    id: "woodblock",
-    name: "Color Woodblock",
-    prompt: "Japanese woodblock print, ukiyo-e style, bold flat color areas, black key block outlines, hand-carved texture",
-  },
-  {
-    id: "woodcut",
-    name: "Woodcut",
-    prompt: "hand-carved woodcut print, bold U-gouge marks, black ink on paper, sweeping curved gouge strokes, large solid black ink areas",
-  },
-  {
-    id: "pencil",
-    name: "Pencil Sketch",
-    prompt: "detailed graphite pencil sketch, fine cross-hatching, full tonal range, on white paper",
-  },
-  {
-    id: "charcoal",
-    name: "Charcoal",
-    prompt: "dramatic charcoal drawing, expressive strokes, deep shadows, textured paper",
-  },
-  {
-    id: "pen_ink",
-    name: "Pen + Ink",
-    prompt: "detailed pen and ink drawing, fine crosshatching, stipple shading, clean precise line work, black ink on white paper",
-  },
-  {
-    id: "noir",
-    name: "Ink Noir",
-    prompt: "bold ink noir illustration, heavy black ink pools, dramatic chiaroscuro, film noir shadows",
-  },
-  {
-    id: "linocut",
-    name: "Linocut",
-    prompt: "linocut block print, bold carved relief lines, hand-printed texture with visible ink coverage",
-  },
-  {
-    id: "etching",
-    name: "Etching",
-    prompt: "fine etching engraving, parallel hatching lines, copper plate style, intricate detail",
-  },
-  {
-    id: "watercolor",
-    name: "Watercolor",
-    prompt: "watercolor painting, rich transparent washes, wet-on-wet blooms, soft edges, visible paper texture",
-  },
-  {
-    id: "impressionist",
-    name: "Impressionist",
-    prompt: "Impressionist oil painting, visible brushstrokes, dappled light, Monet-inspired",
-  },
-  {
-    id: "pointillist",
-    name: "Pointillist",
-    prompt: "Pointillist painting, tiny dots of color, Seurat-inspired, luminous",
-  },
-  {
-    id: "art_nouveau",
-    name: "Art Nouveau",
-    prompt: "Art Nouveau illustration, flowing organic lines, Mucha-inspired decorative framing",
-  },
-  {
-    id: "art_deco",
-    name: "Art Deco",
-    prompt: "Art Deco poster, geometric patterns, gold and bold accents, streamlined elegant forms",
-  },
-  {
-    id: "pop_art",
-    name: "Pop Art",
-    prompt: "Pop Art, Lichtenstein-inspired, vivid colors, halftone dots, bold outlines",
-  },
-] as const;
+/** The moment's styles: every style in the shared library that suits a scene (DECISIONS #86). */
+export const COLOR_MOMENT_STYLES = stylesFor("moment");
 
-/** Get the color moment style for a given Chicago-timezone date string. */
-export function getColorMomentStyle(dateStr: string): typeof COLOR_MOMENT_STYLES[number] {
-  const d = new Date(dateStr + "T12:00:00Z");
-  const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const dayOfYear = Math.floor((d.getTime() - start.getTime()) / 86400000) + 1;
-  return COLOR_MOMENT_STYLES[(dayOfYear - 1) % COLOR_MOMENT_STYLES.length];
+/** The colour moment style for a Chicago date: a random order with no repeat until all have had a day. */
+export function getColorMomentStyle(dateStr: string): ArtStyle {
+  return momentStyleFor(dateStr);
 }
 
 /** Generate the full-colour moment image, returns base64 PNG + styleId. */

@@ -118,7 +118,7 @@ All pipelines share one LLM-selected event per day through `getOrGenerateMoment(
 | | A: `/fact.png` | B: `/fact1.png` | C: birthday | D: `/color/moment` | E: skyline |
 |---|---|---|---|---|---|
 | Model | FLUX.2 klein-9b, SDXL fallback | SDXL | FLUX.2 + up to 4 R2 photos | FLUX.2, SDXL fallback | FLUX.2 + R2 reference photo, SDXL fallback; BW variant is SDXL only |
-| Style rotation | 3, by day of year | 6, by hash of date/title/location | 24, random per person and year, never shared in a year or repeated in 24 years (#85) | 18, by day of year (every style, #84) | 19 styles over 30 cities (#84) |
+| Style rotation | 3, by day of year | 6, by hash of date/title/location | 51 from the shared library (#86), random per person and year, never shared in a year or repeated within a block | 70 from the shared library, random daily order, no repeat until all used (#86) | 66 from the shared library over 30 cities, never the moment's style that day (#86) |
 | Output | Full colour as-is (#81) | 1-bit PNG (Bayer or threshold per style) | Full colour as-is (#81) | Full colour as-is (#81) | Full colour as-is, both modes (#81) |
 | Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v3:DATE`, `color-birthday:v3:DATE` | `color-moment:v4:DATE:STYLE` | `skyline:v5:DATE:daily[:bw]` |
 
@@ -342,7 +342,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 **Unconfirmed as of 2026-10-02:**
 
 - The pagelists in section 2 are inferred from renderer requests, not read from SenseCraft HMI.
-- Decision records #31 and #33 give older skyline style counts (15 and 18). They are history and are left as written; `src/skyline.ts` defines 19 (9 mono + 10 colour, #84).
+- Decision records #31 and #33 give older skyline style counts (15 and 18). They are history and are left as written; the skyline now draws 66 styles from the shared library in `src/art-styles.ts` (#86).
 - Decision record #38 describes `/color/headlines` as disabled with a redirect to `/skyline`. That was reversed in #39: it is a live page with deterministic, non-LLM ranking, It was warmed by the 6-hourly cron until 2026-10-16, when the owner confirmed they had dropped it from the E1002 and the warm was retired (#82); the route still works on request.
 
 **Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.

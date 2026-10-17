@@ -9,6 +9,8 @@
  * June 1 (>= 2025) always forces Chicago, USA (style still rotates normally).
  */
 
+import { stylesFor, dailyPick, momentStyleFor } from "./art-styles";
+
 export const SKYLINE_SERIES_NAME = "World Skyline Series";
 
 // --- Modes ---
@@ -144,144 +146,16 @@ export interface SkylineStyle {
   colorMode: SkylineColorMode;
 }
 
-export const SKYLINE_STYLES: readonly SkylineStyle[] = [
-  // --- Monochrome art styles (9). Pencil, etching and pen & ink are back: they were culled for our
-  // old 4-level grayscale, and the panels convert any picture themselves since #81 (DECISIONS #84) ---
-  {
-    key: "woodcut_hero_bw",
-    label: "Woodcut",
-    promptPrefix:
-      "hand-carved woodcut print, bold U-gouge marks, high contrast black and white, large solid black ink areas, sweeping curved gouge strokes",
-    colorMode: "bw",
-  },
-  {
-    key: "noir_silhouette_bw",
-    label: "Noir Silhouette",
-    promptPrefix:
-      "dramatic film noir silhouette, black and white, bold shadow shapes, cinematic contrast",
-    colorMode: "bw",
-  },
-  {
-    key: "linocut_bw",
-    label: "Linocut",
-    promptPrefix:
-      "linocut print, bold carved lines, black ink on paper, chunky strokes, handmade texture",
-    colorMode: "bw",
-  },
-  {
-    key: "comic_ink_bw",
-    label: "Comic Ink",
-    promptPrefix:
-      "bold comic book ink illustration, thick outlines, large solid black areas, dynamic composition, high contrast",
-    colorMode: "bw",
-  },
-  {
-    key: "scratchboard_bw",
-    label: "Scratchboard",
-    promptPrefix:
-      "scratchboard illustration, white lines scratched on black surface, dramatic negative space, bold architectural forms",
-    colorMode: "bw",
-  },
-  {
-    key: "charcoal_bw",
-    label: "Dark Charcoal",
-    promptPrefix:
-      "bold charcoal drawing, heavy black strokes, stark contrast, large solid dark masses, dramatic shadows",
-    colorMode: "bw",
-  },
-  {
-    key: "pen_ink_bw",
-    label: "Pen & Ink",
-    promptPrefix:
-      "pen and ink illustration, controlled crosshatching, crisp linework, architectural drawing, black ink on white paper",
-    colorMode: "bw",
-  },
-  {
-    key: "pencil_bw",
-    label: "Pencil Sketch",
-    promptPrefix:
-      "architectural graphite pencil sketch, fine shading, full tonal range, on white paper",
-    colorMode: "bw",
-  },
-  {
-    key: "etching_bw",
-    label: "Etching",
-    promptPrefix:
-      "fine etching engraving, parallel hatching lines, copper plate style, architectural precision",
-    colorMode: "bw",
-  },
-  // --- Color styles (10) ---
-  {
-    key: "travel_poster_color",
-    label: "Travel Poster",
-    promptPrefix:
-      "vintage travel poster illustration, bold flat color fields, retro graphic design, warm sunset palette",
-    colorMode: "color",
-  },
-  {
-    key: "wpa_poster_color",
-    label: "WPA Poster",
-    promptPrefix:
-      "WPA poster style, screenprint colors, bold stylised shapes, 1930s national park poster",
-    colorMode: "color",
-  },
-  {
-    key: "minimal_flat_color",
-    label: "Minimal Flat",
-    promptPrefix:
-      "minimal flat color illustration, clean geometric shapes, large flat color blocks, modern graphic design",
-    colorMode: "color",
-  },
-  {
-    key: "art_deco_poster_color",
-    label: "Art Deco",
-    promptPrefix:
-      "art deco poster, geometric symmetry, gold and bold color accents, streamlined forms, 1920s graphic elegance, flat decorative shapes",
-    colorMode: "color",
-  },
-  {
-    key: "screenprint_color",
-    label: "Screenprint",
-    promptPrefix:
-      "screenprint poster, bold overlapping color layers, slight registration offset, graphic texture, Andy Warhol inspired",
-    colorMode: "color",
-  },
-  {
-    key: "ukiyoe_evening_color",
-    label: "Ukiyo-e",
-    promptPrefix:
-      "ukiyo-e woodblock print, Japanese style, flat color areas, bold outlines, evening sky gradients, Hiroshige inspired landscape",
-    colorMode: "color",
-  },
-  {
-    key: "synthwave_sunset_color",
-    label: "Synthwave",
-    promptPrefix:
-      "synthwave retro-futuristic sunset, neon grid horizon, bold magenta and cyan, glowing geometric buildings, 80s aesthetic",
-    colorMode: "color",
-  },
-  {
-    key: "mediterranean_travel_color",
-    label: "Mediterranean",
-    promptPrefix:
-      "Mediterranean travel illustration, warm terracotta and blue palette, whitewashed buildings, gouache painting, sun-drenched colors",
-    colorMode: "color",
-  },
-  {
-    key: "watercolor_color",
-    label: "Watercolor",
-    promptPrefix:
-      "watercolor painting, rich transparent washes, wet-on-wet sky, loose architectural brushwork, visible paper texture",
-    colorMode: "color",
-  },
-  {
-    key: "impressionist_color",
-    label: "Impressionist",
-    promptPrefix:
-      "Impressionist oil painting, visible brushstrokes, shimmering reflected light, Monet-inspired",
-    colorMode: "color",
-  },
-];
+/**
+ * The skyline's styles: every style in the shared library that suits a city view (DECISIONS #86).
+ * A black-and-white medium (`mono`) gets daylight instead of golden hour in the prompt.
+ */
+export const SKYLINE_STYLES: readonly SkylineStyle[] = stylesFor("skyline").map((s) => ({
+  key: s.id,
+  label: s.name,
+  promptPrefix: s.prompt,
+  colorMode: s.mono ? "bw" : "color",
+}));
 
 export function findSkylineStyleByKey(key: string): SkylineStyle | undefined {
   return SKYLINE_STYLES.find((s) => s.key === key);
@@ -348,11 +222,11 @@ export function pickSkylineStyle(parts: SkylineDateParts, opts: SkylinePickerOpt
     return shuffled[0];
   }
 
-  // mode === "daily"
-  const seed = djb2(`${parts.year}|skyline-styles`);
-  const shuffled = shuffleSeeded(pool, seed);
-  const idx = (parts.dayOfYear - 1) % shuffled.length;
-  return shuffled[idx];
+  // mode === "daily": a random order with no repeat until every style has had a day, and never
+  // the colour moment's style on the same day, so the two pictures differ (DECISIONS #86).
+  const pick = dailyPick(pool, parts.dateStr, 0x534b);
+  if (pick.key !== momentStyleFor(parts.dateStr).id || pool.length < 2) return pick;
+  return pool[(pool.indexOf(pick) + 1) % pool.length];
 }
 
 // --- Prompt builder ---

@@ -306,6 +306,28 @@ test("birthday styles vary by person and walk the whole list (DECISIONS #85)", (
   for (let y = 2026; y < 2026 + n - 1; y++) steps.add((idx(y + 1) - idx(y) + n) % n);
   assert.ok(steps.size > 3);
   assert.equal(resolveBirthdayStyle(thiago, 2026, 2).name, BIRTHDAY_STYLES[2].name);
-  assert.equal(parseStyleIdx("23", BIRTHDAY_STYLES.length), 23);
-  assert.equal(parseStyleIdx("24", BIRTHDAY_STYLES.length), 0);
+  assert.equal(parseStyleIdx(String(BIRTHDAY_STYLES.length - 1), BIRTHDAY_STYLES.length), BIRTHDAY_STYLES.length - 1);
+  assert.equal(parseStyleIdx(String(BIRTHDAY_STYLES.length), BIRTHDAY_STYLES.length), 0);
+});
+
+test("one shared style library feeds the moment, skyline and portrait (DECISIONS #86)", () => {
+  const { ART_STYLES, stylesFor, momentStyleFor } = fromBuild("src/art-styles.js");
+  const ids = ART_STYLES.map((s) => s.id);
+  assert.equal(new Set(ids).size, ids.length, "style ids are unique");
+  for (const s of ART_STYLES) assert.ok(s.for.length > 0, `${s.id} suits something`);
+  // Portraits never get a style that hides the face.
+  const portrait = stylesFor("portrait").map((s) => s.id);
+  for (const id of ["pixel_art", "low_poly", "isometric", "bauhaus", "minimal_flat"]) assert.ok(!portrait.includes(id));
+  // The moment: no repeat until every moment style has had a day.
+  const n = stylesFor("moment").length;
+  const seen = new Set();
+  const day = (i) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+  for (let i = 0; i < n; i++) seen.add(momentStyleFor(day(i)).id);
+  assert.equal(seen.size, n);
+  // The skyline never matches the moment on the same day.
+  for (let i = 0; i < 400; i++) {
+    const parts = parseDateParts(day(i));
+    const sky = pickSkylineStyle(parts, { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 });
+    assert.notEqual(sky.key, momentStyleFor(day(i)).id, day(i));
+  }
 });

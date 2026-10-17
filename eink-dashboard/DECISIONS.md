@@ -3855,3 +3855,46 @@ three tests a day next to the panels' own pictures.
 **Addendum (2026-10-17, owner on the examples page: "the likeness is MUCH better!!!"):** the
 face-cropped references and the likeness prompt are confirmed. Keep them; do not go back to
 whole-photo references.
+
+## 86. One Shared Art-Style Library, Expanded (2026-10-17)
+
+The owner asked whether the skylines and moments used the same styles as the portraits. The
+answer was no: they were three lists sharing about 14 styles. The owner asked for the lists to be
+merged, "and expand to other styles we have not considered before".
+
+`src/art-styles.ts` now holds one library of 71 styles. Each style is tagged with what it suits
+(`moment`, `skyline`, `portrait`), and `mono` marks a black-and-white medium. The colour moment
+takes the 70 scene styles, the skyline 66, and the birthday portrait 51. Portraits leave out
+styles that hide the face, such as pixel art, low poly, isometric, Bauhaus and flat posters,
+because likeness comes first (#85). Portrait-only styles (Oil Portrait) stay out of the scenes.
+New styles:
+- Painting: fresco, Baroque, Pre-Raphaelite, Romantic (Turner), Expressionist, Mexican muralism,
+  Brazilian modernism (Tarsila do Amaral), Persian miniature, Korean minhwa, Chinese shan shui,
+  sumi-e, Surrealist.
+- Print and drawing: Brazilian cordel woodcut, risograph, cyanotype, scratchboard, colored
+  pencil, chalkboard.
+- Illustration: ligne claire, manga, mid-century, Constructivist, Bauhaus, psychedelic, pulp
+  sci-fi, 80s airbrush.
+- Material: azulejo tiles, tapestry, embroidery, layered paper, paper cutouts, claymation.
+- Photo and digital: tintype, hand-painted anime, 3D animated film, pixel art, low poly,
+  isometric diorama.
+
+The prompts describe only the medium. None names a living artist; the artists named (Rivera,
+Tarsila, Klimt and so on) are historical.
+
+**Picking.**
+- Moment: `dailyPick` walks the pool in a fresh seeded random order for each block of
+  pool-size days, so no style repeats until every one has had its day.
+- Skyline (daily mode): the same walk with its own seed. If that lands on the moment's style
+  for the day, it takes the next style, so the two pictures always differ.
+- Portrait: the Latin square of #85 runs over the 51 portrait styles, so the block is now 51
+  years.
+
+Tests check that ids are unique, that portraits never get a face-hiding style, that the moment
+has no repeats within its block, and that the skyline never matches the moment over 400 days.
+
+**Not bumped:** the colour-moment key carries the style id, so a date whose style changed gets a
+new key by itself. The skyline key does not carry it, so today's skyline keeps the picture it
+has and the library applies from the next warmed date. Bumping either would regenerate today's
+pictures a second time on a day already used for portrait tests (budget read from GraphQL).
+Pipeline A (`/fact.png`, not warmed) and Pipeline B (`/fact1.png`, 1-bit) keep their own lists.

@@ -236,7 +236,7 @@ Chicago date → birthday check (9 family members)
         Fetch up to 4 reference photos from R2 ("portraits/{key}_0.jpg" .. "{key}_3.jpg")
                 │
                 ▼
-        Pick art style (24 styles, random per person and year, no repeats, #85)
+        Pick art style (51 portrait styles from the shared library, random, no repeats, #85/#86)
                 │
                 ▼
         FLUX.2 klein-9b (multipart FormData, guidance 7.0, reference images)
@@ -251,7 +251,7 @@ Chicago date → birthday check (9 family members)
         Full-colour RGB PNG, picture untouched → KV cache (birthday:v3)   [until #81: tone curve → 4 levels]
 ```
 
-**Art styles** (24, DECISIONS #85): Woodcut, Watercolor, Art Nouveau, Pop Art, Impressionist, Ukiyo-e, Art Deco, Pointillist, Pencil Sketch, Charcoal, Oil Portrait, Renaissance, Gouache, Graphic Novel, Ink + Wash, Linocut, Etching, Pastel, Klimt Gold, Van Gogh, Fauvist, Stained Glass, Mosaic, Storybook. The style is random but follows a seeded schedule (a shuffled Latin square, re-shuffled every 24 years): no two people share a style in the same year, and nobody repeats one within the 24-year block (until #85 everyone got the same style, `year % 10`). The prompt asks FLUX.2 to keep the face from the reference photos and change only the medium, and the portrait is generated at 1280x768 (the panel's 5:3 shape) so the crop no longer cuts the top of the head. Test a style: `/color/test-birthday?name=thiago&style=10`.
+**Art styles** (DECISIONS #85, #86): the 51 portrait-friendly styles of the shared library in `src/art-styles.ts` (styles that hide the face, such as pixel art or flat geometric posters, are left out). The style is random but follows a seeded schedule (a shuffled Latin square, re-shuffled every 24 years): no two people share a style in the same year, and nobody repeats one within the 24-year block (until #85 everyone got the same style, `year % 10`). The prompt asks FLUX.2 to keep the face from the reference photos and change only the medium, and the portrait is generated at 1280x768 (the panel's 5:3 shape) so the crop no longer cuts the top of the head. Test a style: `/color/test-birthday?name=thiago&style=10`.
 
 **Reference photos** are stored in R2 (`eink-birthday-photos` bucket). Upload with:
 ```bash
@@ -264,13 +264,13 @@ Photos go in `photos/portraits/` with naming: `{key}_0.jpg`, `{key}_1.jpg`, etc.
 
 Uses **FLUX.2 klein-9b** (fallback SDXL) with 18 daily-rotating art styles (5 until #84, tuned for our old 6-colour dithering). Since #81 the picture goes untouched in full colour to the E1002 and, since #84, to the home E1001; each panel converts it. On family birthdays it shows the colour birthday portrait, which the cron now warms first (#84).
 
-**Styles** (rotate daily by `(dayOfYear - 1) % 18`): Gouache, Oil Painting, Graphic Novel, Ink + Wash, Color Woodblock, Woodcut, Pencil Sketch, Charcoal, Pen + Ink, Ink Noir, Linocut, Etching, Watercolor, Impressionist, Pointillist, Art Nouveau, Art Deco, Pop Art. Test override: `/color/test-moment?m=7&d=20&style=ink_wash`.
+**Styles** (DECISIONS #86): the 70 scene styles of the shared library `src/art-styles.ts`, from gouache, fresco and Brazilian modernism to cordel woodcut, azulejo tiles, cyanotype, ligne claire, claymation and tintype. Each block of 70 days walks them in a fresh random order, so none repeats until all have had a day. Test override: `/color/test-moment?m=7&d=20&style=cordel`.
 
 ```
 Shared Moment (from KV cache or LLM)
         │
         ▼
-Pick daily style (18-style rotation, DECISIONS #84)
+Pick daily style (shared library, random order, DECISIONS #86)
         │
         ▼
 Prepend style prompt + anti-text suffix (the old palette suffix for our dithering was dropped, DECISIONS #81)
@@ -298,7 +298,7 @@ KV cache (24h)
 
 - **Image models**: FLUX.2 klein-9b (Pipeline A, Skyline with ref photos), SDXL (Pipeline B, Skyline fallback)
 - **LLM**: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (scene-only prompts, no style baked in)
-- **Art styles**: Daily rotation for Pipeline A (Woodcut / Pencil Sketch / Charcoal); 6-style rotation for Pipeline B (Woodcut / Silhouette / Linocut / Noir / Pen & Ink / Charcoal Block); 18-style rotation for Pipeline D (the five painterly styles plus the mono styles of A and B, etching and the birthday painters, #84); 19 skyline styles (9 mono + 10 colour, #84)
+- **Art styles**: Daily rotation for Pipeline A (Woodcut / Pencil Sketch / Charcoal); 6-style rotation for Pipeline B (Woodcut / Silhouette / Linocut / Noir / Pen & Ink / Charcoal Block); one shared library of 71 styles (`src/art-styles.ts`, #86) for the colour moment (70), skyline (66) and birthday portraits (51)
 - **Panel pictures**: full-colour RGB PNG, the AI image untouched apart from crop/resize and a solid black-and-white caption; the panels convert (#81). (Until #81: 4-level grayscale for the mono panel, Spectra 6 Floyd-Steinberg for the colour panel.)
 - **1-bit output**: True 1-bit PNG with style-aware conversion (Bayer dithering or histogram threshold)
 - **PNG encoder/decoder**: Pure JavaScript using Web API `CompressionStream`/`DecompressionStream`
