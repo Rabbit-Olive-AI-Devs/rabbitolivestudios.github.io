@@ -1,7 +1,7 @@
 # Family Memory: a family photo from this day, redrawn as art (design)
 
 **Status:** design for the owner (2026-10-17), not built. Builder check done; the owner answered its
-two questions (wide photos only; favourites only, a curated album later).
+two questions (wide photos only; the curated shared album "Coelhos de Oliveira" as the source).
 
 ## Intent
 
@@ -15,10 +15,13 @@ moment and skyline.
 - **A colour page only**, at a new route (`/color/family`), drawn like every panel picture since #81:
   the art cropped to 800x480 in full colour, untouched, and each panel converts it. The owner adds it
   to the **office E1002** and the **home E1001** (not the desk panel) in SenseCraft.
-- **Family photos only:** photos where Photos has recognised at least one family member, meaning the
-  nine people of the birthday list. The names map to Photos People through
-  `photos/portraits/people.json` (gitignored), the same map as #87. In the library there are several
-  `ZPERSON` rows for some names; all of them count.
+- **Family photos only, from the owner's curated shared album "Coelhos de Oliveira"** (owner,
+  2026-10-17). It is a new-style iCloud shared album that the owner already shares with another
+  agent, and it is in the Photos library: `ZSHARE` row with `ZTITLE = 'Coelhos de Oliveira'`
+  (scope `SharedCollection-07996160-…`), its photos are the `ZASSET` rows whose `ZCOLLECTIONSHARE`
+  points at it. The album *is* the curation, so no face or People check is needed (its photos have
+  no face data anyway). Photos the owner adds later are picked up on the next evening. The album is
+  one setting (its title), so the source can change without touching anything else.
 - **This date in an earlier year.** If no family photo exists for the exact date in any earlier year,
   use the **closest date** that has one, by calendar distance within the year, looking either way and
   wrapping around New Year.
@@ -26,11 +29,12 @@ moment and skyline.
   `15 Oct 2019 · 7 years ago` ("1 year ago" singular). **No names** in the caption.
 - **Wide photos only (owner, 2026-10-17):** landscape photos (wider than tall, as displayed). They
   crop to the panel's 5:3 without cutting heads. Tall photos are never picked.
-- **Favourites only, for now (owner):** only photos the owner has marked with the heart in Photos.
-  Nobody reviews the photo before it airs, including on the office panel, so the owner curates by
-  marking. **The owner will make a curated album later.** The source must be one setting (favourites,
-  or a named album), so switching changes nothing else. Photos newly marked or added are picked up
-  automatically on the next evening.
+- **Nobody reviews the photo before it airs**, including on the office panel; the album is the
+  owner's curation. **Caution found 2026-10-17:** the album's public link allows anyone who has it
+  to add photos (`ZPUBLICPERMISSION` read-write, anonymous public access on). A photo added that way
+  would reach the panel. Claude advised the owner to make the link view-only; the builder should
+  also take only photos contributed by the owner's own account if Photos records that reliably
+  (`ZCOLLECTIONSHAREASSETCONTRIBUTOR`), and say so if it cannot.
 - **Repeats (owner accepted the proposal):** every photo in the source is shown once before any
   photo repeats. After that, the photo shown longest ago comes back first, still choosing by the
   closest date.
@@ -40,11 +44,17 @@ moment and skyline.
 
 - **All family photos:** 17,205 still photos with a family face (2011-2026), 8,231 with two or more
   family members.
-- **The source, favourites that are wide:** 778 family favourites, of which **538 are wide**. They
-  fall on only **164 days** of the year, so on most days "the closest date" is days or weeks away; the
-  caption still gives the real date. At one a day the pool is used up in about 18 months, hence the
-  repeat rule. (The width check used `ZWIDTH > ZHEIGHT`; the builder should confirm those columns are
-  already display-oriented.)
+- **The source, the shared album:** **296 photos (1 video), 261 wide**, 2014-2026, on **116 days**
+  of the year, so on most days "the closest date" is days or weeks away; the caption still gives the
+  real date. At one a day the pool is used up in about 9 months, hence the repeat rule. (The width
+  check used `ZWIDTH > ZHEIGHT`; the builder should confirm those columns are display-oriented.)
+- **Files:** the library holds only 480 px previews of the album (27 MB in
+  `scopes/collectionshare/`); the originals stay in iCloud. **The Mac mini is short of space** (owner),
+  so nothing is synced in bulk: one photo a day is downloaded at 1600 px through PhotoKit
+  (`PHImageManager.requestImage`, `isNetworkAccessAllowed`, local identifier `<ZUUID>/L0/001`) and
+  deleted after upload. Tested 2026-10-17 from a Terminal session: a 4032x3024 album photo came back
+  at 1600x1200. The builder must confirm it also works from the launchd job, which needs Photos
+  access (privacy permission) of its own.
 
 ## How it works
 
@@ -55,17 +65,16 @@ needed.
    example as part of the same launchd job). It reads a fresh **read-only copy** of `Photos.sqlite`,
    as `scripts/pick-portraits-from-photos.py` does, and never touches the live database. It picks
    tomorrow's photo with these rules:
-   - **Candidates:** still images (no videos or screenshots) from the source (favourites, or the
-     curated album once set), wide, not hidden or trashed, with at least one family face, and **at
+   - **Candidates:** still images (no videos) from the album, wide, not hidden or trashed, and **at
      least 11 months old** (Claude's call: a photo from 31 Dec can never appear on 1 Jan as "0 years
      ago"). "N years ago" is the whole years between the two dates, at least 1.
    - **Day:** among the photos not yet shown in the current round (all of them once every photo has
      been shown, ordered by longest since shown), the closest calendar day to the target.
-   - **Ranking within that day:** more family faces first, then larger and sharper faces. Exact
-     weights are the builder's call.
-   - **The photo itself:** exports the original upright (EXIF applied) at a usable size. The long side
-     is resized to about 1600 px; reject anything under 1024 px and move to the next candidate. The
-     export uses the AppleScript route (#87) when the original is iCloud-only.
+   - **Ranking within that day:** the builder's call (for example the photo shown least recently,
+     then the higher-resolution one).
+   - **The photo itself:** downloaded upright at about 1600 px on the long side through PhotoKit (see
+     Files above); reject anything under 1024 px and move to the next candidate. Nothing stays on the
+     Mac afterwards.
    - **Upload:** puts the JPEG to R2 `PHOTOS` at `family/<date>/photo.jpg`, with
      `family/<date>/photo.json` = `{ "taken": "YYYY-MM-DD" }`. Nothing else about the photo leaves the
      Mac: no names and no location. It uses the mini's own Cloudflare login (`wrangler r2 object put`),
