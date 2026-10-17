@@ -28,6 +28,7 @@ import {
   colorMomentCacheKey,
   colorBirthdayCacheKey,
   momentCacheKey,
+  familyCacheKey,
   skylineCacheKey,
 } from "./cache-keys";
 import {
@@ -58,6 +59,8 @@ import {
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
 import { buildArtBrief, storeJarvisColor, storeJarvisSkyline, jarvisDrew } from "./art";
+import { storeFamily, FAMILY_WATCH_FROM } from "./family";
+import { handleFamilyPage } from "./pages/family";
 
 const VERSION = "3.22.0";
 
@@ -667,6 +670,7 @@ function dailyImageKeys(dateStr: string, monthNum: number, dayNum: number) {
       color_moment: birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id),
       skyline: skylineCacheKey(dateStr, skylineMode, DEFAULT_ROTATE_MIN, bucket),
       moment_event: momentCacheKey(dateStr),
+      family: familyCacheKey(dateStr),
     },
   };
 }
@@ -674,17 +678,22 @@ function dailyImageKeys(dateStr: string, monthNum: number, dayNum: number) {
 /** The two generated pictures the alert watches (moment_event is metadata, not a panel image).
  * /fact.png, /fact1.png and /skyline-bw are not among them: no panel shows them and the cron
  * no longer makes them (DECISIONS #83, #84). */
-const ALERT_WATCHED_IMAGES = ["color_moment", "skyline"] as const;
+const ALERT_WATCHED_IMAGES = ["color_moment", "skyline", "family"] as const;
+
+/** The pictures the alert watches on a date: the family picture only from its first day (#92). */
+function watchedImages(dateStr: string): readonly (typeof ALERT_WATCHED_IMAGES)[number][] {
+  return dateStr >= FAMILY_WATCH_FROM ? ALERT_WATCHED_IMAGES : ALERT_WATCHED_IMAGES.filter((l) => l !== "family");
+}
 
 /** "jarvis", "workers-ai" or null (not made yet) for the day's colour picture and skyline. */
-async function drawnBy(env: Env, dateStr: string, month: number, day: number, colorKey: string, skylineKey: string) {
+async function drawnBy(env: Env, dateStr: string, month: number, day: number, colorKey: string, skylineKey: string, familyKey: string) {
   const colorKind = getBirthdayToday(month, day) ? "birthday" : "moment";
-  const [jColor, jSky, color, sky] = await Promise.all([
-    jarvisDrew(env, dateStr, colorKind), jarvisDrew(env, dateStr, "skyline"),
-    env.CACHE.get(colorKey, "stream"), env.CACHE.get(skylineKey, "stream"),
+  const [jColor, jSky, jFam, color, sky, fam] = await Promise.all([
+    jarvisDrew(env, dateStr, colorKind), jarvisDrew(env, dateStr, "skyline"), jarvisDrew(env, dateStr, "family"),
+    env.CACHE.get(colorKey, "stream"), env.CACHE.get(skylineKey, "stream"), env.CACHE.get(familyKey, "stream"),
   ]);
-  const who = (jarvis: boolean, cached: unknown) => (jarvis ? "jarvis" : cached ? "workers-ai" : null);
-  return { [colorKind]: who(jColor, color), skyline: who(jSky, sky) };
+  const who = (jarvis: boolean, cached: unknown, backup = "workers-ai") => (jarvis ? "jarvis" : cached ? backup : null);
+  return { [colorKind]: who(jColor, color), skyline: who(jSky, sky), family: who(jFam, fam, "photo") };
 }
 
 async function handleHealthDetailed(env: Env): Promise<Response> {
@@ -757,10 +766,11 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         color_moment: { cached: colorMomentRaw !== null, key: colorMomentKey, style: colorStyle.id },
         skyline:      { cached: skylineRaw !== null,     key: skylineKey },
         moment_event: { cached: momentRaw !== null,      key: momentKey },
+        family:       { cached: (await env.CACHE.get(dailyKeys.family, "stream")) !== null, key: dailyKeys.family },
       },
       next_day_images: { date_chicago: nextDate, ...nextCached },
       // Who drew each picture: Jarvis, or Workers AI as the backup (DECISIONS #89, #90).
-      drawn_by: await drawnBy(env, dateStr, monthNum, dayNum, dailyKeys.color_moment, dailyKeys.skyline),
+      drawn_by: await drawnBy(env, dateStr, monthNum, dayNum, dailyKeys.color_moment, dailyKeys.skyline, dailyKeys.family),
       ephemeral: {
         weather_home:   weatherStatus(weatherHomeRaw),
         weather_office: weatherStatus(weatherOfficeRaw),
@@ -854,8 +864,8 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
       const alertResult = await runAlertCheck(env, {
         dateStr,
         chicagoHour: getChicagoHour(),
-        imageKeys: Object.fromEntries(ALERT_WATCHED_IMAGES.map((l) => [l, watched[l]])),
-        jarvisKinds: [watchedBirthday ? "birthday" : "moment", "skyline"],
+        imageKeys: Object.fromEntries(watchedImages(dateStr).map((l) => [l, watched[l]])),
+        jarvisKinds: [watchedBirthday ? "birthday" : "moment", "skyline", ...(dateStr >= FAMILY_WATCH_FROM ? ["family" as const] : [])],
         baseUrl: WORKER_BASE_URL,
       });
       if (alertResult.checked) {
@@ -976,6 +986,14 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
         console.error("Cron: skyline warm failed:", err);
       }
     }
+  }
+
+  // Family Memory (#92): Jarvis's repainting or the photo itself; no AI, so it ignores the budget.
+  try {
+    const familySource = await storeFamily(env, dateStr);
+    console.log(familySource ? `Cron: stored the family picture for ${dateStr} (${familySource})` : `Cron: no family photo put up for ${dateStr}`);
+  } catch (err) {
+    console.error("Cron: family picture failed:", err);
   }
 
   // The B&W skyline (/skyline-bw) is not warmed: no panel shows it since the home panel
@@ -1151,8 +1169,8 @@ export default {
         const result = await runAlertCheck(env, {
           dateStr: aDate,
           chicagoHour: getChicagoHour(),
-          imageKeys: Object.fromEntries(ALERT_WATCHED_IMAGES.map((l) => [l, aKeys[l]])),
-          jarvisKinds: [getBirthdayToday(Number(aDate.slice(5, 7)), Number(aDate.slice(8, 10))) ? "birthday" : "moment", "skyline"],
+          imageKeys: Object.fromEntries(watchedImages(aDate).map((l) => [l, aKeys[l]])),
+          jarvisKinds: [getBirthdayToday(Number(aDate.slice(5, 7)), Number(aDate.slice(8, 10))) ? "birthday" : "moment", "skyline", ...(aDate >= FAMILY_WATCH_FROM ? ["family" as const] : [])],
           baseUrl: WORKER_BASE_URL,
         });
         return jsonResponse(result as unknown as Record<string, unknown>, 200, 0);
@@ -1224,6 +1242,8 @@ export default {
         if (authBlockSTP) return authBlockSTP;
         return handleSkylineTestPage(url);
       }
+      case "/color/family":
+        return handleFamilyPage(env);
       case "/art/brief": {
         // What Jarvis draws for a date (#89). Today or tomorrow (Chicago) only: each new date
         // costs at most one LLM call for its event, which the warm would make anyway.
@@ -1269,7 +1289,7 @@ export default {
             endpoints: [
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
-              "/skyline", "/skyline-bw", "/skyline.png", "/art/brief", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo",
+              "/skyline", "/skyline-bw", "/skyline.png", "/color/family", "/art/brief", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo",
               "/desk/series", "/series", "/color/series",
               "/test-birthday.png", "/health", "/health-detailed",
             ],

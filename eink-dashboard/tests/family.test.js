@@ -88,3 +88,35 @@ test("storeFamily prefers Jarvis, falls back to the photo, cleans up after itsel
   assert.equal(await storeFamily(nothing, "2026-10-18"), null, "no photo.json, no caption date");
   assert.equal(nothing.kv.size, 0);
 });
+
+const { handleFamilyPage } = fromBuild("src/pages/family.js");
+const { describeProblems } = fromBuild("src/alert.js");
+
+function pageKV(entries) {
+  const m = new Map(Object.entries(entries));
+  return {
+    get: async (k) => m.get(k) ?? null,
+    put: async (k, v) => { m.set(k, v); },
+    list: async ({ prefix }) => ({ keys: [...m.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+  };
+}
+
+test("the page serves today, then the latest earlier day, then the text page", async () => {
+  const today = await (await handleFamilyPage({ CACHE: pageKV({ "family:v1:2026-10-18": "VE9EQVk=" }) }, "2026-10-18")).text();
+  assert.match(today, /data:image\/png;base64,VE9EQVk=/);
+
+  const stale = await (await handleFamilyPage({ CACHE: pageKV({ "family:v1:2026-10-16": "T0xE" }) }, "2026-10-18")).text();
+  assert.match(stale, /data:image\/png;base64,T0xE/, "the mini missed an evening: yesterday's picture stays up");
+
+  const none = await handleFamilyPage({ CACHE: pageKV({}) }, "2026-10-18");
+  const html = await none.text();
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /Family Memory/);
+  assert.equal(none.headers.get("Cache-Control"), "no-store");
+});
+
+test("the alert names a missed family picture without blaming Workers AI", () => {
+  const problems = describeProblems({ dateStr: "2026-10-18", missingImages: [], aiBlocked: false, quietMachines: [], jarvisMissed: ["skyline", "family"] });
+  assert.ok(problems.some((p) => /2026-10-18's skyline; Workers AI drew it/.test(p)));
+  assert.ok(problems.some((p) => /2026-10-18's family picture; the photo itself is shown/.test(p)));
+});

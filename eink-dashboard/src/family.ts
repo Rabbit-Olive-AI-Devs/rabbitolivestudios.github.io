@@ -21,6 +21,9 @@ import { pngToBase64 } from "./png";
 
 export const FAMILY_TITLE = "Family Memory";
 
+/** The first date the alert expects a family picture for (the feature went live the evening before). */
+export const FAMILY_WATCH_FROM = "2026-10-19";
+
 const PHOTO_KEY = (date: string) => `family/${date}/photo.jpg`;
 const META_KEY = (date: string) => `family/${date}/photo.json`;
 const ART_KEY = (date: string) => `art/${date}/family`;

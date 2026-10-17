@@ -89,8 +89,12 @@ export function describeProblems(state: AlertState): string[] {
       `(mailbox watcher, Jarvis's briefs, TARS). After a restart it waits for its password (FileVault): log in on it.`,
     );
   }
-  if (state.jarvisMissed && state.jarvisMissed.length > 0) {
-    problems.push(`Jarvis did not deliver ${state.dateStr}'s ${state.jarvisMissed.join(" and ")}; Workers AI drew ${state.jarvisMissed.length === 1 ? "it" : "them"}`);
+  const aiDrew = (state.jarvisMissed ?? []).filter((k) => k !== "family");
+  if (aiDrew.length > 0) {
+    problems.push(`Jarvis did not deliver ${state.dateStr}'s ${aiDrew.join(" and ")}; Workers AI drew ${aiDrew.length === 1 ? "it" : "them"}`);
+  }
+  if (state.jarvisMissed?.includes("family")) {
+    problems.push(`Jarvis did not deliver ${state.dateStr}'s family picture; the photo itself is shown (#92)`);
   }
   return problems;
 }
@@ -228,7 +232,7 @@ export async function runAlertCheck(
     chicagoHour: number;
     imageKeys: Record<string, string>;
     /** The day's pictures Jarvis is meant to draw ("moment" or "birthday", and "skyline"). */
-    jarvisKinds?: ("moment" | "birthday" | "skyline")[];
+    jarvisKinds?: ("moment" | "birthday" | "skyline" | "family")[];
     baseUrl: string;
     now?: number;
     force?: boolean;
@@ -259,7 +263,7 @@ export async function runAlertCheck(
       series,
       quietMachines: quietMachines(lastReport, now),
       // Only a picture that exists counts as "drawn by Workers AI"; a missing one is reported above.
-      jarvisMissed: kinds.filter((k, i) => !drew[i] && present[labels.indexOf(k === "skyline" ? "skyline" : "color_moment")] !== null),
+      jarvisMissed: kinds.filter((k, i) => !drew[i] && present[labels.indexOf(k === "moment" || k === "birthday" ? "color_moment" : k)] !== null),
     };
 
     const problems = describeProblems(state);
