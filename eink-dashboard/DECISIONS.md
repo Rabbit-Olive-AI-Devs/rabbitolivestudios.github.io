@@ -4106,7 +4106,7 @@ and made Workers AI redraw them.
 
 ---
 
-## 92. Family Memory: a Family Photo From This Day, Redrawn as Art (2026-10-17, designed, not built)
+## 92. Family Memory: a Family Photo From This Day, Redrawn as Art (2026-10-17)
 
 The owner's second pick from the idea list. A new colour page, `/color/family`, for the office E1002
 and the home E1001 (not the desk panel). Each day it shows one family photo taken on this date in an
@@ -4135,3 +4135,15 @@ Rejected along the way:
 - **Reading the album from Apple's web service:** its photo list needs an iCloud sign-in, and the
   web page is a private API that can change.
 - **Turning on Shared Albums sync:** it costs disk the mini does not have.
+
+**Built and deployed the same day** (plan `docs/superpowers/plans/2026-10-17-family-memory.md`):
+- **Worker:** `src/family.ts` and `src/pages/family.ts`. The brief gains a `family` picture, the warm
+  stores it without AI, the alert and `drawn_by` include it, and `/health-detailed` lists the key.
+- **Mac mini:** `scripts/family-pick.py` with unit tests, and `scripts/family-fetch.swift`. Both run
+  inside the existing art-brief job, with no new launchd job.
+- **Alert start date.** The alert expects a family picture only from 19 October
+  (`FAMILY_WATCH_FROM`), so it did not email about days before the feature existed.
+- **Wording when Jarvis misses.** A missed family picture says "the photo itself is shown", not
+  "Workers AI drew it".
+- **The scratch copy of the 2 GB Photos database** lives on the external drive and is deleted after
+  each pick. The Mac's own disk had 30 GB free.

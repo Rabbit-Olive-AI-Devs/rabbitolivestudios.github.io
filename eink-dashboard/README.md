@@ -4,7 +4,7 @@ A Cloudflare Workers backend for the **reTerminal E1001** (ESP32-S3, 7.5" ePaper
 
 Every day it generates an AI illustration depicting a famous historical event at its most iconic, dramatic moment — the viewer sees the scene, the location, and the date.
 
-Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67). Since v3.22.0 the daily pictures are drawn by the owner's agent Jarvis from an evening brief, with Workers AI as the backup, in styles from one shared library of 71, and both home panels show them in full colour (DECISIONS.md #84-#90). In the week before each holiday (Carnaval, Easter, Festa Junina, the Fourth of July, Halloween, Thanksgiving, Christmas, New Year) the skyline city is dressed for it and the moment leans its way; on the day itself the moment shows the holiday's own history (DECISIONS.md #91).
+Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67). Since v3.22.0 the daily pictures are drawn by the owner's agent Jarvis from an evening brief, with Workers AI as the backup, in styles from one shared library of 71, and both home panels show them in full colour (DECISIONS.md #84-#90). In the week before each holiday (Carnaval, Easter, Festa Junina, the Fourth of July, Halloween, Thanksgiving, Christmas, New Year) the skyline city is dressed for it and the moment leans its way; on the day itself the moment shows the holiday's own history (DECISIONS.md #91). A new page, `/color/family`, shows a family photo from this day in an earlier year, repainted by Jarvis (DECISIONS.md #92).
 
 ## The Concept
 
@@ -42,6 +42,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
 | **World Cup 2026** | *Retired 2026-08-21 — routes now 404. Source and tests are preserved for 2030; see DECISIONS.md #61.* | — |
 | `GET /art/brief?date=YYYY-MM-DD` | What Jarvis draws for today or tomorrow (Chicago): the moment or birthday portrait and the skyline, with styles, prompts and look rules, as JSON (DECISIONS #89) | none |
+| `GET /color/family` | 800x480 **Family Memory**: a family photo from this date in an earlier year (the album "Coelhos de Oliveira", then Favourites, then the album's closest day), repainted by Jarvis, or the photo itself if he missed; caption "15 Oct 2019 \| Family Memory \| 7 years ago", no names. PNG inlined, one request; never generates; falls back to the latest earlier day, then a text page. For the office E1002 and home E1001 (DECISIONS #92) | none |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for the E1002 and (since 2026-10-16, #84) the home E1001, with the PNG **inlined as a data URI** — one request, nothing for the renderer to cancel (DECISIONS #65). Always no-store. Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
 | `GET /skyline-bw` | 800x480 HTML skyline page, mono art styles only; on no panel and not warmed since 2026-10-16 (#84), generates on request; PNG inlined the same way. Same text fallback as `/skyline` (DECISIONS #58, #65) | none |
@@ -340,6 +341,15 @@ The page advances through phases by the **current round being played**, not by w
 The two displays use **fully separate stylesheets** (`src/worldcup-styles.ts`: `COLOR_STYLE`, `MONO_STYLE_BASE`), passed via `WcTheme.styleCSS`, so a change to one display's CSS can't affect the other. Structure and logic (`worldcup-ui.ts`) stay shared.
 
 > **Setup (for a future tournament):** `npx wrangler secret put FOOTBALL_DATA_KEY` (interactive; without it the page runs on the openfootball fallback). The B&W image needs **Cloudflare Browser Rendering** enabled on the account. The `[browser]` binding was **removed** at retirement and must be restored in `wrangler.toml`, and `@cloudflare/puppeteer` moved back to `dependencies` (it is currently a devDependency so the preserved source still typechecks without shipping). `nodejs_compat` was deliberately left in place. Then add the two routes to the device pagelists. Full checklist: DECISIONS.md #61; background: #44/#47/#48.
+
+## Family Memory
+
+DECISIONS #92, design `docs/superpowers/specs/2026-10-17-family-memory-design.md`. Each evening the Mac mini's art-brief job (`scripts/series-mailbox.mjs`) picks tomorrow's photo before writing Jarvis's brief:
+
+1. **Pick.** `scripts/family-pick.py` reads a scratch copy of Photos.sqlite on the external drive (deleted afterwards). Order: the album's exact day, then a Favourites photo with a family face on the exact day, then the album's closest day. Only wide still photos at least 11 months old; each photo once per round (shown log `~/.config/eink/family-shown.json`, UUIDs and dates only).
+2. **Download.** `family-fetch` (compiled from `scripts/family-fetch.swift` to `~/Library/Application Support/eink-family/`) downloads just that photo at 1600 px through PhotoKit. The album's originals stay in iCloud.
+3. **Upload.** The photo goes to R2 `family/<date>/photo.jpg` with `photo.json` (`{"taken"}`), and the brief adds a `family` picture with the photo as its reference.
+4. **Warm.** The nightly warm stores Jarvis's repainting (`art/<date>/family`), or the photo itself, cropped with the caption burned in, under KV `family:v1:<date>`, then deletes the R2 copies. No Workers AI. The alert watches it from 19 Oct 2026.
 
 ## The Series
 

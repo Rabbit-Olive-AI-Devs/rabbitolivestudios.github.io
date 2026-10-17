@@ -251,6 +251,12 @@ const ART_IN = path.join(INBOX, "art");
 const ART_BUCKET = "eink-birthday-photos";
 const ART_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
 const ART_MAX_BYTES = 15 * 1024 * 1024;
+// Family Memory (#92): the photo library, the scratch copy of its database (on the external drive:
+// the Mac's own disk is short of space), the PhotoKit downloader and the shown log.
+const PHOTOS_LIB = process.env.PHOTOS_LIBRARY ?? "/Volumes/SamsungSSD/Pictures/Photos Library.photoslibrary";
+const FAMILY_TMP = process.env.FAMILY_TMP ?? "/Volumes/SamsungSSD/Pictures/.eink-family-tmp";
+const FAMILY_FETCH = path.join(HOME, "Library", "Application Support", "eink-family", "family-fetch");
+const FAMILY_SHOWN = path.join(HOME, ".config", "eink", "family-shown.json");
 
 /** Chicago date plus N days, for "tomorrow". */
 function chicagoDate(offsetDays) {
@@ -268,6 +274,53 @@ function looksLikeImage(buf, ext) {
 }
 
 /**
+ * Family Memory (#92): pick the date's family photo and put it in R2 for the brief and the warm,
+ * once per date. Works on a scratch copy of the Photos database, downloads only the chosen photo,
+ * keeps nothing on the Mac but the shown log (UUIDs and dates).
+ */
+function familyPhoto(date) {
+  const shown = fs.existsSync(FAMILY_SHOWN) ? JSON.parse(fs.readFileSync(FAMILY_SHOWN, "utf8")) : [];
+  if (shown.some((e) => e.date === date)) return;
+  if (!fs.existsSync(path.join(PHOTOS_LIB, "database", "Photos.sqlite")) || !fs.existsSync(FAMILY_FETCH)) {
+    log(`family ${date}: Photos library or family-fetch missing; skipped`);
+    return;
+  }
+  fs.rmSync(FAMILY_TMP, { recursive: true, force: true });
+  fs.mkdirSync(FAMILY_TMP, { recursive: true });
+  try {
+    for (const f of fs.readdirSync(path.join(PHOTOS_LIB, "database")).filter((f) => /^Photos\.sqlite(-wal|-shm)?$/.test(f))) {
+      fs.copyFileSync(path.join(PHOTOS_LIB, "database", f), path.join(FAMILY_TMP, f));
+    }
+    const pick = JSON.parse(execFileSync("python3", ["-E", "-P", path.join(REPO, "scripts", "family-pick.py"),
+      "--db", path.join(FAMILY_TMP, "Photos.sqlite"), "--date", date,
+      "--people", path.join(REPO, "photos", "portraits", "people.json"), "--shown", FAMILY_SHOWN], { encoding: "utf8" }));
+    const jpg = path.join(FAMILY_TMP, "photo.jpg");
+    for (const c of pick.candidates) {
+      const got = spawnSync(FAMILY_FETCH, [c.localIdentifier, jpg], { encoding: "utf8", timeout: 120_000 });
+      const width = got.status === 0 ? Number(got.stdout.trim().split("x")[0]) : 0;
+      if (width < 1024) { log(`family ${date}: ${c.uuid} not usable (${(got.stderr || got.stdout || "").trim().slice(0, 120)})`); continue; }
+      const meta = path.join(FAMILY_TMP, "photo.json");
+      fs.writeFileSync(meta, JSON.stringify({ taken: c.taken }));
+      const put = (file, key, type) => spawnSync("npx", ["wrangler", "r2", "object", "put", `${ART_BUCKET}/family/${date}/${key}`, "--file", file, "--content-type", type, "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+      if (put(jpg, "photo.jpg", "image/jpeg").status !== 0 || put(meta, "photo.json", "application/json").status !== 0) {
+        log(`family ${date}: upload failed`);
+        return;
+      }
+      shown.push({ uuid: c.uuid, date, round: pick.round });
+      fs.mkdirSync(path.dirname(FAMILY_SHOWN), { recursive: true });
+      fs.writeFileSync(FAMILY_SHOWN, JSON.stringify(shown, null, 1) + "\n");
+      log(`family ${date}: photo from ${c.taken} (${c.source}) put up`);
+      return;
+    }
+    log(`family ${date}: no usable photo among ${pick.candidates.length} candidates`);
+  } catch (err) {
+    log(`family ${date}: ${String(err?.message ?? err).slice(0, 300)}`);
+  } finally {
+    fs.rmSync(FAMILY_TMP, { recursive: true, force: true });
+  }
+}
+
+/**
  * The evening brief for Jarvis: what to draw for a date, as JSON, from the Worker's own
  * choices (event, styles, prompts). On a family birthday the face crops go with it.
  */
@@ -275,6 +328,7 @@ async function cmdArtBrief() {
   if (!fs.existsSync(OUTBOX)) { log("mailbox not mounted; art brief skipped"); return; }
   const date = process.argv[3] ?? chicagoDate(1);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("usage: art-brief [YYYY-MM-DD]");
+  familyPhoto(date);   // first, so the brief already carries the family picture (#92)
   const res = await fetch(`${SITE}/art/brief?date=${date}`);
   if (!res.ok) throw new Error(`brief for ${date}: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
   const brief = await res.json();
@@ -296,6 +350,14 @@ async function cmdArtBrief() {
     birthday.references = refs.length;
     birthday.referenceFiles = refs.map((f) => `from-claude/art/${f}`);
   }
+  const family = brief.pictures.find((p) => p.kind === "family");
+  if (family) {
+    const dest = path.join(ART_OUT, `${date}-family-ref.jpg`);
+    const r = spawnSync("npx", ["wrangler", "r2", "object", "get", `${ART_BUCKET}/family/${date}/photo.jpg`, "--file", dest, "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+    const ok = r.status === 0 && fs.existsSync(dest) && fs.statSync(dest).size > 0;
+    family.references = ok ? 1 : 0;
+    family.referenceFiles = ok ? [`from-claude/art/${path.basename(dest)}`] : [];
+  }
   fs.writeFileSync(json, JSON.stringify(brief, null, 2) + "\n");
   const files = brief.pictures.map((p) => `- ${p.kind}: to-claude/art/${p.file} (${p.style.name})`).join("\n");
   reply(`art-brief-${date}`, `ART BRIEF date=${date}\n\nThe picture brief for ${date} is from-claude/art/${date}-brief.json. Draw each picture, save it under the name below, then send a note whose first line is:\n\n    ART DELIVERY date=${date}\n\n${files}\n\nDeliver by ${brief.deliverBy}. Anything not delivered by then is drawn by Workers AI as before.${brief.pictures.some((p) => p.chooseEvent) ? "\n\nThe moment's event is yours to pick this time: see chooseEvent in the JSON, and put the title / year / place lines in your ART DELIVERY note." : ""}${brief.waiting ? `\n\nNot in this brief yet: ${brief.waiting.join(", ")} (the day's event is not picked yet). The 19:00 and 21:00 runs send a new brief for ${date} if it is picked by then; otherwise Workers AI draws it. Draw the rest now.` : ""}`);
@@ -316,7 +378,7 @@ function artDelivery(file, date) {
   const text = fs.readFileSync(path.join(INBOX, file), "utf8");
   const field = (name) => text.match(new RegExp(`^\\s*${name}\\s*:\\s*(.+)$`, "im"))?.[1].replace(/[\u0000-\u001f]/g, "").trim();
   const chosen = { title: field("title"), year: Number(field("year")), place: field("place") };
-  for (const kind of ["moment", "birthday", "skyline"]) {
+  for (const kind of ["moment", "birthday", "skyline", "family"]) {
     const f = found.find((x) => new RegExp(`^${date}-${kind}\\.(png|jpe?g|webp)$`, "i").test(x));
     if (!f) continue;
     const ext = f.split(".").pop().toLowerCase();

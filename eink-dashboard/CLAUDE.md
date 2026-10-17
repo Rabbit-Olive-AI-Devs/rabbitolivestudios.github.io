@@ -56,6 +56,7 @@ Every session must begin with these steps:
 | Spending AI on test generations (portraits, styles) | Read real usage from GraphQL `aiInferenceAdaptiveGroups` first, and until ~06:00 UTC **add the previous UTC day's total**: Cloudflare's daily reset lags, and a refusal arms the budget block for the whole day, which can cost the nightly warm (DECISIONS #88). Leave room for the warm (~2,000-2,800) |
 | Touching the daily pictures, `src/art.ts` or `/art/brief` | Jarvis draws them from the brief, and Workers AI only fills what he did not deliver (DECISIONS #89). Keep the brief built from the Worker's own choices (event, `momentStyleFor`, skyline picks, `getBirthdayStyle`), so both sources agree. The warm takes R2 `art/<date>/<kind>` first. A refused event pick is never cached; the brief then lets Jarvis choose the event (`chooseEvent`), and his `title/year/place` lines become the caption. The alert emails when Jarvis missed a night (markers `art/used/<date>/<kind>`) or the Mac mini stops reporting to TARS (#90) |
 | Adding or changing a holiday week | One entry in `src/holidays.ts` (DECISIONS #91): ASCII name (the skyline caption font), skyline dressing without snow (southern cities), a documented history event for the day itself. The test keeps weeks from overlapping. A theme change only affects dates not yet cached, so no cache-key bump is needed unless non-holiday prompts change |
+| Touching Family Memory (`src/family.ts`, `/color/family`, `scripts/family-pick.py`) | The photo comes from the owner's album, then Favourites, then the album's closest day: wide only, at least 11 months old, once per round, no names on the panel (DECISIONS #92). Never write the album's share link anywhere; never commit photos, the shown log or `people.json`. Copy Photos.sqlite to the external drive, not the Mac's disk (short of space). No Workers AI: Jarvis or the photo itself |
 | Refreshing the birthday reference photos | `scripts/pick-portraits-from-photos.py` on a read-only copy of the Photos database → review the crops' contact sheet → `npm run upload-photos` (needs `hints.json` so group photos crop the right face). Never commit photos or the people/hints files (DECISIONS #87) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
@@ -332,6 +333,7 @@ eink-dashboard/
     styles-1bit.ts        — Pipeline B style table, picker, hash
     art.ts                — Jarvis's daily pictures: the brief (`/art/brief`), and the warm taking his R2 deliveries before Workers AI (DECISIONS #89)
     art-styles.ts         — The shared art-style library (71 styles, each tagged moment/skyline/portrait) + seeded daily pick (DECISIONS #86)
+    family.ts             — Family Memory: the brief's family picture, the warm's store (Jarvis's repainting or the photo itself), caption (DECISIONS #92)
     holidays.ts           — Holiday weeks: the 7 days up to each holiday dress the skyline and add a mood to the moment; on the day the moment is the holiday's history (DECISIONS #91)
     birthday.ts           — Birthday data + detection
     tars.ts               — Desk panel TARS: cleans and merges the Macs' reports into KV `tars:v1:state`, builds the page's view (DECISIONS #69)
@@ -412,6 +414,7 @@ eink-dashboard/
       color-headlines.ts  — /color/headlines HTML page
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
       desk.ts             — /desk/test, /desk/aurebesh, /desk/planet, /desk/tars (view + report), /desk/flamengo handlers (DECISIONS #66–#70)
+      family.ts           — /color/family: today's family picture inlined, else the latest earlier one, else the text page (#92)
       series.ts           — /desk/series, /series, /color/series (one R2 page inlined; before a premiere the "coming soon" card is drawn live with a countdown, #80) and /series/proof (DECISIONS #71)
   photos/
     portraits/            — Birthday reference photos ({key}_0..3.jpg) + people.json (key → Photos name), hints.json (face positions), picks.json (manual face picks); all gitignored (#85, #87)
@@ -420,6 +423,8 @@ eink-dashboard/
     upload-photos.sh      — Upload birthday photos to R2, prepared by prepare-portraits.py (#85)
     prepare-portraits.py  — Birthday references for FLUX.2: upright, cropped to the face (Vision via portrait-faces.swift), under 512px; picks.json for group photos; contact sheet (#85)
     portrait-faces.swift  — Prints the faces Apple's Vision finds in each image, as JSON (#85)
+    family-pick.py        — Family Memory: picks the date's photo from a read-only Photos.sqlite copy (album, Favourites, closest day); tests in test_family_pick.py (#92)
+    family-fetch.swift    — Family Memory: downloads one photo at 1600 px through PhotoKit; compiled to ~/Library/Application Support/eink-family/ (#92)
     pick-portraits-from-photos.py — Best recent face photos per family member from the Photos library's People album (read-only DB copy; iCloud originals exported via Photos) + face-position hints (#87)
     download-skyline-photos.sh — Download skyline photos from Unsplash
     upload-skyline-photos.sh   — Upload skyline photos to R2

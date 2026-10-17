@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-17 · **Describes:** v3.22.0 (2026-10-17: #82-#90) + #91 holiday weeks theme the daily pictures (not yet a version); #92 Family Memory designed, not built (code: #90 the alert watches Jarvis's deliveries and the Mac mini; #89 Jarvis draws the daily pictures through the series mailbox, Workers AI as backup; #87 birthday references picked from the owner's Photos library; #86 one shared art-style library of 71 styles; #85 a birthday style per person, face-cropped reference photos, likeness prompt, no invented seals; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-17, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-17 · **Describes:** v3.22.0 (2026-10-17: #82-#90) + #91 holiday weeks theme the daily pictures (not yet a version); #92 Family Memory page (code: #90 the alert watches Jarvis's deliveries and the Mac mini; #89 Jarvis draws the daily pictures through the series mailbox, Workers AI as backup; #87 birthday references picked from the owner's Photos library; #86 one shared art-style library of 71 styles; #85 a birthday style per person, face-cropped reference photos, likeness prompt, no invented seals; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-17, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -256,7 +256,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 302 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 308 tests (+ `python3 -E -P -m unittest discover -s scripts -p 'test_family_pick.py'`, 7)
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -343,7 +343,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 - ~~Check that the 17 October pictures were made~~ **resolved:** Jarvis drew both (Loma Prieta fresco, Mexico City cyanotype; `drawn_by: jarvis`). Owner on the mono E1001s: the fresco moment was too dark, Mexico City lovely; keep as-is for now. If dark mono pictures recur, offer a mono-only lightened page (lift tones, or our own Atkinson 1-bit), colour panel unchanged.
 - **Holiday weeks (#91, deployed 2026-10-17, no version bump yet):** the first themed day is 25 Oct (Halloween week; brief on the evening of the 24th). 31 Oct is Álvaro's birthday, so only the skyline goes Halloween that day. Ask the owner's verdict.
-- **Family Memory (#92) is designed and approved, not built:** next step is the build plan from `docs/superpowers/specs/2026-10-17-family-memory-design.md`. The owner then adds `/color/family` to the office E1002 and the home E1001.
+- **Family Memory (#92) built and deployed 2026-10-17** (plan `docs/superpowers/plans/2026-10-17-family-memory.md`): `/color/family`, KV `family:v1:<date>`, R2 `family/<date>/photo.{jpg,json}` and `art/<date>/family`; the pick runs inside the 17/19/21h art-brief job (`scripts/family-pick.py`, `family-fetch`). **Open:** the owner adds `/color/family` to the office E1002 and home E1001 pagelists; check the first evenings in `mailbox.log` (`family <date>: …`); if `family-fetch` reports "no Photos access" under launchd, the owner grants it Photos access (System Settings → Privacy & Security → Photos). The alert watches it from 19 Oct.
 - Family example portraits for the owner: Thiago (Oil Portrait test), Sônia and Teteu are on the private examples page (https://claude.ai/artifact/Cn4Pt1Nsd3PePgKm1JNmpR), made with the old references. Still to make with the Photos-library references: Gilmara, João Pedro, Lucas, Álvaro, Mariana, Theo. At most four or five a day, only after a clean reset (#88). Generate locally: seed the local R2 with the prepared crops, then `/color/test-birthday?name=KEY`.
 - Thiago's birthday on 20 October is the first real colour birthday portrait on both home panels (2026 style: Pointillist). Ask the owner how it looked.
 - The planet in colour on the desk panel is still unjudged (#81 addendum 4).
@@ -402,6 +402,7 @@ This is separate from the Muse firmware experiment above, which concerns the fir
 | Skyline | `src/skyline.ts`, `src/skyline-image.ts`, `src/pages/skyline.ts` |
 | Art styles (shared) | `src/art-styles.ts` |
 | Holiday weeks (#91) | `src/holidays.ts` |
+| Family Memory (#92) | `src/family.ts`, `src/pages/family.ts`, `scripts/family-pick.py`, `scripts/family-fetch.swift` |
 | Birthday | `src/birthday.ts`, `src/birthday-image.ts`; references: `scripts/pick-portraits-from-photos.py` → `scripts/prepare-portraits.py` (+ `portrait-faces.swift`) → `npm run upload-photos` |
 | Weather | `src/weather.ts`, `src/weather-nws.ts`, `src/alerts.ts`, `src/device.ts`, `src/weather-ui.ts`, `src/pages/weather2.ts`, `src/pages/color-weather.ts` |
 | Caching and guards | `src/cache-keys.ts`, `src/cache-guard.ts`, `src/stale-cache.ts`, `src/with-budget.ts` |
