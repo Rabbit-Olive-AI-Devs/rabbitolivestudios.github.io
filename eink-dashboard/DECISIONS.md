@@ -3898,3 +3898,34 @@ new key by itself. The skyline key does not carry it, so today's skyline keeps t
 has and the library applies from the next warmed date. Bumping either would regenerate today's
 pictures a second time on a day already used for portrait tests (budget read from GraphQL).
 Pipeline A (`/fact.png`, not warmed) and Pipeline B (`/fact1.png`, 1-bit) keep their own lists.
+
+## 87. Birthday Reference Photos Come From the Photos Library (2026-10-17)
+
+The owner pointed at the Photos library on this Mac (`/Volumes/SamsungSSD/Pictures/Photos
+Library.photoslibrary`). Its People album has thousands of pictures of each family member and
+names them, and the owner confirmed the less obvious names: Mariana is "Nana", Sônia is "Mãe",
+Álvaro is "Pai".
+
+`scripts/pick-portraits-from-photos.py` reads a copy of `Photos.sqlite`, opened read-only so the
+live library is never touched. Photos has already analysed every face, so the script uses that
+analysis rather than guessing:
+- Glasses type 2 is sunglasses, 1 is prescription glasses and 3 is none. This was worked out by
+  comparing João Pedro, who always wears glasses, with Lucas, who never does.
+- It keeps faces with eyes open, turned towards the camera, large in the frame and sharp, and
+  prefers pictures where the person is alone.
+- It looks back two years (three for family seen less often), because the children change fast,
+  and takes at most one picture per day.
+
+Two problems came up:
+- Most older pictures are kept only in iCloud (optimised storage leaves a 480px preview).
+  AppleScript `export … with using originals` makes Photos download the full original.
+- In group photos the largest face is usually Thiago's. Photos records where it saw each person
+  (`ZCENTERX/Y`, normalised, y from the bottom, in the upright picture; checked against Vision
+  on twelve photos and all rotations). The script writes that as `hints.json`, and
+  `prepare-portraits.py --hints` crops the face nearest to it.
+
+Claude reviewed every crop on a contact sheet and chose four per person, recent and varied.
+Teteu has only one usable recent photo, so his two solo pictures from the old set stay. All 35
+references were uploaded on 2026-10-17. The old originals are in
+`photos/portraits-before-2026-10-17/`. `people.json`, `hints.json` and every photo stay out of the
+repo. Refresh the set every year or so, as the children grow.

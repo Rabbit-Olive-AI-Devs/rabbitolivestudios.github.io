@@ -55,12 +55,17 @@ def main():
     ap.add_argument("--src", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--picks", help="JSON {\"name_i\": face_index} for group photos")
+    ap.add_argument("--hints", help="JSON {\"name_i\": [x, y]}: where Photos saw the person's face "
+                    "(its normalised coordinates, y from the bottom), from pick-portraits-from-photos.py")
     ap.add_argument("--upload", action="store_true")
     args = ap.parse_args()
 
     picks = {}
     if args.picks and os.path.exists(args.picks):
         picks = json.load(open(args.picks))
+    hints = {}
+    if args.hints and os.path.exists(args.hints):
+        hints = json.load(open(args.hints))
 
     upright_dir = os.path.join(args.out, "upright")
     os.makedirs(upright_dir, exist_ok=True)
@@ -87,6 +92,11 @@ def main():
         found = faces[stem].get("faces", [])
         pick = picks.get(stem, 0)
         idx, rotate = (pick.get("face", 0), pick.get("rotate", 0)) if isinstance(pick, dict) else (pick, 0)
+        if stem in hints and found and stem not in picks:
+            # The face nearest where Photos saw this person (y flipped to the upright image).
+            hx, hy = hints[stem][0] * img.width, (1 - hints[stem][1]) * img.height
+            idx = min(range(len(found)), key=lambda n: (found[n]["x"] + found[n]["w"] / 2 - hx) ** 2
+                      + (found[n]["y"] + found[n]["h"] / 2 - hy) ** 2)
         if not found:
             print(f"{stem}: NO FACE FOUND, centre crop", file=sys.stderr)
             side = min(img.size)
