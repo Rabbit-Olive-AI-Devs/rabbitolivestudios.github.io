@@ -103,6 +103,12 @@ function validateMoment(obj: any): MomentBeforeData | null {
  * Use the LLM to select an event and generate a "Moment Before" scene.
  * Falls back gracefully if the LLM call fails.
  */
+/** The events offered for the day's pick: prefer 1800–2000, at most 20. Shared with Jarvis's brief (#89). */
+export function eventCandidates(events: Array<{ year: number; text: string }>): Array<{ year: number; text: string }> {
+  const preferred = events.filter((e) => e.year >= 1800 && e.year <= 2000);
+  return (preferred.length >= 5 ? preferred : events).slice(0, 20);
+}
+
 export async function generateMomentBefore(
   env: Env,
   events: Array<{ year: number; text: string }>,
@@ -111,10 +117,7 @@ export async function generateMomentBefore(
     return fallback();
   }
 
-  // Pre-filter to a manageable list: prefer 1800–2000, cap at 20
-  const preferred = events.filter((e) => e.year >= 1800 && e.year <= 2000);
-  const pool = preferred.length >= 5 ? preferred : events;
-  const capped = pool.slice(0, 20);
+  const capped = eventCandidates(events);
 
   const userMessage = formatEventsForLLM(capped);
 

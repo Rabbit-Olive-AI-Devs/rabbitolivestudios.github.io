@@ -345,3 +345,14 @@ test("Jarvis's skyline brief matches what the Worker would draw (DECISIONS #89)"
   assert.equal(artKey("2026-10-18", "moment"), "art/2026-10-18/moment");
   assert.ok(ART_RULES.some((r) => /No text/.test(r)));
 });
+
+test("when the event cannot be picked, Jarvis gets the same candidates the LLM would (DECISIONS #89)", () => {
+  const { eventCandidates } = fromBuild("src/moment.js");
+  const { CHOOSE_EVENT } = fromBuild("src/art.js");
+  const events = Array.from({ length: 40 }, (_, i) => ({ year: 1700 + i * 10, text: `event ${i}` }));
+  const c = eventCandidates(events);
+  assert.equal(c.length, 20);
+  assert.ok(c.every((e) => e.year >= 1800 && e.year <= 2000));
+  assert.deepEqual(eventCandidates([{ year: 1500, text: "old" }]), [{ year: 1500, text: "old" }]);
+  for (const line of ["title:", "year:", "place:"]) assert.ok(CHOOSE_EVENT.includes(line));
+});

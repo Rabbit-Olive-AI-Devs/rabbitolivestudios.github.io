@@ -4020,3 +4020,19 @@ Tested locally without AI: two fake deliveries were stored by the warm under
 were removed. In production the first brief (17 October) went out at 03:34 UTC with the skyline
 only, because the lagging quota (#88) still refused the event pick. Cost: no neurons for Jarvis's
 pictures. KV writes are the same as the warm's (one per picture). R2 gets a few writes and deletes a day.
+
+**Addendum (same night, owner: "do the event fallback for Jarvis now"):** the first brief had to
+list the moment as `waiting`, because the LLM that picks the day's event was refused (#88). Now
+a refused pick no longer holds Jarvis up:
+- The brief gives him the same candidates the LLM would see (`eventCandidates`: prefer
+  1800-2000, at most 20) under `chooseEvent`, with the Worker's own rules: the event at its
+  defining moment, period-accurate, no gore. The prompt is the style plus his scene plus the
+  anti-text suffix.
+- He adds `title:`, `year:` and `place:` lines to his `ART DELIVERY` note. The watcher stores
+  them as `art/<date>/moment.json`.
+- The warm uses them as the caption for his picture. When the Worker has no real event of its own
+  for the date, they also become the day's shared moment, so the other pages agree.
+
+Only an empty event list (Wikipedia down) still leaves the moment `waiting`. Tested locally: a
+delivery with "Sputnik launch / 1957 / Baikonur" was stored with that caption and filled
+`moment:v1:2026-10-17`.

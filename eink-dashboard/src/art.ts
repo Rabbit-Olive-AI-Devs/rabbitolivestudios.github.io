@@ -14,7 +14,7 @@
 
 import type { Env, MomentBeforeData } from "./types";
 import { getTodayEvents } from "./fact";
-import { getOrGenerateMoment } from "./moment";
+import { getOrGenerateMoment, eventCandidates } from "./moment";
 import { momentCacheKey, skylineCacheKey } from "./cache-keys";
 import { getAiBudgetBlock } from "./cache-guard";
 import { momentStyleFor } from "./art-styles";
@@ -44,6 +44,10 @@ export interface ArtPicture {
   prompt: string;           // the wording the Worker itself would send its image model
   subject: Record<string, string | number>;
   references?: number;      // birthday: how many face photos come with the brief
+  chooseEvent?: {           // moment, when the Worker could not pick the event: Jarvis picks it
+    instructions: string;
+    candidates: Array<{ year: number; text: string }>;
+  };
 }
 
 export interface ArtBrief {
@@ -63,6 +67,14 @@ export const ART_RULES: readonly string[] = [
   "No frames or borders around the picture.",
   "Historical scenes: accurate to the period; no graphic injury or gore.",
 ];
+
+/** What Jarvis is told when he picks the day's event himself (the Worker's own LLM rules, #7, #75). */
+export const CHOOSE_EVENT =
+  "Pick the one event from the candidates that makes the most striking picture: a famous, visual moment, " +
+  "preferably 1800-2000. Draw the event itself at its defining moment of action, not the calm before or the aftermath, " +
+  "historically accurate to the period (architecture, vehicles, clothing, technology). No graphic injury, bodies, blood " +
+  "or close-up suffering; show the scene and its scale. Then, in the ART DELIVERY note, add three lines: " +
+  "'title: <2-5 word name of the event>', 'year: <year>', 'place: <where it happened>'. The panel's caption is made from them.";
 
 /** The skyline part of the brief (pure: city, style and prompt come from the date). */
 export function skylinePicture(dateStr: string): ArtPicture {
@@ -101,7 +113,22 @@ export async function buildArtBrief(env: Env, dateStr: string): Promise<ArtBrief
   }
   const waiting: ArtKind[] = [];
   const moment = birthday ? null : await briefMoment(env, dateStr);
-  if (!birthday && !moment) waiting.push("moment");
+  if (!birthday && !moment) {
+    // The event could not be picked (the LLM is refused or paused). Jarvis picks it from the
+    // day's events instead and reports what he drew, so the caption stays right (#89).
+    const { events } = await getTodayEvents(env, dateStr);
+    const candidates = eventCandidates(events);
+    const style = momentStyleFor(dateStr);
+    if (candidates.length === 0) waiting.push("moment");
+    else pictures.push({
+      kind: "moment",
+      file: `${dateStr}-moment.png`,
+      style: { id: style.id, name: style.name },
+      prompt: `${style.prompt}, [the scene you choose: the event itself at its defining moment of action], ${ANTI_TEXT_SUFFIX}`,
+      subject: { note: "choose the event from chooseEvent.candidates" },
+      chooseEvent: { instructions: CHOOSE_EVENT, candidates },
+    });
+  }
   if (moment) {
     const style = momentStyleFor(dateStr);
     pictures.push({
@@ -161,10 +188,35 @@ export async function storeJarvisColor(
       birthdayInfo: { name: birthday.name, age: year - birthday.birthYear, styleName: style.name },
     });
   } else {
-    await saveColorEntry(env, dateStr, null, { imageB64, moment, displayDate, source: "jarvis" });
+    const chosen = await jarvisMoment(env, dateStr);
+    await saveColorEntry(env, dateStr, null, { imageB64, moment: chosen ?? moment, displayDate, source: "jarvis" });
   }
   await env.PHOTOS.delete(artKey(dateStr, kind));
   return true;
+}
+
+/**
+ * The event Jarvis chose and drew when the brief left the pick to him (`art/DATE/moment.json`,
+ * written by the watcher from his delivery note), or null. It also becomes the day's shared
+ * moment when the Worker has none of its own, so the other pages agree.
+ */
+async function jarvisMoment(env: Env, dateStr: string): Promise<MomentBeforeData | null> {
+  const obj = await env.PHOTOS.get(`${artKey(dateStr, "moment")}.json`);
+  if (!obj) return null;
+  await env.PHOTOS.delete(`${artKey(dateStr, "moment")}.json`);
+  let parsed: { title?: unknown; year?: unknown; place?: unknown };
+  try { parsed = await obj.json(); } catch { return null; }
+  const title = typeof parsed.title === "string" ? parsed.title.slice(0, 80) : "";
+  const year = Number(parsed.year);
+  if (!title || !Number.isInteger(year)) return null;
+  const moment: MomentBeforeData = {
+    title, year, location: typeof parsed.place === "string" ? parsed.place.slice(0, 80) : "", scene: "", imagePrompt: "",
+  };
+  const cached = await env.CACHE.get<{ data: MomentBeforeData }>(momentCacheKey(dateStr), "json");
+  if (!cached?.data?.title) {
+    await env.CACHE.put(momentCacheKey(dateStr), JSON.stringify({ data: moment, timestamp: Date.now() }), { expirationTtl: 604800 });
+  }
+  return moment;
 }
 
 /** Store Jarvis's skyline for a date under the daily skyline key, caption burned in. True when stored. */

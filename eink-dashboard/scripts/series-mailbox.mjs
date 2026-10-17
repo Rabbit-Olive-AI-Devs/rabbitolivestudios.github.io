@@ -298,7 +298,7 @@ async function cmdArtBrief() {
   }
   fs.writeFileSync(json, JSON.stringify(brief, null, 2) + "\n");
   const files = brief.pictures.map((p) => `- ${p.kind}: to-claude/art/${p.file} (${p.style.name})`).join("\n");
-  reply(`art-brief-${date}`, `ART BRIEF date=${date}\n\nThe picture brief for ${date} is from-claude/art/${date}-brief.json. Draw each picture, save it under the name below, then send a note whose first line is:\n\n    ART DELIVERY date=${date}\n\n${files}\n\nDeliver by ${brief.deliverBy}. Anything not delivered by then is drawn by Workers AI as before.${brief.waiting ? `\n\nNot in this brief yet: ${brief.waiting.join(", ")} (the day's event is not picked yet). The 19:00 and 21:00 runs send a new brief for ${date} if it is picked by then; otherwise Workers AI draws it. Draw the rest now.` : ""}`);
+  reply(`art-brief-${date}`, `ART BRIEF date=${date}\n\nThe picture brief for ${date} is from-claude/art/${date}-brief.json. Draw each picture, save it under the name below, then send a note whose first line is:\n\n    ART DELIVERY date=${date}\n\n${files}\n\nDeliver by ${brief.deliverBy}. Anything not delivered by then is drawn by Workers AI as before.${brief.pictures.some((p) => p.chooseEvent) ? "\n\nThe moment's event is yours to pick this time: see chooseEvent in the JSON, and put the title / year / place lines in your ART DELIVERY note." : ""}${brief.waiting ? `\n\nNot in this brief yet: ${brief.waiting.join(", ")} (the day's event is not picked yet). The 19:00 and 21:00 runs send a new brief for ${date} if it is picked by then; otherwise Workers AI draws it. Draw the rest now.` : ""}`);
   log(`art brief ${date}: written (${brief.pictures.map((p) => p.kind).join(", ")})`);
 }
 
@@ -312,6 +312,10 @@ function artDelivery(file, date) {
   const found = fs.existsSync(ART_IN) ? fs.readdirSync(ART_IN).filter((f) => f.startsWith(`${date}-`)) : [];
   const lines = [];
   fs.mkdirSync(path.join(ART_IN, "done"), { recursive: true });
+  // When the brief left the event to Jarvis, his note carries what he drew: title / year / place.
+  const text = fs.readFileSync(path.join(INBOX, file), "utf8");
+  const field = (name) => text.match(new RegExp(`^\\s*${name}\\s*:\\s*(.+)$`, "im"))?.[1].replace(/[\u0000-\u001f]/g, "").trim();
+  const chosen = { title: field("title"), year: Number(field("year")), place: field("place") };
   for (const kind of ["moment", "birthday", "skyline"]) {
     const f = found.find((x) => new RegExp(`^${date}-${kind}\\.(png|jpe?g|webp)$`, "i").test(x));
     if (!f) continue;
@@ -323,6 +327,12 @@ function artDelivery(file, date) {
     if (r.status !== 0) { lines.push(`- ${f}: upload failed, I will look at it`); log(`art upload ${f}: ${(r.stderr ?? "").slice(-300)}`); continue; }
     fs.renameSync(full, path.join(ART_IN, "done", f));
     lines.push(`- ${f}: received`);
+    if (kind === "moment" && chosen.title && Number.isInteger(chosen.year) && chosen.year > -5000 && chosen.year <= 2100) {
+      const meta = path.join(ART_IN, "done", `${date}-moment.json`);
+      fs.writeFileSync(meta, JSON.stringify({ title: chosen.title.slice(0, 80), year: chosen.year, place: (chosen.place ?? "").slice(0, 80) }));
+      const m = spawnSync("npx", ["wrangler", "r2", "object", "put", `${ART_BUCKET}/art/${date}/moment.json`, "--file", meta, "--content-type", "application/json", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+      lines.push(m.status === 0 ? `  caption: ${chosen.title}, ${chosen.year}, ${chosen.place ?? ""}` : "  caption details could not be stored; the Worker's own caption is used");
+    }
   }
   if (lines.length === 0) lines.push(`- no pictures found: name them to-claude/art/${date}-moment.png (or -birthday.png) and to-claude/art/${date}-skyline.png, then send ART DELIVERY again`);
   const when = date === tomorrow ? "Tonight's 23:35 run puts them on the panels for tomorrow." : "The 00:35 run tonight puts them on the panels; until then today's pictures stay.";
