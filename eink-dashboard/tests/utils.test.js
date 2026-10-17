@@ -284,10 +284,27 @@ test("birthday styles vary by person and walk the whole list (DECISIONS #85)", (
   const thiago = getBirthdayByKey("thiago");
   const sonia = getBirthdayByKey("sonia");
   assert.equal(getBirthdayStyle(thiago, 2026).name, getBirthdayStyle(thiago, 2026).name);
-  const seen = new Set();
-  for (let y = 2026; y < 2026 + BIRTHDAY_STYLES.length; y++) seen.add(getBirthdayStyle(thiago, y).name);
-  assert.equal(seen.size, BIRTHDAY_STYLES.length);
   assert.notEqual(getBirthdayStyle(thiago, 2026).name, getBirthdayStyle(sonia, 2026).name);
+  const keys = ["thiago", "gilmara", "joaopedro", "lucas", "sonia", "alvaro", "mariana", "theo", "teteu"];
+  const n = BIRTHDAY_STYLES.length;
+  for (const start of [2026, 2026 + n]) {
+    // Nobody repeats a style within a block of n years...
+    for (const k of keys) {
+      const seen = new Set();
+      for (let y = start; y < start + n; y++) seen.add(getBirthdayStyle(getBirthdayByKey(k), y).name);
+      assert.equal(seen.size, n, `${k} repeats a style in ${start}-${start + n - 1}`);
+    }
+    // ...and no two people share one in the same year.
+    for (let y = start; y < start + n; y++) {
+      const names = keys.map((k) => getBirthdayStyle(getBirthdayByKey(k), y).name);
+      assert.equal(new Set(names).size, keys.length, `two people share a style in ${y}`);
+    }
+  }
+  // Not a fixed walk down the list: next year's style is not simply the next entry.
+  const idx = (y) => BIRTHDAY_STYLES.findIndex((s) => s.name === getBirthdayStyle(thiago, y).name);
+  const steps = new Set();
+  for (let y = 2026; y < 2026 + n - 1; y++) steps.add((idx(y + 1) - idx(y) + n) % n);
+  assert.ok(steps.size > 3);
   assert.equal(resolveBirthdayStyle(thiago, 2026, 2).name, BIRTHDAY_STYLES[2].name);
   assert.equal(parseStyleIdx("23", BIRTHDAY_STYLES.length), 23);
   assert.equal(parseStyleIdx("24", BIRTHDAY_STYLES.length), 0);

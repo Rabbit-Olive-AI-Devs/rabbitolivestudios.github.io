@@ -118,7 +118,7 @@ All pipelines share one LLM-selected event per day through `getOrGenerateMoment(
 | | A: `/fact.png` | B: `/fact1.png` | C: birthday | D: `/color/moment` | E: skyline |
 |---|---|---|---|---|---|
 | Model | FLUX.2 klein-9b, SDXL fallback | SDXL | FLUX.2 + up to 4 R2 photos | FLUX.2, SDXL fallback | FLUX.2 + R2 reference photo, SDXL fallback; BW variant is SDXL only |
-| Style rotation | 3, by day of year | 6, by hash of date/title/location | 24, each person their own, one a year (#85) | 18, by day of year (every style, #84) | 19 styles over 30 cities (#84) |
+| Style rotation | 3, by day of year | 6, by hash of date/title/location | 24, random per person and year, never shared in a year or repeated in 24 years (#85) | 18, by day of year (every style, #84) | 19 styles over 30 cities (#84) |
 | Output | Full colour as-is (#81) | 1-bit PNG (Bayer or threshold per style) | Full colour as-is (#81) | Full colour as-is (#81) | Full colour as-is, both modes (#81) |
 | Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v3:DATE`, `color-birthday:v3:DATE` | `color-moment:v4:DATE:STYLE` | `skyline:v5:DATE:daily[:bw]` |
 

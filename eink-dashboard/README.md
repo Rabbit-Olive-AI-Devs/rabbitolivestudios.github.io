@@ -236,7 +236,7 @@ Chicago date → birthday check (9 family members)
         Fetch up to 4 reference photos from R2 ("portraits/{key}_0.jpg" .. "{key}_3.jpg")
                 │
                 ▼
-        Pick art style (24 styles; each person their own, one a year, #85)
+        Pick art style (24 styles, random per person and year, no repeats, #85)
                 │
                 ▼
         FLUX.2 klein-9b (multipart FormData, guidance 7.0, reference images)
@@ -251,7 +251,7 @@ Chicago date → birthday check (9 family members)
         Full-colour RGB PNG, picture untouched → KV cache (birthday:v3)   [until #81: tone curve → 4 levels]
 ```
 
-**Art styles** (24, DECISIONS #85): Woodcut, Watercolor, Art Nouveau, Pop Art, Impressionist, Ukiyo-e, Art Deco, Pointillist, Pencil Sketch, Charcoal, Oil Portrait, Renaissance, Gouache, Graphic Novel, Ink + Wash, Linocut, Etching, Pastel, Klimt Gold, Van Gogh, Fauvist, Stained Glass, Mosaic, Storybook. Each person walks the whole list, one style a year, from their own starting place, so nobody repeats a style for 24 years and no two people share one in the same year (until #85 everyone got the same style, `year % 10`). The prompt asks FLUX.2 to keep the face from the reference photos and change only the medium, and the portrait is generated at 1280x768 (the panel's 5:3 shape) so the crop no longer cuts the top of the head. Test a style: `/color/test-birthday?name=thiago&style=10`.
+**Art styles** (24, DECISIONS #85): Woodcut, Watercolor, Art Nouveau, Pop Art, Impressionist, Ukiyo-e, Art Deco, Pointillist, Pencil Sketch, Charcoal, Oil Portrait, Renaissance, Gouache, Graphic Novel, Ink + Wash, Linocut, Etching, Pastel, Klimt Gold, Van Gogh, Fauvist, Stained Glass, Mosaic, Storybook. The style is random but follows a seeded schedule (a shuffled Latin square, re-shuffled every 24 years): no two people share a style in the same year, and nobody repeats one within the 24-year block (until #85 everyone got the same style, `year % 10`). The prompt asks FLUX.2 to keep the face from the reference photos and change only the medium, and the portrait is generated at 1280x768 (the panel's 5:3 shape) so the crop no longer cuts the top of the head. Test a style: `/color/test-birthday?name=thiago&style=10`.
 
 **Reference photos** are stored in R2 (`eink-birthday-photos` bucket). Upload with:
 ```bash

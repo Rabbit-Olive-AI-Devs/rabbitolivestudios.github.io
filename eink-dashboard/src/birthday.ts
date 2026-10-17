@@ -69,16 +69,51 @@ export const BIRTHDAY_STYLES: ArtStyle[] = [
   { name: "Storybook",      prompt: "storybook illustration, warm gouache and colored pencil, gentle whimsical detail" },
 ];
 
+/** The first year of the shuffled schedule; each block of BIRTHDAY_STYLES.length years after it gets a new shuffle. */
+const STYLE_EPOCH = 2026;
+
+/** Deterministic PRNG (mulberry32), so the schedule needs no storage and every caller agrees. */
+function seededRandom(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** 0..n-1 in a seeded random order (Fisher-Yates). */
+function shuffledIndices(n: number, rand: () => number): number[] {
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 /**
- * The person's style this year. Each person walks the whole list, one style a year, starting
- * at their own place, spaced evenly by their position in BIRTHDAYS: nobody repeats a style for
- * 24 years and no two people share one in the same year (until #85 everyone got the same
- * style, picked by `year % 10`).
+ * The person's style this year: random, but never shared by two people in the same year and
+ * never repeated by one person within a block of 24 years (DECISIONS #85).
+ *
+ * It is a Latin square, cell (year, person) = (year + person) mod 24, with its rows (years),
+ * columns (people) and symbols (styles) each shuffled by a seed for the block. Shuffling a
+ * Latin square's rows, columns and symbols keeps it Latin, so every year has distinct styles
+ * and every person sees all 24 once per block, in an order that looks random. A person's column
+ * comes from their position in BIRTHDAYS, so adding someone at the end changes nobody else's.
  */
 export function getBirthdayStyle(person: BirthdayPerson, year: number): ArtStyle {
-  const spacing = Math.max(1, Math.floor(BIRTHDAY_STYLES.length / BIRTHDAYS.length));
-  const place = Math.max(0, BIRTHDAYS.findIndex(p => p.key === person.key));
-  return BIRTHDAY_STYLES[(place * spacing + year) % BIRTHDAY_STYLES.length];
+  const n = BIRTHDAY_STYLES.length;
+  const offset = year - STYLE_EPOCH;
+  const block = Math.floor(offset / n);
+  const rand = seededRandom(0x6b1d + block * 7919);
+  const styleOrder = shuffledIndices(n, rand);
+  const yearOrder = shuffledIndices(n, rand);
+  const personOrder = shuffledIndices(n, rand);
+  const place = Math.max(0, BIRTHDAYS.findIndex(p => p.key === person.key)) % n;
+  const yearInBlock = ((offset % n) + n) % n;
+  return BIRTHDAY_STYLES[styleOrder[(yearOrder[yearInBlock] + personOrder[place]) % n]];
 }
 
 /** A style picked by index (test routes, `?style=N`), or the person's style for the year. */

@@ -3830,3 +3830,17 @@ head was not cut off. Keys: `birthday:v3`, `color-birthday:v3`.
 Better input would help further. The model still sees sunglasses in 10 of the 33 photos, and one
 photo of Theo is low resolution. Close-ups without sunglasses, taken in good light, are the best
 replacements.
+
+**Addendum (same evening, owner: "the styles for the birthday portrait should be random, and not
+repetitive amongst them and with themselves as years pass by"):** walking down the list in
+order was predictable. Each person's next style was simply the next entry, and one person's
+sequence was another's, shifted. Truly random picks would need a stored history to promise no
+repeats. The schedule is a Latin square instead, cell (year, person) = (year + person) mod 24,
+with its years, people and styles each shuffled by a seed for every 24-year block from 2026.
+Shuffling a Latin square's rows, columns and symbols keeps it Latin. Inside a block, no two people
+share a style in a year, and each person gets all 24 once, in random order. Tests check both, and
+that the order is not a fixed step. The block seams are not covered by that promise. A style can
+come back sooner than 24 years across a seam; a check of the next three seams (2049/50, 2073/74,
+2097/98) found nobody with the same style two years running. Nothing had been cached under
+`color-birthday:v3` yet (no birthday since it was introduced), so the key is not bumped.
+Thiago's 2026 style becomes Charcoal, not the Oil Portrait used for the test.
