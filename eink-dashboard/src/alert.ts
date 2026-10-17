@@ -13,6 +13,8 @@
 import type { Env } from "./types";
 import { getAiBudgetBlock } from "./cache-guard";
 import { seriesProblems } from "./series/watch";
+import { readState } from "./tars";
+import { jarvisDrew } from "./art";
 
 const ALERT_STATE_KEY = "alert:v1:last";
 
@@ -40,6 +42,20 @@ export interface AlertState {
   aiBlockSource?: string;
   /** Series problems from src/series/watch.ts (DECISIONS #71). */
   series?: string[];
+  /** Machines whose TARS reports stopped: the jobs on them are not running (DECISIONS #90). */
+  quietMachines?: string[];
+  /** The day's pictures Workers AI drew because Jarvis delivered none (DECISIONS #89, #90). */
+  jarvisMissed?: string[];
+}
+
+/** Machines that run the e-ink jobs and must keep reporting (the Mac mini runs the mailbox). */
+export const WATCHED_MACHINES: readonly string[] = ["mini"];
+/** Reports come every 30 minutes; this long without one means the machine is not running its jobs. */
+export const QUIET_AFTER_MS = 2 * 60 * 60 * 1000;
+
+/** Watched machines whose last TARS report is older than QUIET_AFTER_MS (or that never reported). */
+export function quietMachines(lastReport: Record<string, number | undefined>, now: number): string[] {
+  return WATCHED_MACHINES.filter((id) => now - (lastReport[id] ?? 0) > QUIET_AFTER_MS);
 }
 
 export interface AlertRecord {
@@ -67,6 +83,15 @@ export function describeProblems(state: AlertState): string[] {
     problems.push(`AI generation is blocked by the neuron budget guard${src}`);
   }
   problems.push(...(state.series ?? []));
+  for (const id of state.quietMachines ?? []) {
+    problems.push(
+      `The ${id === "mini" ? "Mac mini" : id} has not reported for over 2 hours, so its jobs are not running ` +
+      `(mailbox watcher, Jarvis's briefs, TARS). After a restart it waits for its password (FileVault): log in on it.`,
+    );
+  }
+  if (state.jarvisMissed && state.jarvisMissed.length > 0) {
+    problems.push(`Jarvis did not deliver ${state.dateStr}'s ${state.jarvisMissed.join(" and ")}; Workers AI drew ${state.jarvisMissed.length === 1 ? "it" : "them"}`);
+  }
   return problems;
 }
 
@@ -84,6 +109,8 @@ export function alertFingerprint(state: AlertState): string {
   }
   if (state.aiBlocked) parts.push("ai:blocked");
   if (state.series && state.series.length > 0) parts.push(`series:${[...state.series].sort().join(";")}`);
+  if (state.quietMachines && state.quietMachines.length > 0) parts.push(`quiet:${[...state.quietMachines].sort().join(",")}`);
+  if (state.jarvisMissed && state.jarvisMissed.length > 0) parts.push(`jarvis:${[...state.jarvisMissed].sort().join(",")}`);
   return parts.length === 0 ? OK_FINGERPRINT : parts.join("|");
 }
 
@@ -200,6 +227,8 @@ export async function runAlertCheck(
     dateStr: string;
     chicagoHour: number;
     imageKeys: Record<string, string>;
+    /** The day's pictures Jarvis is meant to draw ("moment" or "birthday", and "skyline"). */
+    jarvisKinds?: ("moment" | "birthday" | "skyline")[];
     baseUrl: string;
     now?: number;
     force?: boolean;
@@ -212,11 +241,15 @@ export async function runAlertCheck(
     }
 
     const labels = Object.keys(opts.imageKeys);
-    const [present, block, series] = await Promise.all([
+    const kinds = opts.jarvisKinds ?? [];
+    const [present, block, series, tars, drew] = await Promise.all([
       Promise.all(labels.map((l) => env.CACHE.get(opts.imageKeys[l], "stream"))),
       getAiBudgetBlock(env),
       seriesProblems(env, new Date(now)),
+      readState(env),
+      Promise.all(kinds.map((k) => jarvisDrew(env, opts.dateStr, k))),
     ]);
+    const lastReport = Object.fromEntries(Object.entries(tars.machines).map(([id, m]) => [id, m.receivedAt]));
 
     const state: AlertState = {
       dateStr: opts.dateStr,
@@ -224,6 +257,9 @@ export async function runAlertCheck(
       aiBlocked: block !== null,
       aiBlockSource: block?.source,
       series,
+      quietMachines: quietMachines(lastReport, now),
+      // Only a picture that exists counts as "drawn by Workers AI"; a missing one is reported above.
+      jarvisMissed: kinds.filter((k, i) => !drew[i] && present[labels.indexOf(k === "skyline" ? "skyline" : "color_moment")] !== null),
     };
 
     const problems = describeProblems(state);

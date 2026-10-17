@@ -191,3 +191,18 @@ test("series problems are part of the message and the fingerprint", () => {
   assert.deepEqual(describeProblems(state), state.series);
   assert.match(alertFingerprint(state), /^series:/);
 });
+
+test("a quiet Mac mini and a night Jarvis missed are alerted (DECISIONS #90)", () => {
+  const { quietMachines, QUIET_AFTER_MS, describeProblems, alertFingerprint } = fromBuild("src/alert.js");
+  const now = 1_800_000_000_000;
+  assert.deepEqual(quietMachines({ mini: now - 30 * 60_000, macbook: now - 10 * QUIET_AFTER_MS }, now), []);
+  assert.deepEqual(quietMachines({ mini: now - QUIET_AFTER_MS - 1 }, now), ["mini"]);
+  assert.deepEqual(quietMachines({}, now), ["mini"]);
+  const state = { dateStr: "2026-10-18", missingImages: [], aiBlocked: false, quietMachines: ["mini"], jarvisMissed: ["moment"] };
+  const problems = describeProblems(state);
+  assert.match(problems[0], /Mac mini has not reported/);
+  assert.match(problems[1], /Jarvis did not deliver 2026-10-18's moment; Workers AI drew it/);
+  assert.equal(alertFingerprint(state), "quiet:mini|jarvis:moment");
+  assert.equal(alertFingerprint({ ...state, dateStr: "2026-10-19" }), "quiet:mini|jarvis:moment");
+  assert.equal(alertFingerprint({ dateStr: "2026-10-18", missingImages: [], aiBlocked: false, quietMachines: [], jarvisMissed: [] }), "ok");
+});

@@ -192,7 +192,18 @@ export async function storeJarvisColor(
     await saveColorEntry(env, dateStr, null, { imageB64, moment: chosen ?? moment, displayDate, source: "jarvis" });
   }
   await env.PHOTOS.delete(artKey(dateStr, kind));
+  await markJarvisDrew(env, dateStr, kind);
   return true;
+}
+
+/** Record that a day's picture came from Jarvis, for /health-detailed and the alert check (#90). */
+async function markJarvisDrew(env: Env, dateStr: string, kind: ArtKind): Promise<void> {
+  await env.PHOTOS.put(`art/used/${dateStr}/${kind}`, new Date().toISOString());
+}
+
+/** Did Jarvis draw this picture for the date? (Written when the warm stores his delivery.) */
+export async function jarvisDrew(env: Env, dateStr: string, kind: ArtKind): Promise<boolean> {
+  return (await env.PHOTOS.head(`art/used/${dateStr}/${kind}`)) !== null;
 }
 
 /**
@@ -228,5 +239,6 @@ export async function storeJarvisSkyline(env: Env, dateStr: string): Promise<boo
   const png = await finishSkylinePNG(rgb, formatSkylineCaption(city, parts.displayDate));
   await env.CACHE.put(skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0), pngToBase64(png), { expirationTtl: 604800 });
   await env.PHOTOS.delete(artKey(dateStr, "skyline"));
+  await markJarvisDrew(env, dateStr, "skyline");
   return true;
 }

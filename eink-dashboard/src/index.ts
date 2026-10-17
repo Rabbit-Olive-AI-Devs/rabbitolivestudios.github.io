@@ -57,7 +57,7 @@ import {
 } from "./skyline";
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
-import { buildArtBrief, storeJarvisColor, storeJarvisSkyline } from "./art";
+import { buildArtBrief, storeJarvisColor, storeJarvisSkyline, jarvisDrew } from "./art";
 
 const VERSION = "3.21.0";
 
@@ -676,6 +676,17 @@ function dailyImageKeys(dateStr: string, monthNum: number, dayNum: number) {
  * no longer makes them (DECISIONS #83, #84). */
 const ALERT_WATCHED_IMAGES = ["color_moment", "skyline"] as const;
 
+/** "jarvis", "workers-ai" or null (not made yet) for the day's colour picture and skyline. */
+async function drawnBy(env: Env, dateStr: string, month: number, day: number, colorKey: string, skylineKey: string) {
+  const colorKind = getBirthdayToday(month, day) ? "birthday" : "moment";
+  const [jColor, jSky, color, sky] = await Promise.all([
+    jarvisDrew(env, dateStr, colorKind), jarvisDrew(env, dateStr, "skyline"),
+    env.CACHE.get(colorKey, "stream"), env.CACHE.get(skylineKey, "stream"),
+  ]);
+  const who = (jarvis: boolean, cached: unknown) => (jarvis ? "jarvis" : cached ? "workers-ai" : null);
+  return { [colorKind]: who(jColor, color), skyline: who(jSky, sky) };
+}
+
 async function handleHealthDetailed(env: Env): Promise<Response> {
   const { month, day, dateStr } = getChicagoDateParts();
   const monthNum = parseInt(month);
@@ -748,6 +759,8 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         moment_event: { cached: momentRaw !== null,      key: momentKey },
       },
       next_day_images: { date_chicago: nextDate, ...nextCached },
+      // Who drew each picture: Jarvis, or Workers AI as the backup (DECISIONS #89, #90).
+      drawn_by: await drawnBy(env, dateStr, monthNum, dayNum, dailyKeys.color_moment, dailyKeys.skyline),
       ephemeral: {
         weather_home:   weatherStatus(weatherHomeRaw),
         weather_office: weatherStatus(weatherOfficeRaw),
@@ -837,11 +850,12 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
     // throws, but the await is guarded anyway: nothing here may prevent the
     // daily image warm below from running.
     try {
-      const watched = dailyImageKeys(dateStr, monthNum, dayNum).keys;
+      const { keys: watched, birthday: watchedBirthday } = dailyImageKeys(dateStr, monthNum, dayNum);
       const alertResult = await runAlertCheck(env, {
         dateStr,
         chicagoHour: getChicagoHour(),
         imageKeys: Object.fromEntries(ALERT_WATCHED_IMAGES.map((l) => [l, watched[l]])),
+        jarvisKinds: [watchedBirthday ? "birthday" : "moment", "skyline"],
         baseUrl: WORKER_BASE_URL,
       });
       if (alertResult.checked) {
@@ -1138,6 +1152,7 @@ export default {
           dateStr: aDate,
           chicagoHour: getChicagoHour(),
           imageKeys: Object.fromEntries(ALERT_WATCHED_IMAGES.map((l) => [l, aKeys[l]])),
+          jarvisKinds: [getBirthdayToday(Number(aDate.slice(5, 7)), Number(aDate.slice(8, 10))) ? "birthday" : "moment", "skyline"],
           baseUrl: WORKER_BASE_URL,
         });
         return jsonResponse(result as unknown as Record<string, unknown>, 200, 0);

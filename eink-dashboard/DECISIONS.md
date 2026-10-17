@@ -4045,3 +4045,25 @@ revision shows the Bay Bridge's upper deck fallen onto the lower deck, as it rea
 his caption, and the R2 files were consumed. No Workers AI picture was made. Jarvis's three daily
 jobs (17:10, 19:10, 21:10) are enabled and pinned to one model with no fallback; if that model is
 unavailable, Workers AI covers the night.
+
+## 90. The Alert Watches Jarvis's Deliveries and the Mac Mini (2026-10-17)
+
+On the first night of #89 Claude watched the mailbox by hand. The owner: "you should have this
+automated". The existing failure alert (#60) now covers both new ways the pictures can quietly
+degrade. It still runs every 6 hours (from Chicago 03:00), sends one email per distinct problem
+with a reminder each 24 hours and a recovery notice, and uses no extra KV writes.
+
+- **Jarvis missed a night.** When the warm stores one of his pictures it writes a tiny marker in
+  R2, `art/used/<date>/<kind>`. The check compares the day's pictures against those markers. A
+  picture that exists but has no marker was drawn by Workers AI, and the email says "Jarvis did
+  not deliver <date>'s moment; Workers AI drew it". A missing picture is still reported as missing.
+- **The Mac mini went quiet.** It runs the mailbox watcher and Jarvis's briefs, and TARS
+  already records each machine's last report (every 30 minutes, `tars:v1:state`). If `mini` has not
+  reported for over 2 hours, the email says so and points at the likely cause: after a restart it
+  waits at the FileVault password (see the Mac mini note in HANDOVER section 15). The MacBook is not
+  watched; it reports too, but the jobs do not live there.
+
+`/health-detailed` also gained `drawn_by`: `jarvis`, `workers-ai`, or `null` (not made yet) for
+the day's colour picture and skyline. The markers for 17 October were written by hand, because
+those pictures were stored before markers existed. Tests cover the quiet rule (2 hours, a machine
+that never reported counts as quiet), the wording, and the date-free fingerprints.
