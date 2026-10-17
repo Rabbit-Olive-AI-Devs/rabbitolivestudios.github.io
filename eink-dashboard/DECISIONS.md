@@ -4159,3 +4159,7 @@ Rejected along the way:
 
 After that the launchd run put up 18 October's photo, an album photo from 19 October 2024, and the
 brief was resent with it before Jarvis's 17:10 run.
+
+**Released as v3.23.0 (2026-10-17, owner's approval):** #91, holiday weeks theming the skyline and
+the moment, and #92, the Family Memory page `/color/family`. The owner asked Claude to add the page to
+the home E1001 and the office E1002 in SenseCraft.
