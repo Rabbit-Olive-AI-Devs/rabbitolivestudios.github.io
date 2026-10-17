@@ -1,7 +1,8 @@
 # Family Memory: a family photo from this day, redrawn as art (design)
 
 **Status:** design for the owner (2026-10-17), not built. Builder check done; the owner answered its
-two questions (wide photos only; the curated shared album "Coelhos de Oliveira" as the source).
+two questions (wide photos only; the curated shared album "Coelhos de Oliveira" as the source, then
+Favourites for the exact day, then the album's closest day). **Approved by the owner 2026-10-17.**
 
 ## Intent
 
@@ -22,19 +23,24 @@ moment and skyline.
   points at it. The album *is* the curation, so no face or People check is needed (its photos have
   no face data anyway). Photos the owner adds later are picked up on the next evening. The album is
   one setting (its title), so the source can change without touching anything else.
-- **This date in an earlier year.** If no family photo exists for the exact date in any earlier year,
-  use the **closest date** that has one, by calendar distance within the year, looking either way and
-  wrapping around New Year.
+- **This date in an earlier year, in this order (owner, 2026-10-17):**
+  1. a photo from the **album** taken on the exact date (month and day) in an earlier year;
+  2. if the album has none, a photo from the owner's **Favourites** taken on the exact date, limited
+     to family photos: at least one recognised family member, i.e. the nine people of the birthday
+     list, mapped to Photos People through `photos/portraits/people.json` (gitignored, #87; several
+     `ZPERSON` rows per name all count). Favourites have about 538 wide family photos on 164 days;
+  3. if neither has one, the **closest date** in the album, by calendar distance within the year,
+     looking either way and wrapping around New Year.
+
+  The same candidate rules (wide, still, not hidden or trashed, at least 11 months old) and the same
+  shown log apply to both sources.
 - **The caption shows the photo's real date and how long ago**, for example
   `15 Oct 2019 · 7 years ago` ("1 year ago" singular). **No names** in the caption.
 - **Wide photos only (owner, 2026-10-17):** landscape photos (wider than tall, as displayed). They
   crop to the panel's 5:3 without cutting heads. Tall photos are never picked.
-- **Nobody reviews the photo before it airs**, including on the office panel; the album is the
-  owner's curation. **Caution found 2026-10-17:** the album's public link allows anyone who has it
-  to add photos (`ZPUBLICPERMISSION` read-write, anonymous public access on). A photo added that way
-  would reach the panel. Claude advised the owner to make the link view-only; the builder should
-  also take only photos contributed by the owner's own account if Photos records that reliably
-  (`ZCOLLECTIONSHAREASSETCONTRIBUTOR`), and say so if it cannot.
+- **Nobody reviews the photo before it airs**, including on the office panel; the album and the
+  owner's Favourites are the curation. The album's public link allows anyone who has it to add
+  photos; the owner knows and accepted it ("don't worry"), so no contributor filter.
 - **Repeats (owner accepted the proposal):** every photo in the source is shown once before any
   photo repeats. After that, the photo shown longest ago comes back first, still choosing by the
   closest date.
@@ -68,8 +74,9 @@ needed.
    - **Candidates:** still images (no videos) from the album, wide, not hidden or trashed, and **at
      least 11 months old** (Claude's call: a photo from 31 Dec can never appear on 1 Jan as "0 years
      ago"). "N years ago" is the whole years between the two dates, at least 1.
-   - **Day:** among the photos not yet shown in the current round (all of them once every photo has
-     been shown, ordered by longest since shown), the closest calendar day to the target.
+   - **Day and source:** the order above (album exact day, Favourites exact day, album closest day),
+     among photos not yet shown in the current round. Once every album photo has been shown, the
+     round restarts with the photo shown longest ago first.
    - **Ranking within that day:** the builder's call (for example the photo shown least recently,
      then the higher-resolution one).
    - **The photo itself:** downloaded upright at about 1600 px on the long side through PhotoKit (see
@@ -132,7 +139,8 @@ needed.
 - Ranking weights and the face-quality thresholds.
 - Where the pick step lives (in `series-mailbox.mjs` or its own script), and its launchd wiring.
 - The exact prompt wording, within the rules above.
-- Test coverage. At least: the closest-date search with wraparound and the 11-month rule, the
+- Test coverage. At least: the source order (album exact, Favourites exact, album closest), the
+  closest-date search with wraparound and the 11-month rule, the
   repeat rule, the style never equal to the moment's or the skyline's, the caption text, the brief
   with and without a photo, and the page fallbacks.
 
