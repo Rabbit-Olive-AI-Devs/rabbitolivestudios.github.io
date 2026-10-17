@@ -4067,3 +4067,5 @@ with a reminder each 24 hours and a recovery notice, and uses no extra KV writes
 the day's colour picture and skyline. The markers for 17 October were written by hand, because
 those pictures were stored before markers existed. Tests cover the quiet rule (2 hours, a machine
 that never reported counts as quiet), the wording, and the date-free fingerprints.
+
+**Released as v3.22.0 (2026-10-17, owner's approval):** #82-#90: headlines and Pipeline B no longer warmed, colour pictures on both home panels, every art style in one shared library, birthday portraits with a style per person and likeness from face crops picked from the Photos library, Jarvis drawing the daily pictures with Workers AI as the backup, the event-pick fallback, and the alerts for a missed night or a quiet Mac mini.

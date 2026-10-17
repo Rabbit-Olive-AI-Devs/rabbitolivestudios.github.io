@@ -4,7 +4,7 @@ A Cloudflare Workers backend for the **reTerminal E1001** (ESP32-S3, 7.5" ePaper
 
 Every day it generates an AI illustration depicting a famous historical event at its most iconic, dramatic moment — the viewer sees the scene, the location, and the date.
 
-Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67).
+Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67). Since v3.22.0 the daily pictures are drawn by the owner's agent Jarvis from an evening brief, with Workers AI as the backup, in styles from one shared library of 71, and both home panels show them in full colour (DECISIONS.md #84-#90).
 
 ## The Concept
 
