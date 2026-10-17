@@ -4036,3 +4036,12 @@ a refused pick no longer holds Jarvis up:
 Only an empty event list (Wikipedia down) still leaves the moment `waiting`. Tested locally: a
 delivery with "Sputnik launch / 1957 / Baikonur" was stored with that caption and filled
 `moment:v1:2026-10-17`.
+
+**First night (16-17 October):** the brief went out at 22:51 CDT with the moment in
+`chooseEvent` mode. Jarvis delivered the skyline (Mexico City, Cyanotype) at 22:48 and the
+moment at 23:23, revised at 23:27. For the moment he chose the Loma Prieta Earthquake, 1989; the
+revision shows the Bay Bridge's upper deck fallen onto the lower deck, as it really happened. The
+23:35 warm took both from R2. `color-moment:v4:2026-10-17:fresco` reads `source: "jarvis"` with
+his caption, and the R2 files were consumed. No Workers AI picture was made. Jarvis's three daily
+jobs (17:10, 19:10, 21:10) are enabled and pinned to one model with no fallback; if that model is
+unavailable, Workers AI covers the night.
