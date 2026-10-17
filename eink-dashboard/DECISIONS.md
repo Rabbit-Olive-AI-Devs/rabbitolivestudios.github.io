@@ -3722,3 +3722,18 @@ builds and caches on request, so it costs nothing unless someone opens it. About
 day and 12 outside fetches saved. Freshness (the news could be stale) stays unsolved and is moot
 while the page is off. To revive: put `getHeadlines(env, dateStr, getCurrentPeriod())` back in the
 6-hourly `Promise.allSettled` in `handleScheduled` (and its label), and add the page in SenseCraft.
+
+## 83. Pipeline B Is No Longer Warmed; a Trial of One Picture for Both Home Panels (2026-10-16)
+
+Since #81 every panel converts a full-colour picture itself, so a picture made specially for a
+1-bit panel has no reader. `/fact1.png` (Pipeline B, SDXL, 1-bit) was generated every night but
+is on no panel's page list (read in SenseCraft on 2026-10-16). The cron no longer warms it and
+the alert check no longer watches it (four images, not five); `/health-detailed` drops it too.
+The route, its styles and its tests stay and it still generates on request, like the headlines
+in #82. Saves one SDXL call and one KV write a night and takes it out of the neuron-budget chain.
+
+The owner also agreed a trial: the home E1001 shows `/color/moment` in place of `/fact` and
+`/skyline` in place of `/skyline-bw`, so the two home pictures come from the colour pipelines
+converted by the panel. If the owner likes it on the panel, the next step retires the `/fact`
+picture (one FLUX image, ~1,364 neurons a day) and the B&W skyline; if not, the page list goes
+back. Nothing in the code changes for the trial itself.

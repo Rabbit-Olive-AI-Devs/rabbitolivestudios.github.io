@@ -647,7 +647,7 @@ function handleHealth(): Response {
 }
 
 /**
- * KV keys that should hold the day's five images (plus the shared moment event),
+ * KV keys that should hold the day's four images (plus the shared moment event),
  * accounting for birthdays and the configured skyline mode.
  *
  * Shared by /health-detailed and the alert check so the two can never disagree
@@ -664,7 +664,6 @@ function dailyImageKeys(dateStr: string, monthNum: number, dayNum: number) {
     colorStyle,
     keys: {
       fact4_gray: birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr),
-      fact1_1bit: fact1CacheKey(dateStr),
       color_moment: birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id),
       skyline: skylineCacheKey(dateStr, skylineMode, DEFAULT_ROTATE_MIN, bucket),
       skyline_bw: skylineCacheKey(dateStr, skylineMode, DEFAULT_ROTATE_MIN, bucket, true),
@@ -673,8 +672,9 @@ function dailyImageKeys(dateStr: string, monthNum: number, dayNum: number) {
   };
 }
 
-/** The five generated images the alert watches (moment_event is metadata, not a panel image). */
-const ALERT_WATCHED_IMAGES = ["fact4_gray", "fact1_1bit", "color_moment", "skyline", "skyline_bw"] as const;
+/** The four generated images the alert watches (moment_event is metadata, not a panel image).
+ * /fact1.png is not among them: no panel shows it and the cron no longer makes it (DECISIONS #83). */
+const ALERT_WATCHED_IMAGES = ["fact4_gray", "color_moment", "skyline", "skyline_bw"] as const;
 
 async function handleHealthDetailed(env: Env): Promise<Response> {
   const { month, day, dateStr } = getChicagoDateParts();
@@ -705,7 +705,7 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 
   // Determine daily image keys (birthday-aware)
   const { keys: dailyKeys, colorStyle } = dailyImageKeys(dateStr, monthNum, dayNum);
-  const { fact4_gray: fact4Key, fact1_1bit: fact1Key, color_moment: colorMomentKey,
+  const { fact4_gray: fact4Key, color_moment: colorMomentKey,
           skyline: skylineKey, skyline_bw: skylineBwKey, moment_event: momentKey } = dailyKeys;
   const aiBudgetBlock = await getAiBudgetBlock(env);
 
@@ -720,13 +720,12 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 
   // Fetch all keys in parallel
   const [
-    fact4Raw, fact1Raw, colorMomentRaw, skylineRaw, skylineBwRaw, momentRaw,
+    fact4Raw, colorMomentRaw, skylineRaw, skylineBwRaw, momentRaw,
     weatherHomeRaw, weatherOfficeRaw,
     alertsHomeRaw, alertsOfficeRaw,
     deviceHomeRaw, deviceOfficeRaw, deviceDeskRaw,
   ] = await Promise.all([
     env.CACHE.get(fact4Key),
-    env.CACHE.get(fact1Key),
     env.CACHE.get(colorMomentKey),
     env.CACHE.get(skylineKey),
     env.CACHE.get(skylineBwKey),
@@ -748,7 +747,6 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
       date_chicago: dateStr,
       daily_images: {
         fact4_gray:   { cached: fact4Raw !== null,       key: fact4Key },
-        fact1_1bit:   { cached: fact1Raw !== null,       key: fact1Key },
         color_moment: { cached: colorMomentRaw !== null, key: colorMomentKey, style: colorStyle.id },
         skyline:      { cached: skylineRaw !== null,     key: skylineKey },
         skyline_bw:   { cached: skylineBwRaw !== null,   key: skylineBwKey },
@@ -873,7 +871,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
 }
 
 /**
- * Generate the day's five images (plus fact.json and the shared moment) for
+ * Generate the day's four images (plus fact.json and the shared moment) for
  * `dateStr`, skipping anything already cached. Sequential, budget-aware.
  */
 async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
@@ -936,29 +934,10 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
     }
   }
 
-  // 2. Pipeline B
-  if (!budgetExhausted) {
-    try {
-      const keyB = fact1CacheKey(dateStr);
-      if (await env.CACHE.get(keyB)) {
-        console.log(`Cron: Pipeline B already cached for ${dateStr}`);
-      } else {
-        const png1 = await generateMomentImage1Bit(env, sharedMoment, displayDate, dateStr);
-        await env.CACHE.put(keyB, pngToBase64(png1), { expirationTtl: 604800 });
-        console.log(`Cron: cached 1-bit image for ${dateStr}`);
-      }
-    } catch (err) {
-      if (isNeuronError(err)) {
-        budgetExhausted = true;
-        await markAiBudgetExhausted(env, "cron Pipeline B", err);
-        console.error("Cron: neuron budget exhausted at Pipeline B");
-      } else {
-        console.error("Cron: Pipeline B failed:", err);
-      }
-    }
-  }
+  // Pipeline B (/fact1.png) is not warmed: no panel shows it (DECISIONS #83). The route
+  // still generates it on request.
 
-  // 3. Color moment
+  // 2. Color moment
   if (!budgetExhausted && !birthday) {
     try {
       const colorStyle = getColorMomentStyle(dateStr);
@@ -985,7 +964,7 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
     }
   }
 
-  // 4. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
+  // 3. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
   if (!budgetExhausted) {
     try {
       const skylineDailyKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0);

@@ -61,7 +61,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/color/weather` | E1002 | Colour HTML weather dashboard (Spectra 6 accents) |
 | `/fact.png` | E1001 | Moment Before PNG, full colour as-is with a black caption bar; the panel converts it (#81). Birthday portrait on family birthdays |
 | `/fact` | E1001 | HTML page with the `/fact.png` picture **inlined** (one request since #81), text fallback |
-| `/fact1.png` | E1001 | 1-bit Moment Before PNG, 6 rotating styles |
+| `/fact1.png` | none (no panel shows it; not warmed since 2026-10-16, #83) | 1-bit Moment Before PNG, 6 rotating styles; generates on request |
 | `/color/moment` | E1002 | HTML with the Spectra-6 dithered Moment image inlined as base64 |
 | `/skyline`, `/skyline-bw` | E1002, E1001 | HTML with the daily skyline PNG inlined as a `data:` URI |
 | `/skyline.png` | — | The skyline PNG itself (`?bw=1`, `?mode=daily\|rotate\|random`) |
@@ -105,7 +105,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 - `35 4,5 * * *` — the daily image warm. It fires *before* Chicago midnight and fills the keys for the date the panels are **about to** ask for (`dailyWarmTargetDate()`), so a panel poll is never the thing that triggers generation (#64). It is one expression with two fire times because the account is at the free plan's cap of 5 cron triggers.
 - `5 0,6,12,18 * * *` — refreshes both weather locations and all three devices' telemetry (no headlines since #82), warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check.
 
-The daily warm runs its pipelines **sequentially in priority order** (Pipeline A or birthday, Pipeline B, colour moment, skyline, skyline BW), skips any key that already exists, and stops at the first neuron-budget error.
+The daily warm runs its pipelines **sequentially in priority order** (Pipeline A or birthday, colour moment, skyline, skyline BW; Pipeline B is no longer warmed, #83), skips any key that already exists, and stops at the first neuron-budget error.
 
 **Off-Worker jobs on the Mac mini** (LaunchAgents, logs in `~/Library/Logs/eink-series/` and `/tmp`): `com.eink.tars-report` (TARS, every 30 min, #69); `com.eink.series-mailbox` (handles Jarvis's mailbox within minutes of a file arriving, #72); `com.eink.series-weekly` (Wednesdays 09:05: writes Claude's next due chapter, #72); `com.eink.series-heartbeat` (Mondays 08:00: a status note for Jarvis of what is late, due and on air, no AI, #76). The series jobs need the external SSD mounted, because Dropbox syncs to `/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox`. They start through `scripts/materialize-exec.py`, because Dropbox keeps files online-only and a launchd job may not download them otherwise (reads fail with "Unknown system error -11").
 
@@ -189,7 +189,7 @@ Supporting mechanisms:
 
 **The series** degrades on its own path: an unapproved or missing chapter shows the last approved scene; a missing page or broken `schedule.json` gives the text page; between seasons a "coming soon" or "returns soon" card shows. The alert check also emails when a chapter airing within 7 days is not approved, when a season ends within 14 days with nothing after it, or when the page for now is missing (#71).
 
-**Alerting** (`src/alert.ts`, #60): graceful degradation hides failures, and two multi-day outages were found only by looking at a panel. The 6-hourly cron now checks whether the day's five images are in KV and whether the budget block is armed, and emails on a *change* of state through Cloudflare Email Routing. A KV fingerprint limits it to one email per distinct problem, one reminder per 24h, and one recovery notice. It skips Chicago hours before 3 so it cannot race the warm. When you add a failure mode, ask whether this check would catch it.
+**Alerting** (`src/alert.ts`, #60): graceful degradation hides failures, and two multi-day outages were found only by looking at a panel. The 6-hourly cron now checks whether the day's four images are in KV (five until #83 dropped `/fact1.png`) and whether the budget block is armed, and emails on a *change* of state through Cloudflare Email Routing. A KV fingerprint limits it to one email per distinct problem, one reminder per 24h, and one recovery notice. It skips Chicago hours before 3 so it cannot race the warm. When you add a failure mode, ask whether this check would catch it.
 
 ## 9. Non-negotiable rules
 

@@ -144,7 +144,7 @@ This project has independent image pipelines. They share the LLM event selection
 | Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | 5-style rotation (gouache/oil/graphic/ink/woodblock) | 14-style rotation (6 BW + 8 color) |
 | Output | Full colour as-is (panel converts, #81) | 1-bit (Bayer or threshold) | Full colour as-is (panel converts, #81) | Full colour as-is, both modes (#81) |
 | Cache key | `fact4:v5:YYYY-MM-DD` | `fact1:v7:YYYY-MM-DD` | `color-moment:v3:YYYY-MM-DD:STYLE_ID` | default `skyline:v4:DATE:daily[:bw]`; rotate `skyline:v4:DATE:rN:bBUCKET[:bw]` |
-| Display | E1001 (mono) | E1001 (mono) | E1002 (Spectra 6) | E1002 (Spectra 6) |
+| Display | E1001 (mono) | none — on request only, not warmed (#83) | E1002 (Spectra 6) | E1002 (Spectra 6) |
 
 ---
 
