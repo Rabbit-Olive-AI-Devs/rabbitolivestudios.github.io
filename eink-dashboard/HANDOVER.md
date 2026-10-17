@@ -256,7 +256,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 308 tests (+ `python3 -E -P -m unittest discover -s scripts -p 'test_family_pick.py'`, 7)
+npm run test:utils        # compiles to /tmp, runs node --test; 314 tests (+ `python3 -E -P -m unittest discover -s scripts -p 'test_family_pick.py'`, 7)
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -343,6 +343,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 - ~~Check that the 17 October pictures were made~~ **resolved:** Jarvis drew both (Loma Prieta fresco, Mexico City cyanotype; `drawn_by: jarvis`). Owner on the mono E1001s: the fresco moment was too dark, Mexico City lovely; keep as-is for now. If dark mono pictures recur, offer a mono-only lightened page (lift tones, or our own Atkinson 1-bit), colour panel unchanged.
 - **Holiday weeks (#91, released in v3.23.0):** the first themed day is 25 Oct (Halloween week; brief on the evening of the 24th). 31 Oct is Álvaro's birthday, so only the skyline goes Halloween that day. Ask the owner's verdict.
+- **Desk story page (#93) built 2026-10-17:** `/desk/castaway`. The owner asked for a total surprise, so never show or describe its content to them. Waiting for Jarvis's answer about the owner's tastes (mailbox question 2026-10-17-1734) to season it. The owner decides when it joins the desk rotation.
 - **Family Memory (#92) built and deployed 2026-10-17** (plan `docs/superpowers/plans/2026-10-17-family-memory.md`): `/color/family`, KV `family:v1:<date>`, R2 `family/<date>/photo.{jpg,json}` and `art/<date>/family`; the pick runs inside the 17/19/21h art-brief job (`scripts/family-pick.py`, `family-fetch`). **Added to the panels by Claude on 2026-10-17 at the owner's request** (SenseCraft canvases with one HTML widget at 0,0, 800x480: "Family Memory" on the home E1001, 4-level grayscale like its other canvases; "Family Memory Color" on the office E1002, full colour), then Apply. **Open:** check the first evenings in `mailbox.log` (`family <date>: …`); the downloader is `~/Applications/EinkFamilyFetch.app` (rebuild: `scripts/build-family-fetch.sh`); the owner granted it Photos access on 2026-10-17. If `mailbox.log` says "no Photos access", re-grant it in System Settings → Privacy & Security → Photos. First run worked under launchd: 18 Oct's photo (album, 19 Oct 2024) was put up and the brief resent with it. The alert watches it from 19 Oct.
 - Family example portraits for the owner: Thiago (Oil Portrait test), Sônia and Teteu are on the private examples page (https://claude.ai/artifact/Cn4Pt1Nsd3PePgKm1JNmpR), made with the old references. Still to make with the Photos-library references: Gilmara, João Pedro, Lucas, Álvaro, Mariana, Theo. At most four or five a day, only after a clean reset (#88). Generate locally: seed the local R2 with the prepared crops, then `/color/test-birthday?name=KEY`.
 - Thiago's birthday on 20 October is the first real colour birthday portrait on both home panels (2026 style: Pointillist). Ask the owner how it looked.
@@ -402,6 +403,7 @@ This is separate from the Muse firmware experiment above, which concerns the fir
 | Skyline | `src/skyline.ts`, `src/skyline-image.ts`, `src/pages/skyline.ts` |
 | Art styles (shared) | `src/art-styles.ts` |
 | Holiday weeks (#91) | `src/holidays.ts` |
+| Desk story page (#93, spoilers: never describe it to the owner) | `src/castaway.ts`, `src/castaway-story.ts`, `src/hud/castaway-draw.ts`, `src/hud/castaway-page.ts`, `src/hud/shapes.ts` |
 | Family Memory (#92) | `src/family.ts`, `src/pages/family.ts`, `scripts/family-pick.py`, `scripts/family-fetch.swift` |
 | Birthday | `src/birthday.ts`, `src/birthday-image.ts`; references: `scripts/pick-portraits-from-photos.py` → `scripts/prepare-portraits.py` (+ `portrait-faces.swift`) → `npm run upload-photos` |
 | Weather | `src/weather.ts`, `src/weather-nws.ts`, `src/alerts.ts`, `src/device.ts`, `src/weather-ui.ts`, `src/pages/weather2.ts`, `src/pages/color-weather.ts` |

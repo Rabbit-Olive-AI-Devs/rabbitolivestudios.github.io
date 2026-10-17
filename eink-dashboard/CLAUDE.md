@@ -56,6 +56,7 @@ Every session must begin with these steps:
 | Spending AI on test generations (portraits, styles) | Read real usage from GraphQL `aiInferenceAdaptiveGroups` first, and until ~06:00 UTC **add the previous UTC day's total**: Cloudflare's daily reset lags, and a refusal arms the budget block for the whole day, which can cost the nightly warm (DECISIONS #88). Leave room for the warm (~2,000-2,800) |
 | Touching the daily pictures, `src/art.ts` or `/art/brief` | Jarvis draws them from the brief, and Workers AI only fills what he did not deliver (DECISIONS #89). Keep the brief built from the Worker's own choices (event, `momentStyleFor`, skyline picks, `getBirthdayStyle`), so both sources agree. The warm takes R2 `art/<date>/<kind>` first. A refused event pick is never cached; the brief then lets Jarvis choose the event (`chooseEvent`), and his `title/year/place` lines become the caption. The alert emails when Jarvis missed a night (markers `art/used/<date>/<kind>`) or the Mac mini stops reporting to TARS (#90) |
 | Adding or changing a holiday week | One entry in `src/holidays.ts` (DECISIONS #91): ASCII name (the skyline caption font), skyline dressing without snow (southern cities), a documented history event for the day itself. The test keeps weeks from overlapping. A theme change only affects dates not yet cached, so no cache-key bump is needed unless non-holiday prompts change |
+| Touching the desk story page (`src/castaway*.ts`, `/desk/castaway`) | It is a surprise the owner asked not to be told about: never show, quote or summarise its content to them, in chat, docs or commit messages (DECISIONS #93). Clock-driven, no AI, no KV writes; keep every line within the tests' fit and glyph checks |
 | Touching Family Memory (`src/family.ts`, `/color/family`, `scripts/family-pick.py`) | The photo comes from the owner's album, then Favourites, then the album's closest day: wide only, at least 11 months old, once per round, no names on the panel (DECISIONS #92). Never write the album's share link anywhere; never commit photos, the shown log or `people.json`. Copy Photos.sqlite to the external drive, not the Mac's disk (short of space). No Workers AI: Jarvis or the photo itself |
 | Refreshing the birthday reference photos | `scripts/pick-portraits-from-photos.py` on a read-only copy of the Photos database → review the crops' contact sheet → `npm run upload-photos` (needs `hints.json` so group photos crop the right face). Never commit photos or the people/hints files (DECISIONS #87) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
@@ -334,6 +335,8 @@ eink-dashboard/
     art.ts                — Jarvis's daily pictures: the brief (`/art/brief`), and the warm taking his R2 deliveries before Workers AI (DECISIONS #89)
     art-styles.ts         — The shared art-style library (71 styles, each tagged moment/skyline/portrait) + seeded daily pick (DECISIONS #86)
     family.ts             — Family Memory: the brief's family picture, the warm's store (Jarvis's repainting or the photo itself), caption (DECISIONS #92)
+    castaway.ts           — Desk story page engine: day number, storylines, moments, cached-context reads (DECISIONS #93). SPOILERS: never describe it to the owner
+    castaway-story.ts     — Its story bank (SPOILERS)
     holidays.ts           — Holiday weeks: the 7 days up to each holiday dress the skyline and add a mood to the moment; on the day the moment is the holiday's history (DECISIONS #91)
     birthday.ts           — Birthday data + detection
     tars.ts               — Desk panel TARS: cleans and merges the Macs' reports into KV `tars:v1:state`, builds the page's view (DECISIONS #69)
@@ -400,6 +403,9 @@ eink-dashboard/
       planet-page.ts      — layout of the planet-of-the-day page + number formatting
       tars-page.ts        — layout of the TARS page (machines, quota table, cards)
       crest.ts            — a club crest PNG → 96x96 RGB (transparency as paper; the panel converts, #81), and drawing it
+      shapes.ts           — filled/outlined polygons, ellipses, arcs, curves for drawn pictures
+      castaway-draw.ts    — the desk story page's picture, drawn from shapes with a white halo layer (#93)
+      castaway-page.ts    — its layout (scene, story text, log)
       flamengo-page.ts    — layout of the Flamengo board (table, next match, cards) + fitting names to their places
     pages/
       weather2.ts         — /weather HTML page (E1001 mono)

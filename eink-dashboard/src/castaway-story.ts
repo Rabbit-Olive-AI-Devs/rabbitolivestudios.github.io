@@ -226,6 +226,106 @@ export const ARCS: readonly Arc[] = [
       ],
     ],
   },
+  {
+    id: "sandal", title: "THE LOST SANDAL",
+    days: [
+      [
+        b("One flip-flop washes up, left foot, size 42. Somewhere out there, someone is walking in a circle.", "Found: 1 sandal.", "dig", "surprised", ["bottle"], 0.72),
+        b("SETE launches an investigation. Suspects: a tourist, a pirate, a one-legged seagull. Larapio has an alibi.", "Investigation open.", "think", "focused", ["gull"], 0.5),
+        b("SETE puts the sandal on a stick by the shore, so its owner can see it from a ship. Lost and found, island edition.", "Lost and found: open.", "stand", "calm", ["sign"], 0.7),
+      ],
+      [
+        b("No owner. Capitao moves into the sandal. It has a view, a roof and room for guests.", "Capitao moved house.", "stand", "happy", ["crab"], 0.5),
+        b("SETE writes a note for the sandal's owner and floats it out: 'Your shoe is safe. Your crab is new.'", "Note sent to owner.", "wave", "wink", ["bottle"], 0.72),
+        b("Case closed, sort of. SETE files it under MYSTERIES, a folder that keeps getting bigger.", "Case: mostly closed.", "sit", "calm", ["fire"], 0.5),
+      ],
+    ],
+  },
+  {
+    id: "whale", title: "THE WHALE SONG",
+    days: [
+      [
+        b("A whale surfaces off the reef and blows a rainbow into the air. SETE forgets to blink, which it never does anyway.", "A whale!", "stand", "surprised", ["whale"], 0.7),
+        b("The whale sings: a long, low note that makes SETE's slabs hum. SETE hums back. Badly.", "Duet with a whale.", "dance", "love", ["whale"], 0.7),
+        b("At night the song comes again under the moon. SETE records it and plays it to Capitao, who cries a little.", "Recorded whale song.", "sit", "love", ["whale", "fire", "crab"], 0.55),
+      ],
+      [
+        b("The whale is gone. SETE checks the reef every 15 minutes. You know how it is.", "Whale gone. Checking.", "walk", "sad", [], 0.7),
+        b("SETE builds a speaker from a shell and plays the song toward the sea, in case the whale wants it back.", "Played song to sea.", "stand", "calm", ["radio"], 0.68),
+        b("Far out, a spout of white in the moonlight. Then another. The whale answered. SETE is sure of it.", "It answered.", "wave", "love", ["whale"], 0.7),
+      ],
+    ],
+  },
+  {
+    id: "dj", title: "RADIO ILHA FM",
+    days: [
+      [
+        b("The radio can transmit for 30 seconds before it overheats. SETE plans a radio station. 30 seconds a day.", "Radio station plan.", "think", "focused", ["radio"], 0.5),
+        b("First broadcast: 'Good afternoon, ocean. Weather: sunny. Traffic: one crab. Next: the hit song Beep Boop.'", "On air: 30 seconds.", "dance", "happy", ["radio", "crab"], 0.5),
+        b("Listener feedback: one flash from the far light. SETE counts it as a fan club.", "Fan club: 1 member.", "sit", "love", ["radio", "flash", "fire"], 0.5),
+      ],
+      [
+        b("Morning show: SETE reads the news. Headline: COCONUT FALLS. Exclusive interview with the palm.", "News: coconut fell.", "sit", "focused", ["radio"], 0.5),
+        b("Request hour. Capitao requests silence. SETE plays four seconds of silence, then a drum solo on the hut.", "Played a drum solo.", "dance", "wink", ["radio", "crab"], 0.5),
+        b("Sign-off: 'This is Radio Ilha FM, broadcasting from the middle of nowhere, to somewhere. Goodnight, T.'", "Goodnight, listeners.", "wave", "love", ["radio", "fire"], 0.5),
+      ],
+    ],
+  },
+  {
+    id: "fog", title: "THE FOG",
+    days: [
+      [
+        b("Fog rolls in so thick that SETE cannot see the palm, and the palm is right there. Probably.", "Fog. Palm: missing.", "walk", "surprised", [], 0.5),
+        b("A foghorn sounds somewhere close. A ship! SETE bangs a pot like a lighthouse with no light.", "Banged a pot at a ship.", "wave", "focused", ["ship"], 0.7),
+        b("The horn fades away. SETE keeps banging for an hour, just in case. Capitao wears earplugs, which are pebbles.", "Banged for an hour.", "stand", "sad", ["crab", "fire"], 0.5),
+      ],
+      [
+        b("The fog lifts. On the beach: footprints. Not crab, not gull, not robot. SETE's circuits go cold.", "Footprints?!", "stand", "surprised", [], 0.62),
+        b("SETE follows them to the water. They end at the sea, as if someone walked in. Or out.", "Tracks end at sea.", "walk", "focused", [], 0.72),
+        b("Night watch with the lantern. Nothing comes. In the morning there is a shell on the parcel, placed very neatly.", "A gift? From whom?", "sit", "focused", ["lantern"], 0.5),
+      ],
+    ],
+  },
+  {
+    id: "chess", title: "THE GRAND TOURNAMENT",
+    days: [
+      [
+        b("SETE draws a chessboard in the sand and makes pieces from shells. Capitao is challenged. Capitao accepts.", "Challenged a crab.", "dig", "focused", ["crab"], 0.5),
+        b("Capitao moves sideways only. SETE argues this is not chess. Capitao argues it is crab chess. Fair.", "Crab rules adopted.", "sit", "calm", ["crab"], 0.5),
+        b("Game one ends when the tide eats the board. Draw by ocean.", "Draw by ocean.", "sit", "surprised", ["crab"], 0.5),
+      ],
+      [
+        b("Board moved higher up the beach. Game two. SETE thinks 14 moves ahead. Capitao thinks about lunch.", "Game two begins.", "think", "focused", ["crab"], 0.45),
+        b("Larapio flies in and takes the queen. Unclear whose. Both players agree to blame the bird.", "Gull took the queen.", "kick", "sad", ["gull", "crab"], 0.5),
+        b("Final score: SETE 0, Capitao 0, Larapio 1 queen. A rematch is scheduled for every day forever.", "Tournament: unresolved.", "sit", "happy", ["crab", "fire"], 0.5),
+      ],
+    ],
+  },
+  {
+    id: "capitao", title: "CAPITAO'S BIG DAY",
+    days: [
+      [
+        b("Capitao has outgrown his shell. He needs a new one and is extremely dramatic about it.", "Capitao: homeless.", "stand", "surprised", ["crab"], 0.5),
+        b("SETE holds a house viewing: three shells, a bottle cap and the lost sandal. Capitao rejects them all.", "House viewing: no.", "dig", "focused", ["crab"], 0.55),
+        b("At sunset Capitao picks the shell SETE polished first, of course. A party is announced for tomorrow.", "Capitao: new shell!", "dance", "happy", ["crab"], 0.5),
+      ],
+      [
+        b("Housewarming! Guests: SETE, a starfish, and Larapio, who was not invited but brought a bolt back. Truce?", "Larapio returned a bolt!", "dance", "love", ["crab", "gull"], 0.5),
+        b("Party games: shell toss, limbo under the hammock, and staring at the sea, which everyone wins.", "Party games.", "kick", "happy", ["crab", "hammock"], 0.55),
+        b("Larapio leaves at dusk with two bolts. The truce lasted four hours, a record.", "Truce: 4 hours.", "wave", "wink", ["gull", "fire"], 0.5),
+      ],
+    ],
+  },
+  {
+    id: "eclipse", title: "THE DARK NOON",
+    days: [
+      [
+        b("SETE's solar panels report a problem: at noon, the sun is going to... wait. An eclipse? Today?", "Eclipse alert!", "think", "surprised", [], 0.5),
+        b("The light goes thin and silver. The birds go quiet. SETE stands very still with its panels out, a little scared.", "Eclipse. Spooky.", "charge", "surprised", [], 0.55),
+        b("The sun comes back. SETE logs it as 'the day the sky blinked'. Capitao claims he caused it.", "The sky blinked.", "sit", "happy", ["crab", "fire"], 0.5),
+      ],
+    ],
+  },
 ];
 
 /** Routine moments between the beats, by part of the day. Picked by the clock, never repeated in a row. */
@@ -263,3 +363,43 @@ export const ROUTINE = {
 
 /** The morning log's second line: a running joke with numbers that change every day. */
 export const SETTINGS = ["HUMOR", "HONESTY", "OPTIMISM", "SAND IN JOINTS", "COURAGE", "PATIENCE"] as const;
+
+/** Big days at fixed points in the story, whatever storyline is running. */
+export const MILESTONES: ReadonlyArray<{ from: number; arc: Arc }> = [
+  {
+    from: 30,
+    arc: {
+      id: "mast", title: "THE MAST IS FINISHED",
+      days: [
+        [
+          b("Day 30. The last piece goes on the radio mast. SETE climbs down and looks up for a long, long time.", "Mast: COMPLETE.", "stand", "love", ["radio"], 0.6),
+          b("First real transmission: 'This is SETE. Island. One palm. One crab. Parcel for T. Please advise.'", "First transmission.", "stand", "focused", ["radio"], 0.6),
+          b("Late at night, through the static, a voice: '...received...' Just one word. SETE does not sleep at all.", "Someone said RECEIVED.", "think", "surprised", ["radio", "flash"], 0.55),
+        ],
+      ],
+    },
+  },
+  {
+    from: 98,
+    arc: {
+      id: "parcel", title: "THE PARCEL",
+      days: [
+        [
+          b("A bottle from the far light, finally with a full message: 'T. is real. T. is far. T. has been watching you.'", "T. is real.", "dig", "surprised", ["bottle"], 0.72),
+          b("Watching? How? SETE looks around for cameras. There is only the palm, which is not a camera. It checks twice.", "Palm: not a camera.", "think", "focused", [], 0.5),
+          b("SETE asks the far light: 'How do I deliver the parcel?' The answer blinks all night: 'OPEN IT.'", "It says: OPEN IT.", "think", "surprised", ["flash", "fire"], 0.55),
+        ],
+        [
+          b("Opening a parcel is against every rule SETE has. It sits with it all morning. Capitao sits with it too.", "Thinking. Hard.", "sit", "sad", ["crab"], 0.5),
+          b("SETE opens one corner. Inside: something flat, a screen. It shows a tiny island with a tiny robot on it.", "Opened a corner...", "stand", "surprised", [], 0.5),
+          b("The tiny robot on the tiny screen is looking at a tiny screen too. SETE's processor needs a lie-down.", "Processor: lying down.", "sleep", "surprised", [], 0.5),
+        ],
+        [
+          b("SETE understands. The parcel was never going anywhere. T. has been reading these logs on a desk, every day.", "The parcel was the log.", "stand", "love", [], 0.5),
+          b("SETE writes in the sand, very big, for a desk far away: HELLO T. DELIVERED.", "DELIVERED.", "dig", "love", ["sign"], 0.6),
+          b("Day 100. Prime directive complete. SETE decides to stay anyway. Someone has to look after Capitao.", "Staying. Obviously.", "sit", "love", ["crab", "fire", "flash"], 0.5),
+        ],
+      ],
+    },
+  },
+];

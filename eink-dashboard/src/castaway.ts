@@ -8,7 +8,7 @@
  */
 
 import type { Light, Prop, Scene, Weather } from "./hud/castaway-draw";
-import { ARCS, ARRIVAL, ROUTINE, SETTINGS } from "./castaway-story";
+import { ARCS, ARRIVAL, MILESTONES, ROUTINE, SETTINGS } from "./castaway-story";
 import type { Arc, Beat } from "./castaway-story";
 import { seededRandom, shuffledIndices } from "./art-styles";
 import { holidayWeek } from "./holidays";
@@ -69,7 +69,10 @@ export function dayNumber(date: string): number {
 /** Which storyline a day belongs to, and which of its days. Days before the epoch replay the arrival. */
 export function arcFor(day: number): { arc: Arc; index: number } {
   if (day <= ARRIVAL.days.length) return { arc: ARRIVAL, index: Math.max(0, day - 1) };
-  let left = day - ARRIVAL.days.length - 1;
+  for (const m of MILESTONES) if (day >= m.from && day < m.from + m.arc.days.length) return { arc: m.arc, index: day - m.from };
+  // Storyline days: every day after the arrival that is not a milestone day.
+  const milestoneDaysBefore = MILESTONES.reduce((n, m) => n + Math.max(0, Math.min(m.arc.days.length, day - m.from)), 0);
+  let left = day - ARRIVAL.days.length - 1 - milestoneDaysBefore;
   let last = -1;
   for (let cycle = 0; cycle < 10_000; cycle++) {
     // Each cycle walks every storyline once, in a fresh order; no back-to-back repeat across cycles.

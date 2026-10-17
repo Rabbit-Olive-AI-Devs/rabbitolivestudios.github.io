@@ -4163,3 +4163,37 @@ brief was resent with it before Jarvis's 17:10 run.
 **Released as v3.23.0 (2026-10-17, owner's approval):** #91, holiday weeks theming the skyline and
 the moment, and #92, the Family Memory page `/color/family`. The owner asked Claude to add the page to
 the home E1001 and the office E1002 in SenseCraft.
+
+---
+
+## 93. A Self-Playing Story on the Desk Panel (2026-10-17)
+
+The owner asked for the saved "self-playing adventure" idea, pointed at the old *Johnny Castaway*
+screensaver as inspiration, and asked for a complete surprise: "create our own twist/story/universe,
+just don't tell me what it is". So this record says how it works, not what it shows.
+**Spoilers live in `src/castaway-story.ts` and `src/castaway.ts`. Do not show them to the owner, and
+do not describe the story to them.**
+
+- **The page.** `/desk/castaway` is drawn by the Worker in the desk style: real fonts, nothing
+  under `plex11m`, pure black and white (#66, #67). It has a scene picture across the top, the
+  story below it, and a short log of earlier moments. `src/hud/castaway-draw.ts` draws the picture
+  from shapes (`src/hud/shapes.ts`). The island layer is composited with a white halo, so strokes
+  stay readable on a night sky.
+- **The clock drives it.** Everything follows from the Chicago date and time: the day number since
+  2026-10-18, the storyline, the moment of the day, and the light. That gives about a dozen moments
+  a day, which suits a panel that rotates several pages. Storylines run in shuffled cycles, with
+  no back-to-back repeat, and a few milestone days are fixed in time.
+- **No AI and no KV writes.** It only reads what the Worker already caches: the home weather and
+  sunrise/sunset, tonight's planet, and the Flamengo board. Each is optional, and the page draws
+  without them.
+- **No mockup, by the owner's choice.** That is an exception to the desk rule "show the owner a
+  mockup before building a new look". They judge it on the panel.
+- **Jarvis was asked about the owner's tastes**, through the mailbox, with no details of the page.
+  His answer, when it comes, seasons the jokes and references.
+- **Tests:** `tests/castaway.test.js` checks that the page draws at every quarter hour across two
+  months, that every line fits, and that every character has a glyph in the fonts. It also covers
+  the calendar moments, the weather mapping and a match day.
+- **Follow-ups:**
+  - Add storylines over time; the bank holds about 50 days before a cycle repeats.
+  - Some storylines assume an earlier state of the story. A later version can vary them by day
+    number.

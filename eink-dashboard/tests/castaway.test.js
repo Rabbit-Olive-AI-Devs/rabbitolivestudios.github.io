@@ -6,7 +6,7 @@ const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
 const fromBuild = (p) => require(path.join(buildDir, p));
 
 const { castawayView, dayTimeline, dayNumber, arcFor, islandWeather, matchOn, lightAt } = fromBuild("src/castaway.js");
-const { ARCS, ARRIVAL, ROUTINE } = fromBuild("src/castaway-story.js");
+const { ARCS, ARRIVAL, ROUTINE, MILESTONES } = fromBuild("src/castaway-story.js");
 const { drawCastawayPage, wrap } = fromBuild("src/hud/castaway-page.js");
 const { measureType } = fromBuild("src/hud/type.js");
 const { FACES } = fromBuild("src/hud/fonts-data.js");
@@ -16,16 +16,19 @@ test("day numbers start on the epoch and storylines never repeat back to back", 
   assert.equal(dayNumber("2027-10-18"), 366);
   assert.equal(arcFor(1).arc.id, "arrival");
   assert.equal(arcFor(3).arc.id, "arrival");
+  assert.equal(arcFor(30).arc.id, "mast");
+  assert.deepEqual([arcFor(98).arc.id, arcFor(100).arc.id, arcFor(100).index], ["parcel", "parcel", 2]);
   let prev = null;
   for (let d = 4; d < 800; d++) {
     const { arc, index } = arcFor(d);
+    if (MILESTONES.some((m) => m.arc === arc)) continue;
     if (index === 0) { assert.notEqual(arc.id, prev, `day ${d}`); prev = arc.id; }
     assert.ok(index < arc.days.length);
   }
 });
 
 test("every beat fits the page and uses only glyphs the fonts have", () => {
-  const beats = [...ARRIVAL.days.flat(), ...ARCS.flatMap((a) => a.days.flat()), ...Object.values(ROUTINE).flat()];
+  const beats = [...ARRIVAL.days.flat(), ...ARCS.flatMap((a) => a.days.flat()), ...MILESTONES.flatMap((m) => m.arc.days.flat()), ...Object.values(ROUTINE).flat()];
   for (const b of beats) {
     assert.ok(wrap("plex13r", b.text, 548).length <= 3, `too long: ${b.text}`);
     assert.ok(measureType("plex12m", b.log) <= 192, `log too long: ${b.log}`);
