@@ -2,7 +2,7 @@
  * Birthday portrait generation pipeline.
  *
  * Uses FLUX.2 klein-9b with optional reference photos from R2.
- * Produces a 4-level grayscale 800x480 PNG with birthday caption.
+ * Produces an 800x480 full-colour PNG with a birthday caption (#81).
  */
 
 import { encodePNGRGB } from "./png";
@@ -12,13 +12,15 @@ import {
   burnCaption, drawText,
 } from "./image";
 import { jpegToRGB } from "./image-color";
-import { getArtStyle } from "./birthday";
+import { resolveBirthdayStyle } from "./birthday";
 import { isNeuronBudgetError } from "./cache-guard";
 import type { BirthdayPerson } from "./birthday";
 import type { Env } from "./types";
 
 const FLUX_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
-const FLUX_WIDTH = 1024;
+// 5:3, the panel's shape: a 4:3 picture lost a fifth of its height to the crop, often the
+// top of the head (#85).
+const FLUX_WIDTH = 1280;
 const FLUX_HEIGHT = 768;
 
 const BAR_H = 24;
@@ -39,7 +41,7 @@ export function ageDescription(person: BirthdayPerson, currentYear: number): str
 
 /**
  * Generate a birthday portrait image using FLUX.2 with optional R2 reference photos.
- * Returns 800x480 4-level grayscale PNG.
+ * Returns an 800x480 full-colour PNG.
  */
 export async function generateBirthdayImage(
   env: Env,
@@ -47,9 +49,7 @@ export async function generateBirthdayImage(
   currentYear: number,
   styleOverride?: number,
 ): Promise<Uint8Array> {
-  const style = styleOverride !== undefined
-    ? getArtStyle(2020 + styleOverride)  // 2020 % 10 === 0, so +N gives style N
-    : getArtStyle(currentYear);
+  const style = resolveBirthdayStyle(person, currentYear, styleOverride);
   const age = currentYear - person.birthYear;
 
   // Fetch up to 4 reference photos from R2
@@ -135,8 +135,14 @@ export async function callFluxPortrait(
     }
     const imageRefs = photos.length === 1
       ? "the person in image 0"
-      : `the person shown in images ${photos.map((_, i) => i).join(", ")}`;
-    prompt = `artistic portrait of ${imageRefs}, ${ageLine}, ${stylePrompt}, head and shoulders, centered composition, looking at viewer, smiling, no text, no words, no letters, no writing`;
+      : `the person shown in images ${photos.map((_, i) => i).join(", ")} (the same person in every photo)`;
+    // Likeness first: the references are face crops (scripts/prepare-portraits.py), and the
+    // prompt asks for the face to be kept and only the medium to change (DECISIONS #85).
+    prompt = `portrait of ${imageRefs}, ${ageLine}, rendered as ${stylePrompt}. ` +
+      "Keep their exact likeness from the photos: the same face shape, eyes, eyebrows, nose, mouth, smile, " +
+      "hairline, hairstyle, hair color, facial hair and skin tone, instantly recognizable. " +
+      "Only the artistic medium changes, not the face. Head and shoulders, centered, looking at the viewer, " +
+      "warm natural smile, eyes clearly visible, no sunglasses, no text, no words, no letters, no writing";
   } else {
     prompt = `artistic portrait of ${ageLine}, ${stylePrompt}, head and shoulders, centered composition, looking at viewer, smiling, no text, no words, no letters, no writing`;
   }

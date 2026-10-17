@@ -410,7 +410,9 @@ eink-dashboard/
     portraits/            — Birthday reference photos source
     skylines/             — Skyline reference photos source (30 cities, 65 photos)
   scripts/
-    upload-photos.sh      — Upload birthday photos to R2
+    upload-photos.sh      — Upload birthday photos to R2, prepared by prepare-portraits.py (#85)
+    prepare-portraits.py  — Birthday references for FLUX.2: upright, cropped to the face (Vision via portrait-faces.swift), under 512px; picks.json for group photos; contact sheet (#85)
+    portrait-faces.swift  — Prints the faces Apple's Vision finds in each image, as JSON (#85)
     download-skyline-photos.sh — Download skyline photos from Unsplash
     upload-skyline-photos.sh   — Upload skyline photos to R2
     tars-report.sh             — Runs on each Mac every 30 min (launchd): posts disk/memory/uptime + CodexBar snapshot to /desk/tars; key from the Keychain (DECISIONS #69)

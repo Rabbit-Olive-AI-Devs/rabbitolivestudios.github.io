@@ -236,7 +236,7 @@ Chicago date → birthday check (9 family members)
         Fetch up to 4 reference photos from R2 ("portraits/{key}_0.jpg" .. "{key}_3.jpg")
                 │
                 ▼
-        Pick art style (currentYear % 10 → 10 rotating styles)
+        Pick art style (24 styles; each person their own, one a year, #85)
                 │
                 ▼
         FLUX.2 klein-9b (multipart FormData, guidance 7.0, reference images)
@@ -248,17 +248,17 @@ Chicago date → birthday check (9 family members)
         Birthday caption (24px black bar: "Happy Birthday!" | "Name - age years" | style name)
                 │
                 ▼
-        Full-colour RGB PNG, picture untouched → KV cache (birthday:v2)   [until #81: tone curve → 4 levels]
+        Full-colour RGB PNG, picture untouched → KV cache (birthday:v3)   [until #81: tone curve → 4 levels]
 ```
 
-**Art styles** rotate yearly: Woodcut, Watercolor, Art Nouveau, Pop Art, Impressionist, Ukiyo-e, Art Deco, Pointillist, Pencil Sketch, Charcoal.
+**Art styles** (24, DECISIONS #85): Woodcut, Watercolor, Art Nouveau, Pop Art, Impressionist, Ukiyo-e, Art Deco, Pointillist, Pencil Sketch, Charcoal, Oil Portrait, Renaissance, Gouache, Graphic Novel, Ink + Wash, Linocut, Etching, Pastel, Klimt Gold, Van Gogh, Fauvist, Stained Glass, Mosaic, Storybook. Each person walks the whole list, one style a year, from their own starting place, so nobody repeats a style for 24 years and no two people share one in the same year (until #85 everyone got the same style, `year % 10`). The prompt asks FLUX.2 to keep the face from the reference photos and change only the medium, and the portrait is generated at 1280x768 (the panel's 5:3 shape) so the crop no longer cuts the top of the head. Test a style: `/color/test-birthday?name=thiago&style=10`.
 
 **Reference photos** are stored in R2 (`eink-birthday-photos` bucket). Upload with:
 ```bash
 npm run upload-photos
 ```
 
-Photos go in `photos/portraits/` with naming: `{key}_0.jpg`, `{key}_1.jpg`, etc. (max 4 per person, pre-resized to <512x512).
+Photos go in `photos/portraits/` with naming: `{key}_0.jpg`, `{key}_1.jpg`, etc. (max 4 per person, any size; never committed). `npm run upload-photos` runs `scripts/prepare-portraits.py`: it turns each photo upright, finds the faces with Apple's Vision framework (`scripts/portrait-faces.swift`, macOS), crops head and shoulders around the person and shrinks the crop under 512px, FLUX.2's limit. In a group photo it takes the largest face unless `photos/portraits/picks.json` names another (`{"theo_2": 1}`, or `{"lucas_2": {"face": 0, "rotate": 180}}`); check the contact sheet it writes. Close-ups without sunglasses give the best likeness (DECISIONS #85).
 
 ### Pipeline D: Color, as-is (`/color/moment`)
 

@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the colour-pictures commit (code, #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-16, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the birthday-likeness commit (code, #85: a birthday style per person, face-cropped reference photos, likeness prompt; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-16, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 84 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 85 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -118,9 +118,9 @@ All pipelines share one LLM-selected event per day through `getOrGenerateMoment(
 | | A: `/fact.png` | B: `/fact1.png` | C: birthday | D: `/color/moment` | E: skyline |
 |---|---|---|---|---|---|
 | Model | FLUX.2 klein-9b, SDXL fallback | SDXL | FLUX.2 + up to 4 R2 photos | FLUX.2, SDXL fallback | FLUX.2 + R2 reference photo, SDXL fallback; BW variant is SDXL only |
-| Style rotation | 3, by day of year | 6, by hash of date/title/location | 10, by year | 18, by day of year (every style, #84) | 19 styles over 30 cities (#84) |
+| Style rotation | 3, by day of year | 6, by hash of date/title/location | 24, each person their own, one a year (#85) | 18, by day of year (every style, #84) | 19 styles over 30 cities (#84) |
 | Output | Full colour as-is (#81) | 1-bit PNG (Bayer or threshold per style) | Full colour as-is (#81) | Full colour as-is (#81) | Full colour as-is, both modes (#81) |
-| Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v2:DATE`, `color-birthday:v2:DATE` | `color-moment:v4:DATE:STYLE` | `skyline:v5:DATE:daily[:bw]` |
+| Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v3:DATE`, `color-birthday:v3:DATE` | `color-moment:v4:DATE:STYLE` | `skyline:v5:DATE:daily[:bw]` |
 
 Facts that have each cost real debugging time:
 

@@ -10,8 +10,8 @@ export function parseDay(s: string): number {
   return (Number.isNaN(n) || n < 1 || n > 31) ? 1 : n;
 }
 
-export function parseStyleIdx(s: string | null): number | undefined {
+export function parseStyleIdx(s: string | null, count = 10): number | undefined {
   if (s === null) return undefined;
   const n = parseInt(s, 10);
-  return (Number.isNaN(n) || n < 0 || n > 9) ? 0 : n;
+  return (Number.isNaN(n) || n < 0 || n >= count) ? 0 : n;
 }

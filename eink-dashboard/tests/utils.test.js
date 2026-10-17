@@ -278,3 +278,17 @@ test("dailyWarmTargetDate warms tomorrow in the evening and today after midnight
   assert.equal(dailyWarmTargetDate("2026-12-31", 23), "2027-01-01");
   assert.equal(dailyWarmTargetDate("2026-09-10", 11), "2026-09-10");
 });
+
+test("birthday styles vary by person and walk the whole list (DECISIONS #85)", () => {
+  const { getBirthdayByKey, getBirthdayStyle, resolveBirthdayStyle, BIRTHDAY_STYLES } = fromBuild("src/birthday.js");
+  const thiago = getBirthdayByKey("thiago");
+  const sonia = getBirthdayByKey("sonia");
+  assert.equal(getBirthdayStyle(thiago, 2026).name, getBirthdayStyle(thiago, 2026).name);
+  const seen = new Set();
+  for (let y = 2026; y < 2026 + BIRTHDAY_STYLES.length; y++) seen.add(getBirthdayStyle(thiago, y).name);
+  assert.equal(seen.size, BIRTHDAY_STYLES.length);
+  assert.notEqual(getBirthdayStyle(thiago, 2026).name, getBirthdayStyle(sonia, 2026).name);
+  assert.equal(resolveBirthdayStyle(thiago, 2026, 2).name, BIRTHDAY_STYLES[2].name);
+  assert.equal(parseStyleIdx("23", BIRTHDAY_STYLES.length), 23);
+  assert.equal(parseStyleIdx("24", BIRTHDAY_STYLES.length), 0);
+});

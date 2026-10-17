@@ -14,7 +14,7 @@ import { getChicagoDateParts, shiftDateStr } from "../date-utils";
 import { findMostRecentCached } from "../stale-cache";
 import { getTodayEvents } from "../fact";
 import { getOrGenerateMoment, generateMomentBefore } from "../moment";
-import { getBirthdayToday, getBirthdayByKey, getArtStyle } from "../birthday";
+import { getBirthdayToday, getBirthdayByKey, getBirthdayStyle, resolveBirthdayStyle, BIRTHDAY_STYLES } from "../birthday";
 import type { BirthdayPerson } from "../birthday";
 import { callFluxPortrait, fetchReferencePhotos, ageDescription } from "../birthday-image";
 import { generateAndDecodeColorFlux, generateAndDecodeColor, jpegToRGB } from "../image-color";
@@ -183,9 +183,7 @@ async function generateColorBirthday(
   currentYear: number,
   styleOverride?: number,
 ): Promise<string> {
-  const style = styleOverride !== undefined
-    ? getArtStyle(2020 + styleOverride)
-    : getArtStyle(currentYear);
+  const style = resolveBirthdayStyle(person, currentYear, styleOverride);
 
   const photos = await fetchReferencePhotos(env, person.key);
   console.log(`Color birthday: found ${photos.length} reference photo(s) for ${person.key}`);
@@ -312,7 +310,7 @@ export async function buildColorMomentEntry(
 
   if (birthday) {
     const age = currentYear - birthday.birthYear;
-    const style = getArtStyle(currentYear);
+    const style = getBirthdayStyle(birthday, currentYear);
     moment = { year: currentYear, location: "", title: birthday.name, scene: "", imagePrompt: "" };
     try {
       imageB64 = await generateColorBirthday(env, birthday, currentYear);
@@ -491,12 +489,12 @@ export async function handleColorTestBirthday(env: Env, url: URL): Promise<Respo
     });
   }
   const styleParam = url.searchParams.get("style");
-  const styleIdx = parseStyleIdx(styleParam);
+  const styleIdx = parseStyleIdx(styleParam, BIRTHDAY_STYLES.length);
   const currentYear = new Date().getFullYear();
 
   try {
     await assertAiBudgetAvailable(env);
-    const style = styleIdx !== undefined ? getArtStyle(2020 + styleIdx) : getArtStyle(currentYear);
+    const style = resolveBirthdayStyle(person, currentYear, styleIdx);
     const age = currentYear - person.birthYear;
     const imageB64 = await generateColorBirthday(env, person, currentYear, styleIdx);
     const moment: MomentBeforeData = { year: currentYear, location: "", title: person.name, scene: "", imagePrompt: "" };

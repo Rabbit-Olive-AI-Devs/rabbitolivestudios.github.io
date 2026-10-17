@@ -3788,3 +3788,45 @@ today's is regenerated (two extra FLUX calls on deploy day, within budget).
 1-bit styles (its own conversion still needs them), the World Cup code (#61).
 To undo for one panel, put its old page back in SenseCraft. The routes still generate on request,
 and the cron warm can be restored from this commit's parent.
+
+## 85. Birthday Portraits: A Style Per Person, and Likeness From Face Crops (2026-10-16)
+
+The owner asked for more varied birthday styles and "more fidelity in the photos".
+
+**Styles.** Until now every birthday in a year got the same style (`year % 10`, ten styles):
+everyone in 2026 would have been Art Deco. Now there are 24 portrait styles. The ten old ones
+lose the 1-bit-era "high contrast black and white" and "bold" wording; the new ones are Oil
+Portrait, Renaissance, Gouache, Graphic Novel, Ink + Wash, Linocut, Etching, Pastel, Klimt Gold,
+Van Gogh, Fauvist, Stained Glass, Mosaic and Storybook. Each person walks the whole list, one
+style a year. Their starting place is spaced evenly by their position in `BIRTHDAYS`, so no two
+people share a style in the same year and nobody repeats one for 24 years. (A string hash was
+tried first: two of the nine keys collided and would have shared a style every year.) Styles
+that abstract the face away, such as cubism or caricature, are left out, because likeness comes
+first. `?style=N` on the test routes now accepts 0-23.
+
+**Likeness.** The reference photos in R2 were whole phone photos shrunk below 512px, FLUX.2
+klein's limit for input images. In most of them the face was a few dozen pixels wide (full-body
+shots, group photos). The old resize had also dropped the EXIF rotation, so several reached the
+model sideways or upside down, and some group photos put other family members' faces into the
+reference. Fixes:
+- `scripts/prepare-portraits.py` turns each original upright. It finds faces with Apple's Vision
+  framework (`scripts/portrait-faces.swift`) and crops head and shoulders around the person: 2.4
+  face widths, or 1.6 in a group photo so neighbours stay out. It shrinks the crop to 511px and
+  uploads it. `photos/portraits/picks.json` picks the face in group photos and can rotate a face
+  that is upside down in the scene. The script writes a contact sheet to check the result.
+  `npm run upload-photos` now runs it, so the raw originals can no longer be uploaded by mistake.
+  All 33 photos were redone on 2026-10-16. The previous R2 objects are kept in
+  `photos/r2-backup-2026-10-16/`, and photos are never committed.
+- The prompt tells the model that every image shows the same person. It asks for their exact
+  likeness: face shape, eyes, eyebrows, nose, mouth, smile, hairline, hair, facial hair and skin
+  tone. Only the medium changes. It also asks for "eyes clearly visible, no sunglasses", because
+  many references have sunglasses.
+- Portraits are generated at 1280x768, the panel's 5:3 shape. A 4:3 picture lost a fifth of its
+  height to the crop, often the top of the head.
+
+A local test portrait (Thiago, Oil Portrait, four face crops) was clearly recognisable, and the
+head was not cut off. Keys: `birthday:v3`, `color-birthday:v3`.
+
+Better input would help further. The model still sees sunglasses in 10 of the 33 photos, and one
+photo of Theo is low resolution. Close-ups without sunglasses, taken in good light, are the best
+replacements.

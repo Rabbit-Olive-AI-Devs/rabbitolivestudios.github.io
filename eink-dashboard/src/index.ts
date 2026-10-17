@@ -14,7 +14,7 @@ import { handleSeries, handleSeriesProof, handleSeriesProofPage, handleSeriesTes
 import { seriesHealth } from "./series/watch";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
-import { getBirthdayToday, getBirthdayByKey } from "./birthday";
+import { getBirthdayToday, getBirthdayByKey, BIRTHDAY_STYLES } from "./birthday";
 import { generateBirthdayImage } from "./birthday-image";
 import { fetchDeviceData, E1001_DEVICE_ID, E1002_DEVICE_ID, DESK_E1001_DEVICE_ID } from "./device";
 import { fetchWithTimeout } from "./fetch-timeout";
@@ -1150,7 +1150,7 @@ export default {
           return errorResponse(`Unknown person key: ${safeName}`, 400);
         }
         const styleParam = url.searchParams.get("style");
-        const styleIdx = parseStyleIdx(styleParam);
+        const styleIdx = parseStyleIdx(styleParam, BIRTHDAY_STYLES.length);
         try {
           const png = await generateBirthdayImage(env, person, new Date().getFullYear(), styleIdx);
           return new Response(png, {
