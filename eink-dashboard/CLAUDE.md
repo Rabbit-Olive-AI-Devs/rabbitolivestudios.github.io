@@ -424,7 +424,8 @@ eink-dashboard/
     prepare-portraits.py  — Birthday references for FLUX.2: upright, cropped to the face (Vision via portrait-faces.swift), under 512px; picks.json for group photos; contact sheet (#85)
     portrait-faces.swift  — Prints the faces Apple's Vision finds in each image, as JSON (#85)
     family-pick.py        — Family Memory: picks the date's photo from a read-only Photos.sqlite copy (album, Favourites, closest day); tests in test_family_pick.py (#92)
-    family-fetch.swift    — Family Memory: downloads one photo at 1600 px through PhotoKit; compiled to ~/Library/Application Support/eink-family/ (#92)
+    family-fetch.swift    — Family Memory: downloads one photo at 1600 px through PhotoKit, as ~/Applications/EinkFamilyFetch.app so the Photos permission can be granted once (#92)
+    build-family-fetch.sh — builds that app (target macOS 14: the default SDK target is newer than the mini's macOS and LaunchServices refuses it)
     pick-portraits-from-photos.py — Best recent face photos per family member from the Photos library's People album (read-only DB copy; iCloud originals exported via Photos) + face-position hints (#87)
     download-skyline-photos.sh — Download skyline photos from Unsplash
     upload-skyline-photos.sh   — Upload skyline photos to R2

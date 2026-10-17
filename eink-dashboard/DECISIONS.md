@@ -4147,3 +4147,15 @@ Rejected along the way:
   "Workers AI drew it".
 - **The scratch copy of the 2 GB Photos database** lives on the external drive and is deleted after
   each pick. The Mac's own disk had 30 GB free.
+
+**First evening (2026-10-17).** Two problems came up and were fixed:
+- **Old Python.** launchd's `python3` is Xcode's older one, which rejects `-P`. The job now uses
+  `-I`.
+- **Photos permission.** A launchd job cannot show macOS's Photos question, so it was refused
+  ("status 0"). The downloader became a tiny signed background app,
+  `~/Applications/EinkFamilyFetch.app`. It is built for macOS 14, because LaunchServices refuses a
+  binary built for the SDK's newer default (error -10825). The job starts it with `open -W`. The owner
+  clicked Allow once.
+
+After that the launchd run put up 18 October's photo, an album photo from 19 October 2024, and the
+brief was resent with it before Jarvis's 17:10 run.

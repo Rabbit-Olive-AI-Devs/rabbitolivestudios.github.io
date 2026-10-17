@@ -255,7 +255,7 @@ const ART_MAX_BYTES = 15 * 1024 * 1024;
 // the Mac's own disk is short of space), the PhotoKit downloader and the shown log.
 const PHOTOS_LIB = process.env.PHOTOS_LIBRARY ?? "/Volumes/SamsungSSD/Pictures/Photos Library.photoslibrary";
 const FAMILY_TMP = process.env.FAMILY_TMP ?? "/Volumes/SamsungSSD/Pictures/.eink-family-tmp";
-const FAMILY_FETCH = path.join(HOME, "Library", "Application Support", "eink-family", "family-fetch");
+const FAMILY_FETCH = path.join(HOME, "Applications", "EinkFamilyFetch.app");   // scripts/build-family-fetch.sh
 const FAMILY_SHOWN = path.join(HOME, ".config", "eink", "family-shown.json");
 
 /** Chicago date plus N days, for "tomorrow". */
@@ -291,14 +291,21 @@ function familyPhoto(date) {
     for (const f of fs.readdirSync(path.join(PHOTOS_LIB, "database")).filter((f) => /^Photos\.sqlite(-wal|-shm)?$/.test(f))) {
       fs.copyFileSync(path.join(PHOTOS_LIB, "database", f), path.join(FAMILY_TMP, f));
     }
-    const pick = JSON.parse(execFileSync("python3", ["-E", "-P", path.join(REPO, "scripts", "family-pick.py"),
+    const pick = JSON.parse(execFileSync("python3", ["-I", path.join(REPO, "scripts", "family-pick.py"),
       "--db", path.join(FAMILY_TMP, "Photos.sqlite"), "--date", date,
       "--people", path.join(REPO, "photos", "portraits", "people.json"), "--shown", FAMILY_SHOWN], { encoding: "utf8" }));
     const jpg = path.join(FAMILY_TMP, "photo.jpg");
     for (const c of pick.candidates) {
-      const got = spawnSync(FAMILY_FETCH, [c.localIdentifier, jpg], { encoding: "utf8", timeout: 120_000 });
-      const width = got.status === 0 ? Number(got.stdout.trim().split("x")[0]) : 0;
-      if (width < 1024) { log(`family ${date}: ${c.uuid} not usable (${(got.stderr || got.stdout || "").trim().slice(0, 120)})`); continue; }
+      // Launched as an app (`open -W`) so macOS's Photos permission applies; it reports in <jpg>.txt.
+      fs.rmSync(`${jpg}.txt`, { force: true });
+      spawnSync("open", ["-W", "-n", "-g", FAMILY_FETCH, "--args", c.localIdentifier, jpg], { encoding: "utf8", timeout: 180_000 });
+      const report = fs.existsSync(`${jpg}.txt`) ? fs.readFileSync(`${jpg}.txt`, "utf8").trim() : "no report";
+      const width = /^\d+x\d+$/.test(report) ? Number(report.split("x")[0]) : 0;
+      if (width < 1024) {
+        log(`family ${date}: ${c.uuid} not usable (${report.slice(0, 120)})`);
+        if (report.startsWith("no Photos access")) break;   // every candidate would fail the same way
+        continue;
+      }
       const meta = path.join(FAMILY_TMP, "photo.json");
       fs.writeFileSync(meta, JSON.stringify({ taken: c.taken }));
       const put = (file, key, type) => spawnSync("npx", ["wrangler", "r2", "object", "put", `${ART_BUCKET}/family/${date}/${key}`, "--file", file, "--content-type", type, "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
