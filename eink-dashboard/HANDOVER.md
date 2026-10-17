@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the birthday-likeness commit (code, #85: a birthday style per person, face-cropped reference photos, likeness prompt; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-16, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-17 · **Describes:** v3.21.0 at the documentation sweep after #87 (code: #87 birthday references picked from the owner's Photos library; #86 one shared art-style library of 71 styles; #85 a birthday style per person, face-cropped reference photos, likeness prompt, no invented seals; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-17, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 85 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 88 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -117,7 +117,7 @@ All pipelines share one LLM-selected event per day through `getOrGenerateMoment(
 
 | | A: `/fact.png` | B: `/fact1.png` | C: birthday | D: `/color/moment` | E: skyline |
 |---|---|---|---|---|---|
-| Model | FLUX.2 klein-9b, SDXL fallback | SDXL | FLUX.2 + up to 4 R2 photos | FLUX.2, SDXL fallback | FLUX.2 + R2 reference photo, SDXL fallback; BW variant is SDXL only |
+| Model | FLUX.2 klein-9b, SDXL fallback | SDXL | FLUX.2 at 1280x768 + up to 4 face-cropped R2 photos, picked from the Photos library (#85, #87) | FLUX.2, SDXL fallback | FLUX.2 + R2 reference photo, SDXL fallback; BW variant is SDXL only |
 | Style rotation | 3, by day of year | 6, by hash of date/title/location | 51 from the shared library (#86), random per person and year, never shared in a year or repeated within a block | 70 from the shared library, random daily order, no repeat until all used (#86) | 66 from the shared library over 30 cities, never the moment's style that day (#86) |
 | Output | Full colour as-is (#81) | 1-bit PNG (Bayer or threshold per style) | Full colour as-is (#81) | Full colour as-is (#81) | Full colour as-is, both modes (#81) |
 | Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v3:DATE`, `color-birthday:v3:DATE` | `color-moment:v4:DATE:STYLE` | `skyline:v5:DATE:daily[:bw]` |
@@ -159,7 +159,7 @@ Everything here runs inside hard free-tier limits. Cost any change against them 
 
 | Budget | Limit | Normal use | Notes |
 |---|---|---|---|
-| Workers AI neurons | 10,000/day, resets 00:00 UTC | ~5,500 | FLUX.2 klein-9b costs ~1,364 per image and is essentially the whole bill. Both panels share one account-wide pool: either can blank the other. |
+| Workers AI neurons | 10,000/day, nominally resets 00:00 UTC, **but the reset lags by hours** (#88) | ~2,000-2,800 since #84 (two FLUX pictures a night) | FLUX.2 klein-9b costs ~1,000-1,400 per image and is essentially the whole bill; SDXL bills 0. Both panels share one account-wide pool: either can blank the other. Before spending AI on tests, count the previous UTC day's usage too until about 06:00 UTC (#88). |
 | KV writes | 1,000/day | ~590, plus ~96 once both Macs report to TARS, plus 4 to 12 for the Flamengo board | The tightest budget. Mostly weather/alerts/device caches refreshed by two panels polling every 15 minutes. About 400 spare (#62). |
 | KV lists | 1,000/day | 0 on a healthy day | Only the stale fallback lists, and its listings are memoised for 6h. |
 | R2 (series) | 10 GB stored, 10 M reads and 1 M writes a month | ~2 reads per panel poll; ~160 writes per chapter upload | Far inside the free tier (#71). |
@@ -182,7 +182,7 @@ The design goal is that a panel always shows *something reasonable*. In order:
 
 Supporting mechanisms:
 
-- **AI budget block** (`ai-budget:v1:block`): the first neuron-quota error arms a marker that lasts until the next 00:00 UTC. While armed, no new generation is attempted.
+- **AI budget block** (`ai-budget:v1:block`): the first neuron-quota error arms a marker that lasts until the next 00:00 UTC. While armed, no new generation is attempted. Because Cloudflare's reset lags, a call shortly after 00:00 UTC can still be refused and re-arm the marker for a whole day (#88).
 - **Generation lock** (`gen-lock:v1:*`): a best-effort single-flight guard. KV has no atomic put-if-absent, so it reduces duplicates but cannot prevent them. Do not design anything that depends on it being correct.
 - **Weather** uses stale-while-revalidate, a 4-second Open-Meteo timeout, an NWS fallback, and a 5-second cap on the cold path (`with-budget.ts`, #42, #43).
 - **All external fetches** go through `fetchWithTimeout()`; failures return `null` or `[]` and never crash a page.
@@ -256,7 +256,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 290 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 292 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -339,6 +339,14 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 
 ## 15. Unconfirmed points and open items
 
+**Open as of 2026-10-17 (pictures and birthdays, #84-#88):**
+
+- Check that the 17 October pictures were made. The 04:35 UTC warm ran while Cloudflare's lagging quota still refused calls after a night of test portraits (#88). If `/health-detailed` shows them missing, the panels are on the 16 October pictures until the block lifts at 00:00 UTC; nothing else is needed.
+- Family example portraits for the owner: Thiago (Oil Portrait test), Sônia and Teteu are on the private examples page (https://claude.ai/artifact/Cn4Pt1Nsd3PePgKm1JNmpR), made with the old references. Still to make with the Photos-library references: Gilmara, João Pedro, Lucas, Álvaro, Mariana, Theo. At most four or five a day, only after a clean reset (#88). Generate locally: seed the local R2 with the prepared crops, then `/color/test-birthday?name=KEY`.
+- Thiago's birthday on 20 October is the first real colour birthday portrait on both home panels (2026 style: Pointillist). Ask the owner how it looked.
+- The planet in colour on the desk panel is still unjudged (#81 addendum 4).
+- Refresh the birthday references about once a year, as the children grow (#87).
+
 **Unconfirmed as of 2026-10-02:**
 
 - The pagelists in section 2 are inferred from renderer requests, not read from SenseCraft HMI.
@@ -388,7 +396,8 @@ This is separate from the Muse firmware experiment above, which concerns the fir
 | Mono image pipelines | `src/image.ts`, `src/convert-1bit.ts`, `src/styles-1bit.ts` |
 | Colour pipeline | `src/pages/color-moment.ts`, `src/image-color.ts`, `src/dither-spectra6.ts`, `src/spectra6.ts` |
 | Skyline | `src/skyline.ts`, `src/skyline-image.ts`, `src/pages/skyline.ts` |
-| Birthday | `src/birthday.ts`, `src/birthday-image.ts` |
+| Art styles (shared) | `src/art-styles.ts` |
+| Birthday | `src/birthday.ts`, `src/birthday-image.ts`; references: `scripts/pick-portraits-from-photos.py` → `scripts/prepare-portraits.py` (+ `portrait-faces.swift`) → `npm run upload-photos` |
 | Weather | `src/weather.ts`, `src/weather-nws.ts`, `src/alerts.ts`, `src/device.ts`, `src/weather-ui.ts`, `src/pages/weather2.ts`, `src/pages/color-weather.ts` |
 | Caching and guards | `src/cache-keys.ts`, `src/cache-guard.ts`, `src/stale-cache.ts`, `src/with-budget.ts` |
 | Alerting | `src/alert.ts` |

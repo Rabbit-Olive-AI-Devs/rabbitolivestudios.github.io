@@ -53,6 +53,8 @@ Every session must begin with these steps:
 | Touching the daily cron or `dailyWarmTargetDate` | The warm must fill the **next** Chicago date before it rolls (`35 4,5 * * *`). Warming "right after midnight" reopens the hole that blanked the skyline (DECISIONS #64) |
 | Changing how a panel picture is converted (`/fact`, `/color/moment`, `/skyline*`, birthdays) | Since 2026-10-15 every one goes to the panel **as-is**: the AI image cropped to 800x480 in full colour, untouched, caption burned in as solid black and white (`burnCaption` in `src/image.ts`); the panel converts it (DECISIONS #81, after the series #73). Do not add our own quantise/dither step back without the owner seeing both on the panels. A page that inlines such a picture must stay one request (~0.6-1 MB PNG) |
 | Adding or editing an art style or a scene prompt | The panels handle any style (owner, 2026-10-16). Do not cull styles or add palette, simplicity, contrast or composition limits "for the display"; every style is enabled (DECISIONS #84). Styles live in one shared library, `src/art-styles.ts`: add a style there and tag what it suits (#86). Pipeline B's 1-bit styles are the exception: its own conversion needs them |
+| Spending AI on test generations (portraits, styles) | Read real usage from GraphQL `aiInferenceAdaptiveGroups` first, and until ~06:00 UTC **add the previous UTC day's total**: Cloudflare's daily reset lags, and a refusal arms the budget block for the whole day, which can cost the nightly warm (DECISIONS #88). Leave room for the warm (~2,000-2,800) |
+| Refreshing the birthday reference photos | `scripts/pick-portraits-from-photos.py` on a read-only copy of the Photos database → review the crops' contact sheet → `npm run upload-photos` (needs `hints.json` so group photos crop the right face). Never commit photos or the people/hints files (DECISIONS #87) |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
 | Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as an image, never with live HTML text: text and lines pure black and white, pictures (crest, planet) in full colour the panel converts (`setColor`, DECISIONS #81), so the same page suits the mono and the colour panels; a page with no colour stays a 1-bit PNG. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters, and **never smaller than `plex11m`**, the owner's minimum on the panel (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep them free of AI, and of KV unless the page truly needs outside data: then one write a day, warmed by the cron, with an older value and a built-in fallback (`src/planet.ts`, DECISIONS #68). The Flamengo board is the costed exception: one entry refreshed by age, 4 to 12 writes a day (`src/flamengo.ts`, DECISIONS #70). Club crests are fetched at run time and never committed |
@@ -137,7 +139,7 @@ Always build before committing. Do not commit code that doesn't compile.
 
 ## Image Pipelines — DO NOT Cross-Contaminate
 
-This project has independent image pipelines. They share the LLM event selection (via `getOrGenerateMoment`) but diverge at style injection, image model, and post-processing. Changes to one pipeline must not affect the others.
+This project has independent image pipelines. They share the LLM event selection (via `getOrGenerateMoment`) but diverge at style injection, image model, and post-processing. The one deliberate exception: the colour moment (D), skyline (E) and birthday portrait (C) pick styles from the shared library `src/art-styles.ts` (DECISIONS #86); their prompts, models and post-processing stay separate. Changes to one pipeline must not affect the others.
 
 | | Pipeline A (`/fact.png`) | Pipeline B (`/fact1.png`) | Pipeline D (`/color/moment`) | Pipeline E (`/skyline`) |
 |---|---|---|---|---|
@@ -408,7 +410,7 @@ eink-dashboard/
       desk.ts             — /desk/test, /desk/aurebesh, /desk/planet, /desk/tars (view + report), /desk/flamengo handlers (DECISIONS #66–#70)
       series.ts           — /desk/series, /series, /color/series (one R2 page inlined; before a premiere the "coming soon" card is drawn live with a countdown, #80) and /series/proof (DECISIONS #71)
   photos/
-    portraits/            — Birthday reference photos source
+    portraits/            — Birthday reference photos ({key}_0..3.jpg) + people.json (key → Photos name), hints.json (face positions), picks.json (manual face picks); all gitignored (#85, #87)
     skylines/             — Skyline reference photos source (30 cities, 65 photos)
   scripts/
     upload-photos.sh      — Upload birthday photos to R2, prepared by prepare-portraits.py (#85)

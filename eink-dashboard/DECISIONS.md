@@ -3899,6 +3899,10 @@ has and the library applies from the next warmed date. Bumping either would rege
 pictures a second time on a day already used for portrait tests (budget read from GraphQL).
 Pipeline A (`/fact.png`, not warmed) and Pipeline B (`/fact1.png`, 1-bit) keep their own lists.
 
+**Count, corrected (2026-10-17 sweep):** before the merge the three lists held 34 distinct styles;
+the library adds **37**, for 71. The commit message of `5b93413` says "40 new styles"; this line is
+the correct figure.
+
 ## 87. Birthday Reference Photos Come From the Photos Library (2026-10-17)
 
 The owner pointed at the Photos library on this Mac (`/Volumes/SamsungSSD/Pictures/Photos
@@ -3929,3 +3933,30 @@ Teteu has only one usable recent photo, so his two solo pictures from the old se
 references were uploaded on 2026-10-17. The old originals are in
 `photos/portraits-before-2026-10-17/`. `people.json`, `hints.json` and every photo stay out of the
 repo. Refresh the set every year or so, as the children grow.
+
+## 88. Test Generations Must Allow for Cloudflare's Lagging Quota Reset (2026-10-17)
+
+On the night of #84-#87 Claude generated test portraits for the owner. Before the last one it
+read the real usage for the UTC day from GraphQL: 5,860 of 10,000 neurons, at 02:46 UTC. That
+seemed to leave room for one more and for the nightly warm. The call was refused anyway with
+4006 ("used up your daily free allocation").
+
+The quota had not reset at 00:00 UTC. It was still counting the previous UTC day's 4,189 neurons:
+4,189 + 5,860 = 10,049. This lag was already recorded once, in the August incident (a 4006 at
+05:05 UTC with nothing billed that UTC day, success at 06:05), but it was not applied here.
+
+What it risks: the 04:35 UTC daily warm runs inside the lag window. A refusal there arms
+`ai-budget:v1:block` until the next 00:00 UTC (#57), and the next day's moment and skyline are
+not made. The panels keep the previous day's pictures through the stale fallback, and the alert
+check emails. Nothing goes blank, but a day of pictures is lost. The refused test ran under local
+`wrangler dev`, so its budget marker went into the local KV, not production's.
+
+Rule (CLAUDE.md obligations): before spending AI on tests, read GraphQL
+`aiInferenceAdaptiveGroups`. Until about 06:00 UTC, add the previous UTC day's total. Always leave
+room for the warm (~2,000-2,800 neurons since #84). After the reset is clean, the free tier allows
+about four or five test portraits beside the panels' own pictures. Observed cost on 2026-10-17:
+about 1,000 neurons per FLUX image, including 1280x768 portraits; SDXL still bills 0.
+
+Not done: making the budget block smarter about the lag (for example, letting the 05:35 UTC fire
+retry). It would add code for a case that so far comes only from test runs, so it stays a manual
+rule unless it happens without tests.
