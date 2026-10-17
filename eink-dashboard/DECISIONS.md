@@ -3844,3 +3844,10 @@ come back sooner than 24 years across a seam; a check of the next three seams (2
 2097/98) found nobody with the same style two years running. Nothing had been cached under
 `color-birthday:v3` yet (no birthday since it was introduced), so the key is not bumped.
 Thiago's 2026 style becomes Charcoal, not the Oil Portrait used for the test.
+
+**Addendum (2026-10-17, first family tests):** Sônia (Stained Glass, 4 photos) and Teteu
+(Ukiyo-e, 3 photos) came out clearly recognisable. The Ukiyo-e portrait still added an invented
+seal and lettering: a convention of that style that "no text" did not stop. The portrait prompt
+now also forbids signatures, seals, stamps and calligraphy. Actual cost read from GraphQL
+`aiInferenceAdaptiveGroups`: about 1,000 neurons per portrait. That leaves room for roughly
+three tests a day next to the panels' own pictures.

@@ -142,7 +142,8 @@ export async function callFluxPortrait(
       "Keep their exact likeness from the photos: the same face shape, eyes, eyebrows, nose, mouth, smile, " +
       "hairline, hairstyle, hair color, facial hair and skin tone, instantly recognizable. " +
       "Only the artistic medium changes, not the face. Head and shoulders, centered, looking at the viewer, " +
-      "warm natural smile, eyes clearly visible, no sunglasses, no text, no words, no letters, no writing";
+      "warm natural smile, eyes clearly visible, no sunglasses, no text, no words, no letters, no writing, " +
+      "no signature, no seal, no stamp, no calligraphy";
   } else {
     prompt = `artistic portrait of ${ageLine}, ${stylePrompt}, head and shoulders, centered composition, looking at viewer, smiling, no text, no words, no letters, no writing`;
   }
