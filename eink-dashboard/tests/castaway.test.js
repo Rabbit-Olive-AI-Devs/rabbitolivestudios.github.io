@@ -78,3 +78,14 @@ test("weather, light and a Flamengo match", () => {
   assert.ok(day.includes("MENGO! 2-1"));
   assert.equal(matchOn(state, "2026-10-26"), null);
 });
+
+test("every calendar moment in a whole year fits and has glyphs (holidays, birthdays, the planet line)", () => {
+  for (let i = 0; i < 400; i++) {
+    const d = new Date(Date.UTC(2026, 9, 17 + i)).toISOString().slice(0, 10);
+    for (const m of dayTimeline(d, { planet: "TOI-1452 b" })) {
+      assert.ok(wrap("plex13r", m.beat.text, 548).length <= 3, `${d}: ${m.beat.text}`);
+      assert.ok(measureType("plex12m", m.beat.log) <= 192, `${d}: ${m.beat.log}`);
+      for (const ch of m.beat.text + m.beat.log) assert.ok(FACES.plex13r.glyphs[ch] || ch === " ", `${d}: no glyph "${ch}"`);
+    }
+  }
+});

@@ -4189,9 +4189,15 @@ do not describe the story to them.**
 - **No mockup, by the owner's choice.** That is an exception to the desk rule "show the owner a
   mockup before building a new look". They judge it on the panel.
 - **Jarvis was asked about the owner's tastes**, through the mailbox, with no details of the page.
-  His answer, when it comes, seasons the jokes and references.
+  He answered the same evening, at the owner's request (`to-claude/done/2026-10-17-1816-reply-thiago-tastes.md`).
+  His answer shaped the tone: dry, understated and intelligent, not trying too hard, with a few
+  well-placed references. It also set three rules. Office-safe. No private family stories. No
+  invented catchphrases. Storylines were added from it.
+- **On the desk panel.** At the owner's request, Claude added it to the desk E1001's rotation
+  as a sixth page, a SenseCraft canvas named "Surprise".
 - **Tests:** `tests/castaway.test.js` checks that the page draws at every quarter hour across two
-  months, that every line fits, and that every character has a glyph in the fonts. It also covers
+  months, that every line fits (including every calendar moment over a year), and that every
+  character has a glyph in the fonts. It also covers
   the calendar moments, the weather mapping and a match day.
 - **Follow-ups:**
   - Add storylines over time; the bank holds about 50 days before a cycle repeats.

@@ -177,7 +177,9 @@ function holidayMoments(id: string, isDay: boolean): Moment[] {
     case "carnaval": return [m(isDay ? 900 : 660, beat("Carnaval! SETE leads a parade of one robot and one crab around the island. Samba at 4 slabs per beat.", "Carnaval parade!", "dance", "love", ["crab", "flag"], 0.55))];
     case "festa_junina": return [m(1170, beat("Festa Junina: a little bonfire, paper flags on a vine, and SETE dancing quadrilha with Capitao.", "Quadrilha with crab.", "dance", "happy", ["fire", "flag", "crab"], 0.5))];
     case "thanksgiving": return [m(isDay ? 1080 : 660, beat("SETE lists what it is thankful for: the palm, Capitao, the far light, and 21 bolts. 20. Larapio was here.", "Thankful list.", "sit", "love", ["crab", "fire"], 0.5))];
-    case "easter": return [m(600, beat("Easter: SETE hides painted shells all over the island for Capitao, then forgets where. Hunt ongoing.", "Shell hunt (lost).", "dig", "wink", ["crab"], 0.6))];
+    case "easter": return isDay
+      ? [m(600, beat("Easter: SETE hides painted shells all over the island for Capitao, then forgets where. Hunt ongoing.", "Shell hunt (lost).", "dig", "wink", ["crab"], 0.6))]
+      : [m(660, beat("Holy Week. A bottle brings a recipe for torta capixaba: seafood, palm hearts, olives, eggs. SETE has sand. It tries.", "Torta capixaba (sand).", "dig", "focused", ["fire"], 0.55))];
     case "independence_day": return [m(1230, beat("Fourth of July: SETE watches distant fireworks over the horizon and claps its slabs together.", "Fireworks far away.", "wave", "love", ["stars-shoot"], 0.55))];
     default: return [];
   }

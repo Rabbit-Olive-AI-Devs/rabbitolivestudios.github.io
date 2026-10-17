@@ -202,7 +202,7 @@ export const ARCS: readonly Arc[] = [
       [
         b("SETE builds a radio from a tin, a coil of wire and pure stubbornness. It hisses. Hissing is a start.", "Radio hisses.", "dig", "focused", ["radio"], 0.5),
         b("For three seconds a voice breaks through: '...goal...!' Then static. SETE plays it back 200 times.", "Heard a voice!", "dance", "surprised", ["radio"], 0.5),
-        b("Late night, the radio picks up music from somewhere. SETE and Capitao sway. Mostly SETE.", "Radio dance night.", "dance", "love", ["radio", "crab", "fire"], 0.5),
+        b("Late night, the radio finds a long guitar solo from a band that sounds like the dark side of the moon. SETE sways.", "Guitar solo night.", "dance", "love", ["radio", "crab", "fire"], 0.5),
       ],
       [
         b("SETE tries to transmit: 'This is SETE. Parcel for T. Over.' The radio answers with a long, rude buzz.", "Transmitted. Buzz.", "stand", "focused", ["radio"], 0.5),
@@ -326,6 +326,71 @@ export const ARCS: readonly Arc[] = [
       ],
     ],
   },
+  {
+    id: "camera", title: "THIRTY-SIX FRAMES",
+    days: [
+      [
+        b("An old rangefinder camera washes up in a tin, dry, with one roll of black and white film inside. 36 frames.", "Found: camera, 1 roll.", "dig", "surprised", ["bottle"], 0.72),
+        b("SETE winds the film and does not press the shutter. Thirty-six frames is not many. It has to choose.", "Frames left: 36.", "think", "focused", [], 0.5),
+        b("Frame 1: the palm at dusk, light from the left, Capitao in the corner by accident. Keeper.", "Frame 1: the palm.", "stand", "focused", ["crab"], 0.45),
+      ],
+      [
+        b("SETE measures the light for an hour before frame 2. Capitao has moved on with his life.", "Light metering: long.", "stand", "focused", [], 0.55),
+        b("Frame 2: the far island at noon, sharp as a pin. Frame 3: Larapio, mid-theft, blurred. Both keepers.", "Frames: 3 of 36.", "wave", "happy", ["gull"], 0.6),
+        b("At night SETE thinks about the frames it did not take. It decides that is part of photography.", "Thinking in frames.", "sit", "calm", ["fire"], 0.5),
+      ],
+      [
+        b("Frame 4 goes on a sunrise. Frame 5 on the same sunrise, one minute later, because it got better.", "Frames: 5 of 36.", "stand", "love", [], 0.5),
+        b("No darkroom on the island. SETE stores the roll in the parcel pocket, to develop when it reaches T.", "Film: saved for T.", "sit", "calm", [], 0.5),
+        b("Thirty-one frames to go. SETE now looks at everything as if it might be worth one. It is a nice way to look.", "Everything: maybe.", "sit", "love", ["fire"], 0.5),
+      ],
+    ],
+  },
+  {
+    id: "board", title: "THE BOARD",
+    days: [
+      [
+        b("A pink board with no wheels washes up. It is clearly meant to float in the air. It floats in water instead.", "Found: board, no wheels.", "dig", "surprised", [], 0.72),
+        b("SETE tries to ride it across the sand. Physics files a formal objection. Physics wins.", "Physics: 1. SETE: 0.", "sleep", "surprised", [], 0.55),
+        b("On the water, though, the board is fast. SETE skims the lagoon at sunset. Close enough to the future.", "Rode it on water.", "dance", "love", [], 0.74),
+      ],
+      [
+        b("SETE wonders where the board came from. A good question for a robot with plenty of time.", "Board: origin unknown.", "think", "focused", [], 0.5),
+        b("Etched on the back: a date, years from now. SETE checks its clock twice and decides not to think about it.", "Board is from... when?", "think", "surprised", [], 0.5),
+        b("The board goes on the hut wall, next to the trophy shell. The island has a museum now.", "Opened a museum.", "stand", "happy", ["fire"], 0.4),
+      ],
+    ],
+  },
+  {
+    id: "city", title: "URBAN PLANNING",
+    days: [
+      [
+        b("SETE draws a master plan for the island in the sand: residential, commercial, and one zone just for Capitao.", "Master plan: drafted.", "dig", "focused", ["crab"], 0.6),
+        b("Population: 1 robot, 1 crab, 1 gull (disputed). Tax revenue: 0 bolts. Happiness: high.", "Census done.", "think", "happy", ["crab", "gull"], 0.5),
+        b("Infrastructure night: SETE lays a road of flat stones from the hut to the beach. Six metres. A start.", "Built a road (6 m).", "dig", "happy", ["lantern"], 0.5),
+      ],
+      [
+        b("Larapio is declared a natural disaster. Insurance does not cover gulls.", "Gull: natural disaster.", "wave", "sad", ["gull"], 0.55),
+        b("SETE builds a lighthouse district: one lantern on a stick. Property values rise sharply.", "Lighthouse district.", "stand", "happy", ["lantern"], 0.62),
+        b("End of turn. SETE reviews the empire and decides to research Better Fishing next. Just one more turn.", "Just one more turn.", "sit", "wink", ["fire"], 0.5),
+      ],
+    ],
+  },
+  {
+    id: "chef", title: "THE CHEF",
+    days: [
+      [
+        b("A bottle brings a recipe: moqueca, the capixaba way, in a clay pot, no palm oil. SETE cannot eat. It is undeterred.", "Recipe: moqueca.", "dig", "surprised", ["bottle"], 0.72),
+        b("Ingredients: one fish (released, apologised to), tomatoes (none), coriander (none), clay pot (shell). Adapting.", "Ingredients: improvised.", "think", "focused", [], 0.5),
+        b("SETE cooks something over the fire with great seriousness. Capitao tastes it and goes for a long walk.", "Moqueca v1: no.", "sit", "sad", ["fire", "crab"], 0.5),
+      ],
+      [
+        b("Moqueca v2. SETE follows the recipe to the letter where letters exist. The smell is honestly promising.", "Moqueca v2 cooking.", "sit", "focused", ["fire"], 0.5),
+        b("Capitao eats it all and falls asleep in the shell pot. Michelin would award three stars, if it reached islands.", "Moqueca v2: success.", "dance", "love", ["fire", "crab"], 0.5),
+        b("SETE writes the recipe on the hut wall under the heading FOR T. Some deliveries are recipes.", "Recipe saved for T.", "sit", "happy", ["fire"], 0.4),
+      ],
+    ],
+  },
 ];
 
 /** Routine moments between the beats, by part of the day. Picked by the clock, never repeated in a row. */
@@ -346,6 +411,8 @@ export const ROUTINE = {
     b("SETE reads the one book on the island, again. It is a manual for a toaster. Gripping stuff.", "Read: toaster manual.", "sit", "focused", ["book"], 0.45),
     b("Nap under the umbrella. Robots do not need naps, which is what makes them so enjoyable.", "Optional nap.", "sleep", "sleep", ["umbrella"], 0.6),
     b("Shell census: 1,204 shells. Capitao disputes the count. A recount is scheduled for never.", "Shell census.", "dig", "focused", ["crab"], 0.62),
+    b("SETE has questions about gulls. Why the shouting? Who are they shouting at? Does anyone ever answer?", "Questions about gulls.", "think", "focused", ["gull"], 0.55),
+    b("A coconut rolls down the dune at SETE. SETE runs. The coconut gains. It is very archaeological.", "Outran a coconut.", "walk", "surprised", [], 0.7),
   ],
   dusk: [
     b("Sunset watch. Every evening SETE rates it. Today: 9 out of 10. Points off for a cloud.", "Sunset: 9/10.", "sit", "love", [], 0.55),
@@ -356,6 +423,7 @@ export const ROUTINE = {
     b("Ghost stories with Capitao. SETE tells one about a robot with no charger. Capitao hides in a shell.", "Scary story told.", "sit", "wink", ["fire", "crab"], 0.5),
   ],
   night: [
+    b("The sky is enormous tonight and the island very small. SETE finds this strangely comforting, and stays up a while.", "Stayed up. Big sky.", "sit", "calm", [], 0.5),
     b("Low-power mode. SETE dreams of roads, doorbells, and a signature on a delivery slip.", "Sleeping.", "sleep", "sleep", [], 0.5),
     b("Sleeping. Somewhere far away a light blinks, slow and patient, like a heartbeat.", "Sleeping.", "sleep", "sleep", ["flash"], 0.5),
   ],
