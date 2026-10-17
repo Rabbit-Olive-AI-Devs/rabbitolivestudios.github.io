@@ -145,7 +145,8 @@ export interface SkylineStyle {
 }
 
 export const SKYLINE_STYLES: readonly SkylineStyle[] = [
-  // --- BW styles (6) — bold, high-contrast (pencil/etching/pen_ink were removed for our old 4-level grayscale; the panel converts since #81) ---
+  // --- Monochrome art styles (9). Pencil, etching and pen & ink are back: they were culled for our
+  // old 4-level grayscale, and the panels convert any picture themselves since #81 (DECISIONS #84) ---
   {
     key: "woodcut_hero_bw",
     label: "Woodcut",
@@ -157,14 +158,14 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     key: "noir_silhouette_bw",
     label: "Noir Silhouette",
     promptPrefix:
-      "dramatic film noir silhouette, stark black and white, bold shadow shapes, cinematic contrast",
+      "dramatic film noir silhouette, black and white, bold shadow shapes, cinematic contrast",
     colorMode: "bw",
   },
   {
     key: "linocut_bw",
     label: "Linocut",
     promptPrefix:
-      "linocut print, bold carved lines, high contrast black and white, simplified forms, chunky strokes, handmade texture",
+      "linocut print, bold carved lines, black ink on paper, chunky strokes, handmade texture",
     colorMode: "bw",
   },
   {
@@ -188,26 +189,47 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
       "bold charcoal drawing, heavy black strokes, stark contrast, large solid dark masses, dramatic shadows",
     colorMode: "bw",
   },
-  // --- Color styles (9) ---
+  {
+    key: "pen_ink_bw",
+    label: "Pen & Ink",
+    promptPrefix:
+      "pen and ink illustration, controlled crosshatching, crisp linework, architectural drawing, black ink on white paper",
+    colorMode: "bw",
+  },
+  {
+    key: "pencil_bw",
+    label: "Pencil Sketch",
+    promptPrefix:
+      "architectural graphite pencil sketch, fine shading, full tonal range, on white paper",
+    colorMode: "bw",
+  },
+  {
+    key: "etching_bw",
+    label: "Etching",
+    promptPrefix:
+      "fine etching engraving, parallel hatching lines, copper plate style, architectural precision",
+    colorMode: "bw",
+  },
+  // --- Color styles (10) ---
   {
     key: "travel_poster_color",
     label: "Travel Poster",
     promptPrefix:
-      "vintage travel poster illustration, bold flat color fields, simplified geometric shapes, retro graphic design, warm sunset palette, clean edges",
+      "vintage travel poster illustration, bold flat color fields, retro graphic design, warm sunset palette",
     colorMode: "color",
   },
   {
     key: "wpa_poster_color",
     label: "WPA Poster",
     promptPrefix:
-      "WPA poster style, flat screenprint colors, bold simplified shapes, limited palette, minimal texture, high readability",
+      "WPA poster style, screenprint colors, bold stylised shapes, 1930s national park poster",
     colorMode: "color",
   },
   {
     key: "minimal_flat_color",
     label: "Minimal Flat",
     promptPrefix:
-      "minimal flat color illustration, clean geometric shapes, large flat color blocks, modern graphic design, simple bold palette, very clean sky",
+      "minimal flat color illustration, clean geometric shapes, large flat color blocks, modern graphic design",
     colorMode: "color",
   },
   {
@@ -221,7 +243,7 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     key: "screenprint_color",
     label: "Screenprint",
     promptPrefix:
-      "screenprint poster, limited color separation, bold overlapping flat shapes, slight registration offset, graphic texture, Andy Warhol inspired",
+      "screenprint poster, bold overlapping color layers, slight registration offset, graphic texture, Andy Warhol inspired",
     colorMode: "color",
   },
   {
@@ -235,14 +257,28 @@ export const SKYLINE_STYLES: readonly SkylineStyle[] = [
     key: "synthwave_sunset_color",
     label: "Synthwave",
     promptPrefix:
-      "synthwave retro-futuristic sunset, neon grid horizon, bold magenta and cyan, simplified geometric buildings, 80s aesthetic, flat color bands",
+      "synthwave retro-futuristic sunset, neon grid horizon, bold magenta and cyan, glowing geometric buildings, 80s aesthetic",
     colorMode: "color",
   },
   {
     key: "mediterranean_travel_color",
     label: "Mediterranean",
     promptPrefix:
-      "Mediterranean travel illustration, warm terracotta and blue palette, whitewashed buildings, flat gouache shapes, sun-drenched colors, clean edges",
+      "Mediterranean travel illustration, warm terracotta and blue palette, whitewashed buildings, gouache painting, sun-drenched colors",
+    colorMode: "color",
+  },
+  {
+    key: "watercolor_color",
+    label: "Watercolor",
+    promptPrefix:
+      "watercolor painting, rich transparent washes, wet-on-wet sky, loose architectural brushwork, visible paper texture",
+    colorMode: "color",
+  },
+  {
+    key: "impressionist_color",
+    label: "Impressionist",
+    promptPrefix:
+      "Impressionist oil painting, visible brushstrokes, shimmering reflected light, Monet-inspired",
     colorMode: "color",
   },
 ];
@@ -329,19 +365,16 @@ const ANTI_TEXT_SUFFIX =
 export function buildSkylinePrompt(city: SkylineCity, style: SkylineStyle): string {
   const sceneBase =
     `iconic skyline of ${city.name} featuring ${city.landmarks}, ` +
-    "viewed from a classic overlook (waterfront or park), " +
-    "strong horizon line, distinct building outlines, large negative space sky occupying upper half, minimal foreground clutter";
+    "viewed from a classic overlook (waterfront or park)";
 
   const lighting =
     style.colorMode === "color"
       ? "golden-hour sunset or late afternoon daylight, soft warm sky"
       : "clear daylight";
 
-  const atmosphere =
-    "include ONE simple sun disc or moon disc as a solid shape, 2 to 4 birds as tiny silhouettes, and 1 to 3 large soft cloud shapes";
-
-  // No palette or detail limits: they were for our own dithering, retired in #81.
-  const parts: string[] = [style.promptPrefix, sceneBase, lighting, atmosphere, "avoid photographic realism", ANTI_TEXT_SUFFIX];
+  // No palette, detail or composition limits: they were for our own dithering, retired in #81
+  // (DECISIONS #84).
+  const parts: string[] = [style.promptPrefix, sceneBase, lighting, "avoid photographic realism", ANTI_TEXT_SUFFIX];
 
   return parts.join(", ");
 }
@@ -353,8 +386,7 @@ export function buildSkylinePrompt(city: SkylineCity, style: SkylineStyle): stri
 export function buildSkylineRefPrompt(city: SkylineCity, style: SkylineStyle): string {
   const scene =
     `artistic reinterpretation of the scene in image 0 as an iconic ${city.name} skyline, ` +
-    `featuring ${city.landmarks}, ` +
-    "strong horizon line, distinct building outlines, large negative space sky";
+    `featuring ${city.landmarks}`;
 
   const lighting =
     style.colorMode === "color"

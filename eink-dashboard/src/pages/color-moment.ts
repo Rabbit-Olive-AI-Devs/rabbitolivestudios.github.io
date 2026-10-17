@@ -36,7 +36,11 @@ import {
 
 const ANTI_TEXT_SUFFIX = "no text, no words, no letters, no writing, no signage, no captions, no watermark";
 
-/** Art styles chosen for the Spectra 6 panel (originally for our own 6-colour dithering, retired in #81). */
+/**
+ * Every art style the moment rotates through, one per day. The panels convert any picture
+ * themselves (#81), so this is no longer limited to what survived our own dithering: it now
+ * also carries the mono styles of /fact and /fact1 and the birthday painters (DECISIONS #84).
+ */
 export const COLOR_MOMENT_STYLES = [
   {
     id: "gouache",
@@ -61,7 +65,72 @@ export const COLOR_MOMENT_STYLES = [
   {
     id: "woodblock",
     name: "Color Woodblock",
-    prompt: "Japanese woodblock print, ukiyo-e style, bold flat color areas, black key block outlines, hand-carved texture, limited color palette",
+    prompt: "Japanese woodblock print, ukiyo-e style, bold flat color areas, black key block outlines, hand-carved texture",
+  },
+  {
+    id: "woodcut",
+    name: "Woodcut",
+    prompt: "hand-carved woodcut print, bold U-gouge marks, black ink on paper, sweeping curved gouge strokes, large solid black ink areas",
+  },
+  {
+    id: "pencil",
+    name: "Pencil Sketch",
+    prompt: "detailed graphite pencil sketch, fine cross-hatching, full tonal range, on white paper",
+  },
+  {
+    id: "charcoal",
+    name: "Charcoal",
+    prompt: "dramatic charcoal drawing, expressive strokes, deep shadows, textured paper",
+  },
+  {
+    id: "pen_ink",
+    name: "Pen + Ink",
+    prompt: "detailed pen and ink drawing, fine crosshatching, stipple shading, clean precise line work, black ink on white paper",
+  },
+  {
+    id: "noir",
+    name: "Ink Noir",
+    prompt: "bold ink noir illustration, heavy black ink pools, dramatic chiaroscuro, film noir shadows",
+  },
+  {
+    id: "linocut",
+    name: "Linocut",
+    prompt: "linocut block print, bold carved relief lines, hand-printed texture with visible ink coverage",
+  },
+  {
+    id: "etching",
+    name: "Etching",
+    prompt: "fine etching engraving, parallel hatching lines, copper plate style, intricate detail",
+  },
+  {
+    id: "watercolor",
+    name: "Watercolor",
+    prompt: "watercolor painting, rich transparent washes, wet-on-wet blooms, soft edges, visible paper texture",
+  },
+  {
+    id: "impressionist",
+    name: "Impressionist",
+    prompt: "Impressionist oil painting, visible brushstrokes, dappled light, Monet-inspired",
+  },
+  {
+    id: "pointillist",
+    name: "Pointillist",
+    prompt: "Pointillist painting, tiny dots of color, Seurat-inspired, luminous",
+  },
+  {
+    id: "art_nouveau",
+    name: "Art Nouveau",
+    prompt: "Art Nouveau illustration, flowing organic lines, Mucha-inspired decorative framing",
+  },
+  {
+    id: "art_deco",
+    name: "Art Deco",
+    prompt: "Art Deco poster, geometric patterns, gold and bold accents, streamlined elegant forms",
+  },
+  {
+    id: "pop_art",
+    name: "Pop Art",
+    prompt: "Pop Art, Lichtenstein-inspired, vivid colors, halftone dots, bold outlines",
   },
 ] as const;
 
@@ -226,6 +295,52 @@ function renderHTML(
 const BACKGROUND_LOCK_WAIT_MS = 60_000;
 
 /**
+ * Generate the day's colour picture — the birthday portrait on a family birthday (falling
+ * back to the moment if it fails), the moment otherwise — and cache it under its key.
+ * Shared by the page and the daily cron, which warms it first (DECISIONS #84).
+ */
+export async function buildColorMomentEntry(
+  env: Env,
+  dateStr: string,
+  birthday: BirthdayPerson | null,
+  currentYear: number,
+  displayDate: string,
+): Promise<{ imageB64: string; moment: MomentBeforeData; birthdayInfo?: BirthdayCaptionInfo }> {
+  let imageB64: string;
+  let moment: MomentBeforeData;
+  let birthdayInfo: BirthdayCaptionInfo | undefined;
+
+  if (birthday) {
+    const age = currentYear - birthday.birthYear;
+    const style = getArtStyle(currentYear);
+    moment = { year: currentYear, location: "", title: birthday.name, scene: "", imagePrompt: "" };
+    try {
+      imageB64 = await generateColorBirthday(env, birthday, currentYear);
+      birthdayInfo = { name: birthday.name, age, styleName: style.name };
+    } catch (err) {
+      if (isNeuronBudgetError(err)) throw err;
+      console.error("Color birthday failed, falling back to moment:", err);
+      const { events } = await getTodayEvents(env, dateStr);
+      moment = await getOrGenerateMoment(env, events, dateStr);
+      const result = await generateColorMoment(env, moment, dateStr);
+      imageB64 = result.base64;
+    }
+  } else {
+    const { events } = await getTodayEvents(env, dateStr);
+    moment = await getOrGenerateMoment(env, events, dateStr);
+    const result = await generateColorMoment(env, moment, dateStr);
+    imageB64 = result.base64;
+  }
+
+  const cacheKey = birthday
+    ? colorBirthdayCacheKey(dateStr)
+    : colorMomentCacheKey(dateStr, getColorMomentStyle(dateStr).id);
+  const cacheData = JSON.stringify({ imageB64, moment, displayDate, birthdayInfo });
+  await env.CACHE.put(cacheKey, cacheData, { expirationTtl: 604800 });
+  return { imageB64, moment, birthdayInfo };
+}
+
+/**
  * /color/moment page. On a cold key the most recent cached moment is served
  * immediately and today's is generated in the background, so the panel never
  * waits on FLUX (DECISIONS #64). The blocking path only runs when nothing
@@ -265,36 +380,7 @@ export async function handleColorMomentPage(env: Env, url: URL, ctx?: ExecutionC
     try {
       await assertAiBudgetAvailable(env);
       return await withGenerationLock(env, cacheKey, readCache, async () => {
-        let imageB64: string;
-        let moment: MomentBeforeData;
-        let birthdayInfo: BirthdayCaptionInfo | undefined;
-
-        if (birthday) {
-          const age = currentYear - birthday.birthYear;
-          const style = getArtStyle(currentYear);
-          moment = { year: currentYear, location: "", title: birthday.name, scene: "", imagePrompt: "" };
-          try {
-            imageB64 = await generateColorBirthday(env, birthday, currentYear);
-            birthdayInfo = { name: birthday.name, age, styleName: style.name };
-          } catch (err) {
-            if (isNeuronBudgetError(err)) throw err;
-            console.error("Color birthday failed, falling back to moment:", err);
-            const { events } = await getTodayEvents(env);
-            moment = await getOrGenerateMoment(env, events, dateStr);
-            const result = await generateColorMoment(env, moment, dateStr);
-            imageB64 = result.base64;
-          }
-        } else {
-          const { events } = await getTodayEvents(env);
-          moment = await getOrGenerateMoment(env, events, dateStr);
-          const result = await generateColorMoment(env, moment, dateStr);
-          imageB64 = result.base64;
-        }
-
-        // Cache the result
-        const cacheData = JSON.stringify({ imageB64, moment, displayDate, birthdayInfo });
-        await env.CACHE.put(cacheKey, cacheData, { expirationTtl: 604800 });
-
+        const { imageB64, moment, birthdayInfo } = await buildColorMomentEntry(env, dateStr, birthday, currentYear, displayDate);
         const html = renderHTML(imageB64, moment, displayDate, birthdayInfo);
         return htmlResponse(html, "public, max-age=86400");
       }, background ? { waitMs: BACKGROUND_LOCK_WAIT_MS } : {});

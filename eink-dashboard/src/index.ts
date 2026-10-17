@@ -6,7 +6,7 @@ import { generateMomentBefore, getOrGenerateMoment } from "./moment";
 import { handleWeatherPageV2 } from "./pages/weather2";
 import { handleFactPage } from "./pages/fact";
 import { handleColorWeatherPage } from "./pages/color-weather";
-import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, generateColorMoment, getColorMomentStyle } from "./pages/color-moment";
+import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, buildColorMomentEntry, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo } from "./pages/desk";
@@ -647,7 +647,7 @@ function handleHealth(): Response {
 }
 
 /**
- * KV keys that should hold the day's four images (plus the shared moment event),
+ * KV keys that should hold the day's two panel pictures (plus the shared moment event),
  * accounting for birthdays and the configured skyline mode.
  *
  * Shared by /health-detailed and the alert check so the two can never disagree
@@ -663,18 +663,17 @@ function dailyImageKeys(dateStr: string, monthNum: number, dayNum: number) {
     birthday,
     colorStyle,
     keys: {
-      fact4_gray: birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr),
       color_moment: birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id),
       skyline: skylineCacheKey(dateStr, skylineMode, DEFAULT_ROTATE_MIN, bucket),
-      skyline_bw: skylineCacheKey(dateStr, skylineMode, DEFAULT_ROTATE_MIN, bucket, true),
       moment_event: momentCacheKey(dateStr),
     },
   };
 }
 
-/** The four generated images the alert watches (moment_event is metadata, not a panel image).
- * /fact1.png is not among them: no panel shows it and the cron no longer makes it (DECISIONS #83). */
-const ALERT_WATCHED_IMAGES = ["fact4_gray", "color_moment", "skyline", "skyline_bw"] as const;
+/** The two generated pictures the alert watches (moment_event is metadata, not a panel image).
+ * /fact.png, /fact1.png and /skyline-bw are not among them: no panel shows them and the cron
+ * no longer makes them (DECISIONS #83, #84). */
+const ALERT_WATCHED_IMAGES = ["color_moment", "skyline"] as const;
 
 async function handleHealthDetailed(env: Env): Promise<Response> {
   const { month, day, dateStr } = getChicagoDateParts();
@@ -705,8 +704,7 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 
   // Determine daily image keys (birthday-aware)
   const { keys: dailyKeys, colorStyle } = dailyImageKeys(dateStr, monthNum, dayNum);
-  const { fact4_gray: fact4Key, color_moment: colorMomentKey,
-          skyline: skylineKey, skyline_bw: skylineBwKey, moment_event: momentKey } = dailyKeys;
+  const { color_moment: colorMomentKey, skyline: skylineKey, moment_event: momentKey } = dailyKeys;
   const aiBudgetBlock = await getAiBudgetBlock(env);
 
   // Tomorrow's keys: the evening warm fills these before the date rolls (DECISIONS #64),
@@ -720,15 +718,13 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 
   // Fetch all keys in parallel
   const [
-    fact4Raw, colorMomentRaw, skylineRaw, skylineBwRaw, momentRaw,
+    colorMomentRaw, skylineRaw, momentRaw,
     weatherHomeRaw, weatherOfficeRaw,
     alertsHomeRaw, alertsOfficeRaw,
     deviceHomeRaw, deviceOfficeRaw, deviceDeskRaw,
   ] = await Promise.all([
-    env.CACHE.get(fact4Key),
     env.CACHE.get(colorMomentKey),
     env.CACHE.get(skylineKey),
-    env.CACHE.get(skylineBwKey),
     env.CACHE.get(momentKey),
     env.CACHE.get("weather:60540:v2"),
     env.CACHE.get("weather:60606:v2"),
@@ -746,10 +742,8 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
       timestamp: new Date().toISOString(),
       date_chicago: dateStr,
       daily_images: {
-        fact4_gray:   { cached: fact4Raw !== null,       key: fact4Key },
         color_moment: { cached: colorMomentRaw !== null, key: colorMomentKey, style: colorStyle.id },
         skyline:      { cached: skylineRaw !== null,     key: skylineKey },
-        skyline_bw:   { cached: skylineBwRaw !== null,   key: skylineBwKey },
         moment_event: { cached: momentRaw !== null,      key: momentKey },
       },
       next_day_images: { date_chicago: nextDate, ...nextCached },
@@ -871,7 +865,7 @@ async function handleScheduled(env: Env, cronExpression: string): Promise<void> 
 }
 
 /**
- * Generate the day's four images (plus fact.json and the shared moment) for
+ * Generate the day's two panel pictures (plus fact.json and the shared moment) for
  * `dateStr`, skipping anything already cached. Sequential, budget-aware.
  */
 async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
@@ -904,54 +898,23 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
     return isNeuronBudgetError(err);
   }
 
-  // 1. Pipeline A (or birthday) — HIGHEST PRIORITY
+  // /fact.png (Pipeline A), its mono birthday portrait and /fact1.png (Pipeline B) are not
+  // warmed: since the 2026-10-16 trial every panel shows the colour moment instead, which
+  // each converts itself (DECISIONS #83, #84). Their routes still generate on request.
+
+  // 1. Colour moment, or the colour birthday portrait — HIGHEST PRIORITY
   if (!budgetExhausted) {
     try {
-      // Skip if already cached: the day's other daily trigger, or a device that
-      // beat the cron to the new date, may have filled this already. Regenerating
-      // it burned ~1,364 neurons for an identical image (DECISIONS #57).
-      const keyA = birthday ? birthdayCacheKey(dateStr) : fact4CacheKey(dateStr);
-      if (await env.CACHE.get(keyA)) {
-        console.log(`Cron: Pipeline A already cached for ${dateStr}`);
-      } else if (birthday) {
-        console.log(`Cron: birthday detected — ${birthday.name}`);
-        const bdayPng = await generateBirthdayImage(env, birthday, yearNum);
-        await env.CACHE.put(birthdayCacheKey(dateStr), pngToBase64(bdayPng), { expirationTtl: 604800 });
-        console.log(`Cron: cached birthday image for ${birthday.name}`);
-      } else {
-        const png4 = await generateMomentImage(env, sharedMoment, displayDate, dateStr);
-        await env.CACHE.put(fact4CacheKey(dateStr), pngToBase64(png4), { expirationTtl: 604800 });
-        console.log(`Cron: cached 4-level image for ${dateStr}`);
-      }
-    } catch (err) {
-      if (isNeuronError(err)) {
-        budgetExhausted = true;
-        await markAiBudgetExhausted(env, "cron Pipeline A", err);
-        console.error("Cron: neuron budget exhausted at Pipeline A");
-      } else {
-        console.error("Cron: Pipeline A failed:", err);
-      }
-    }
-  }
-
-  // Pipeline B (/fact1.png) is not warmed: no panel shows it (DECISIONS #83). The route
-  // still generates it on request.
-
-  // 2. Color moment
-  if (!budgetExhausted && !birthday) {
-    try {
       const colorStyle = getColorMomentStyle(dateStr);
-      const colorCacheKey = colorMomentCacheKey(dateStr, colorStyle.id);
-      const existing = await env.CACHE.get(colorCacheKey);
-      if (!existing) {
-        const colorResult = await generateColorMoment(env, sharedMoment, dateStr);
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        const colorDisplayDate = `${months[monthNum - 1]} ${dayNum}`;
-        const cacheData = JSON.stringify({ imageB64: colorResult.base64, moment: sharedMoment, displayDate: colorDisplayDate });
-        await env.CACHE.put(colorCacheKey, cacheData, { expirationTtl: 604800 });
-        console.log(`Cron: cached color moment (${colorStyle.name}) for ${dateStr}`);
+      const colorCacheKey = birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id);
+      // Skip if already cached: the day's other daily trigger, or a panel that beat
+      // the cron to the new date, may have filled it (DECISIONS #57).
+      if (await env.CACHE.get(colorCacheKey)) {
+        console.log(`Cron: colour picture already cached for ${dateStr}`);
       } else {
-        console.log(`Cron: color moment already cached for ${dateStr}`);
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        await buildColorMomentEntry(env, dateStr, birthday, yearNum, `${months[monthNum - 1]} ${dayNum}`);
+        console.log(`Cron: cached ${birthday ? `colour birthday (${birthday.name})` : `colour moment (${colorStyle.name})`} for ${dateStr}`);
       }
     } catch (err) {
       if (isNeuronError(err)) {
@@ -964,7 +927,7 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
     }
   }
 
-  // 3. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
+  // 2. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
   if (!budgetExhausted) {
     try {
       const skylineDailyKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0);
@@ -995,36 +958,8 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
     }
   }
 
-  // 5. Skyline BW — daily mode
-  if (!budgetExhausted) {
-    try {
-      const bwCacheKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0, true);
-      const existingBw = await env.CACHE.get(bwCacheKey);
-      if (!existingBw) {
-        const bwParts = parseDateParts(dateStr);
-        const bwOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0, colorModeFilter: "bw" };
-        const bwCity = pickSkylineCity(bwParts, bwOpts);
-        const bwStyle = pickSkylineStyle(bwParts, bwOpts);
-        const bwRefPrompt = buildSkylineRefPrompt(bwCity, bwStyle);
-        const bwSdxlPrompt = buildSkylinePrompt(bwCity, bwStyle);
-        const bwCaption = formatSkylineCaption(bwCity, bwParts.displayDate);
-        const bwPhotoSeed = djb2(`${dateStr}|photo|daily-bw`);
-        const bwResult = await generateSkylineImage(env, bwRefPrompt, bwSdxlPrompt, bwCaption, bwStyle.colorMode, bwCity.key, bwPhotoSeed, true);
-        await env.CACHE.put(bwCacheKey, bwResult.base64, { expirationTtl: 604800 });
-        console.log(`Cron: cached skyline BW daily (${bwCity.name}, ${bwStyle.label}, sdxlOnly)`);
-      } else {
-        console.log(`Cron: skyline BW already cached for today`);
-      }
-    } catch (err) {
-      if (isNeuronError(err)) {
-        budgetExhausted = true;
-        await markAiBudgetExhausted(env, "cron skyline BW", err);
-        console.error("Cron: neuron budget exhausted at skyline BW");
-      } else {
-        console.error("Cron: skyline BW warm failed:", err);
-      }
-    }
-  }
+  // The B&W skyline (/skyline-bw) is not warmed: no panel shows it since the home panel
+  // moved to /skyline (DECISIONS #84). The route still generates on request.
 
   if (budgetExhausted) {
     console.error("Cron: WARNING — neuron budget exhausted before all images generated. Consider upgrading to Workers Paid plan ($5/mo).");

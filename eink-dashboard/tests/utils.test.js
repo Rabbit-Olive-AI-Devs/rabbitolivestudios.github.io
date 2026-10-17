@@ -59,8 +59,8 @@ test("histogram threshold and cache keys stay stable", () => {
   assert.equal(thresholdFromHistogram(ramp, 0.5), 127);
   assert.equal(fact4CacheKey("2026-04-27"), "fact4:v5:2026-04-27");
   assert.equal(fact1CacheKey("2026-04-27"), "fact1:v7:2026-04-27");
-  assert.equal(colorMomentCacheKey("2026-04-27", "gouache"), "color-moment:v3:2026-04-27:gouache");
-  assert.equal(skylineCacheKey("2026-04-27", "daily", 15, 0, true), "skyline:v4:2026-04-27:daily:bw");
+  assert.equal(colorMomentCacheKey("2026-04-27", "gouache"), "color-moment:v4:2026-04-27:gouache");
+  assert.equal(skylineCacheKey("2026-04-27", "daily", 15, 0, true), "skyline:v5:2026-04-27:daily:bw");
   assert.equal(generationLockKey("fact4:v5:2026-04-27"), "gen-lock:v1:fact4:v5:2026-04-27");
 });
 

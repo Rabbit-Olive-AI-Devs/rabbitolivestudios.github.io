@@ -52,6 +52,7 @@ Every session must begin with these steps:
 | Adding or changing any page a panel loads | It must be **one request**: inline images as `data:` URIs (`renderSkylineInlineHTML`, `/color/moment`). SenseCraft screenshots ~1s after the document arrives and cancels sub-resources still in flight — a separate `<img src="/skyline.png">` went white on the E1002 even with a warm cache (DECISIONS #65). The document itself is waited for; a sub-resource is not |
 | Touching the daily cron or `dailyWarmTargetDate` | The warm must fill the **next** Chicago date before it rolls (`35 4,5 * * *`). Warming "right after midnight" reopens the hole that blanked the skyline (DECISIONS #64) |
 | Changing how a panel picture is converted (`/fact`, `/color/moment`, `/skyline*`, birthdays) | Since 2026-10-15 every one goes to the panel **as-is**: the AI image cropped to 800x480 in full colour, untouched, caption burned in as solid black and white (`burnCaption` in `src/image.ts`); the panel converts it (DECISIONS #81, after the series #73). Do not add our own quantise/dither step back without the owner seeing both on the panels. A page that inlines such a picture must stay one request (~0.6-1 MB PNG) |
+| Adding or editing an art style or a scene prompt | The panels handle any style (owner, 2026-10-16). Do not cull styles or add palette, simplicity, contrast or composition limits "for the display"; every style is enabled (DECISIONS #84). Pipeline B's 1-bit styles are the exception: its own conversion needs them |
 | Drawing text or bars into an image that will be Floyd–Steinberg dithered | Draw them after dithering or map them by nearest colour — diffused error turns a black bar into speckle (DECISIONS #64) |
 | Adding anything to `/weather` or `/color/weather` | They carry only 5-7px of vertical slack and `.hourly` absorbs every deficit. `body.scrollHeight` reports 480 even when cards are clipped — measure the **deepest rendered element** instead (DECISIONS #63) |
 | Adding or changing a desk panel page (`/desk/*`) | Draw it with `src/hud/` as an image, never with live HTML text: text and lines pure black and white, pictures (crest, planet) in full colour the panel converts (`setColor`, DECISIONS #81), so the same page suits the mono and the colour panels; a page with no colour stays a 1-bit PNG. **Text is real fonts only** (`drawType` with a face from `fonts-data.ts`); never the 8x8 bitmap font or hand-drawn letters, and **never smaller than `plex11m`**, the owner's minimum on the panel (DECISIONS #67). Need a new size? Add a face in `scripts/generate-desk-fonts.mjs` and run `npm run desk-fonts`. Show the owner a mockup before building a new look. Keep them free of AI, and of KV unless the page truly needs outside data: then one write a day, warmed by the cron, with an older value and a built-in fallback (`src/planet.ts`, DECISIONS #68). The Flamengo board is the costed exception: one entry refreshed by age, 4 to 12 writes a day (`src/flamengo.ts`, DECISIONS #70). Club crests are fetched at run time and never committed |
@@ -95,7 +96,7 @@ npx wrangler deploy
 # Production KV and logs. wrangler 4 kv commands read the LOCAL store unless --remote
 # is given; `wrangler tail` can stop delivering a few minutes after attaching while the
 # process stays alive — re-attach in rounds and kill the node child directly (DECISIONS #65).
-npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "skyline:v4:"
+npx wrangler kv key list --remote --namespace-id de97776d35af4df08b13fd2158acebdc --prefix "skyline:v5:"
 npx wrangler tail eink-dashboard --format json
 pkill -f "bin/wrangler tail"
 
@@ -141,10 +142,10 @@ This project has independent image pipelines. They share the LLM event selection
 | | Pipeline A (`/fact.png`) | Pipeline B (`/fact1.png`) | Pipeline D (`/color/moment`) | Pipeline E (`/skyline`) |
 |---|---|---|---|---|
 | Model | FLUX.2 klein-9b | SDXL | FLUX.2 (fallback SDXL) | FLUX.2 + ref photo (fallback SDXL) |
-| Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | 5-style rotation (gouache/oil/graphic/ink/woodblock) | 14-style rotation (6 BW + 8 color) |
+| Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | 18-style rotation, every style (#84) | 19-style rotation (9 mono + 10 color, #84) |
 | Output | Full colour as-is (panel converts, #81) | 1-bit (Bayer or threshold) | Full colour as-is (panel converts, #81) | Full colour as-is, both modes (#81) |
-| Cache key | `fact4:v5:YYYY-MM-DD` | `fact1:v7:YYYY-MM-DD` | `color-moment:v3:YYYY-MM-DD:STYLE_ID` | default `skyline:v4:DATE:daily[:bw]`; rotate `skyline:v4:DATE:rN:bBUCKET[:bw]` |
-| Display | E1001 (mono) | none — on request only, not warmed (#83) | E1002 (Spectra 6) | E1002 (Spectra 6) |
+| Cache key | `fact4:v5:YYYY-MM-DD` | `fact1:v7:YYYY-MM-DD` | `color-moment:v4:YYYY-MM-DD:STYLE_ID` | default `skyline:v5:DATE:daily[:bw]`; rotate `skyline:v5:DATE:rN:bBUCKET[:bw]` |
+| Display | none — on request only, not warmed (#84) | none — on request only, not warmed (#83) | E1002 + home E1001 (#84) | E1002 + home E1001 (`/skyline-bw` not warmed, #84) |
 
 ---
 

@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the headlines-retirement commit (code, #82) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-16 as 745b161b) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-16 · **Describes:** v3.21.0 at the colour-pictures commit (code, #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-16, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 82 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 84 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -39,9 +39,9 @@ The headline feature is **"Moment Before"**: every day the Worker picks a famous
 | Resolution | 800x480 | 800x480 |
 | Location | Home, Naperville IL (zip 60540) | Office, Chicago IL (zip 60606) |
 | SenseCraft device ID | `20225290` | `20225358` |
-| Routes it uses | `/weather`, `/series` (added 2026-10-14); **trial since 2026-10-16 (#83):** `/color/moment` in place of `/fact.png` and `/skyline` in place of `/skyline-bw` | `/color/moment`, `/color/weather`, `/skyline`, `/color/series` (added 2026-10-14); `/color/headlines` was dropped by the owner (#82) |
+| Routes it uses | `/weather`, `/series` (added 2026-10-14), `/color/moment` and `/skyline` (in place of `/fact` and `/skyline-bw` since 2026-10-16: trial #83, kept #84) | `/color/moment`, `/color/weather`, `/skyline`, `/color/series` (added 2026-10-14); `/color/headlines` was dropped by the owner (#82) |
 
-The exact pagelists live in the SenseCraft HMI web app, not in this repo. (Since SenseCraft HMI v1.3.2, February 2026, there is no separate "Web Function" page type: a URL is shown through the **HTML widget** in the Canvas Editor, sized 800x480 at position 0,0. Older notes in this repo still say "Web Function"; they mean the same mechanism.) The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel. **SenseCraft page lists as read on 2026-10-16** (page names, not URLs): home E1001 = weather, fact, skyline bw, Series_Greyscale (the "fact" and "skyline bw" pages point at `/color/moment` and `/skyline` for the #83 trial; to undo, set them back to `/fact.png` and `/skyline-bw`, save, Apply); E1002 = Skylines Color, Weather Color, Moment Color, Series_Color, so **no headlines page and no duplicate skyline**; desk E1001 = Aurebesh, Planets, TARS, Flamengo, Series_B&W. All three show an orange "Pending" beside their Battery Saver switch, so it is not a sign of one unsent change. Claude can read SenseCraft through Claude in Chrome (signed in); it changes nothing there without the owner's yes.
+The exact pagelists live in the SenseCraft HMI web app, not in this repo. (Since SenseCraft HMI v1.3.2, February 2026, there is no separate "Web Function" page type: a URL is shown through the **HTML widget** in the Canvas Editor, sized 800x480 at position 0,0. Older notes in this repo still say "Web Function"; they mean the same mechanism.) The routes above are what the renderer was seen requesting in `wrangler tail` on 2026-09-10; confirm with the owner before assuming a route is or is not on a panel. **SenseCraft page lists as read on 2026-10-16** (page names, not URLs): home E1001 = weather, fact, skyline bw, Series_Greyscale (the "fact" and "skyline bw" pages point at `/color/moment` and `/skyline`, trial #83 kept by the owner in #84; to undo, set them back to `/fact.png` and `/skyline-bw`, save, Apply, and restore their cron warm); E1002 = Skylines Color, Weather Color, Moment Color, Series_Color, so **no headlines page and no duplicate skyline**; desk E1001 = Aurebesh, Planets, TARS, Flamengo, Series_B&W. All three show an orange "Pending" beside their Battery Saver switch, so it is not a sign of one unsent change. Claude can read SenseCraft through Claude in Chrome (signed in); it changes nothing there without the owner's yes.
 
 A **third panel**, a second E1001 (mono), sits on the owner's home-office desk and shows the `/desk/*` pages. It was paired in SenseCraft HMI on 2026-10-12 as "E1001 - TBO 2"; its device ID is `20238717` (found 2026-10-16: the number at the end of its SenseCraft page address). Unlike the other two it runs firmware v1.2.2 with deep sleep enabled (they run v1.1.4, deep sleep off). The 6-hourly cron reads its sensor, so `/health-detailed` reports it as `device_desk` (stale only after a missed warm, 390 min); no page shows it. The owner added `/desk/series` to it on 2026-10-14.
 
@@ -59,11 +59,11 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 |---|---|---|
 | `/weather` | E1001 | Mono HTML weather dashboard |
 | `/color/weather` | E1002 | Colour HTML weather dashboard (Spectra 6 accents) |
-| `/fact.png` | E1001 | Moment Before PNG, full colour as-is with a black caption bar; the panel converts it (#81). Birthday portrait on family birthdays |
-| `/fact` | E1001 | HTML page with the `/fact.png` picture **inlined** (one request since #81), text fallback |
+| `/fact.png` | none since 2026-10-16 (not warmed, #84) | Moment Before PNG, full colour as-is with a black caption bar; the panel converts it (#81). Birthday portrait on family birthdays |
+| `/fact` | none since 2026-10-16 (#84) | HTML page with the `/fact.png` picture **inlined** (one request since #81), text fallback |
 | `/fact1.png` | none (no panel shows it; not warmed since 2026-10-16, #83) | 1-bit Moment Before PNG, 6 rotating styles; generates on request |
-| `/color/moment` | E1002 | HTML with the Spectra-6 dithered Moment image inlined as base64 |
-| `/skyline`, `/skyline-bw` | E1002, E1001 | HTML with the daily skyline PNG inlined as a `data:` URI |
+| `/color/moment` | E1002, home E1001 | HTML with the full-colour Moment picture (or colour birthday portrait) inlined as base64; each panel converts it (#81, #84) |
+| `/skyline`, `/skyline-bw` | `/skyline`: E1002 and home E1001; `/skyline-bw`: none (not warmed since #84) | HTML with the daily skyline PNG inlined as a `data:` URI |
 | `/skyline.png` | — | The skyline PNG itself (`?bw=1`, `?mode=daily\|rotate\|random`) |
 | `/color/headlines` | none (dropped from the E1002 by the owner; retired 2026-10-16, #82) | Steel/trade headlines, ranked without an LLM; builds on request, not warmed |
 | `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
@@ -105,7 +105,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 - `35 4,5 * * *` — the daily image warm. It fires *before* Chicago midnight and fills the keys for the date the panels are **about to** ask for (`dailyWarmTargetDate()`), so a panel poll is never the thing that triggers generation (#64). It is one expression with two fire times because the account is at the free plan's cap of 5 cron triggers.
 - `5 0,6,12,18 * * *` — refreshes both weather locations and all three devices' telemetry (no headlines since #82), warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check.
 
-The daily warm runs its pipelines **sequentially in priority order** (Pipeline A or birthday, colour moment, skyline, skyline BW; Pipeline B is no longer warmed, #83), skips any key that already exists, and stops at the first neuron-budget error.
+The daily warm runs its pipelines **sequentially in priority order** (colour moment or colour birthday, then skyline; `/fact`, its mono birthday portrait, `/fact1.png` and `/skyline-bw` are no longer warmed, #83, #84), skips any key that already exists, and stops at the first neuron-budget error.
 
 **Off-Worker jobs on the Mac mini** (LaunchAgents, logs in `~/Library/Logs/eink-series/` and `/tmp`): `com.eink.tars-report` (TARS, every 30 min, #69); `com.eink.series-mailbox` (handles Jarvis's mailbox within minutes of a file arriving, #72); `com.eink.series-weekly` (Wednesdays 09:05: writes Claude's next due chapter, #72); `com.eink.series-heartbeat` (Mondays 08:00: a status note for Jarvis of what is late, due and on air, no AI, #76). The series jobs need the external SSD mounted, because Dropbox syncs to `/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox`. They start through `scripts/materialize-exec.py`, because Dropbox keeps files online-only and a launchd job may not download them otherwise (reads fail with "Unknown system error -11").
 
@@ -118,9 +118,9 @@ All pipelines share one LLM-selected event per day through `getOrGenerateMoment(
 | | A: `/fact.png` | B: `/fact1.png` | C: birthday | D: `/color/moment` | E: skyline |
 |---|---|---|---|---|---|
 | Model | FLUX.2 klein-9b, SDXL fallback | SDXL | FLUX.2 + up to 4 R2 photos | FLUX.2, SDXL fallback | FLUX.2 + R2 reference photo, SDXL fallback; BW variant is SDXL only |
-| Style rotation | 3, by day of year | 6, by hash of date/title/location | 10, by year | 5, by day of year | 14 styles over 30 cities |
+| Style rotation | 3, by day of year | 6, by hash of date/title/location | 10, by year | 18, by day of year (every style, #84) | 19 styles over 30 cities (#84) |
 | Output | Full colour as-is (#81) | 1-bit PNG (Bayer or threshold per style) | Full colour as-is (#81) | Full colour as-is (#81) | Full colour as-is, both modes (#81) |
-| Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v2:DATE`, `color-birthday:v2:DATE` | `color-moment:v3:DATE:STYLE` | `skyline:v4:DATE:daily[:bw]` |
+| Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v2:DATE`, `color-birthday:v2:DATE` | `color-moment:v4:DATE:STYLE` | `skyline:v5:DATE:daily[:bw]` |
 
 Facts that have each cost real debugging time:
 
@@ -189,7 +189,7 @@ Supporting mechanisms:
 
 **The series** degrades on its own path: an unapproved or missing chapter shows the last approved scene; a missing page or broken `schedule.json` gives the text page; between seasons a "coming soon" or "returns soon" card shows. The alert check also emails when a chapter airing within 7 days is not approved, when a season ends within 14 days with nothing after it, or when the page for now is missing (#71).
 
-**Alerting** (`src/alert.ts`, #60): graceful degradation hides failures, and two multi-day outages were found only by looking at a panel. The 6-hourly cron now checks whether the day's four images are in KV (five until #83 dropped `/fact1.png`) and whether the budget block is armed, and emails on a *change* of state through Cloudflare Email Routing. A KV fingerprint limits it to one email per distinct problem, one reminder per 24h, and one recovery notice. It skips Chicago hours before 3 so it cannot race the warm. When you add a failure mode, ask whether this check would catch it.
+**Alerting** (`src/alert.ts`, #60): graceful degradation hides failures, and two multi-day outages were found only by looking at a panel. The 6-hourly cron now checks whether the day's two panel pictures (colour moment, skyline) are in KV (five until #83 and #84 dropped `/fact1.png`, `/fact` and the B&W skyline) and whether the budget block is armed, and emails on a *change* of state through Cloudflare Email Routing. A KV fingerprint limits it to one email per distinct problem, one reminder per 24h, and one recovery notice. It skips Chicago hours before 3 so it cannot race the warm. When you add a failure mode, ask whether this check would catch it.
 
 ## 9. Non-negotiable rules
 
@@ -342,7 +342,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 **Unconfirmed as of 2026-10-02:**
 
 - The pagelists in section 2 are inferred from renderer requests, not read from SenseCraft HMI.
-- Decision records #31 and #33 give older skyline style counts (15 and 18). They are history and are left as written; `src/skyline.ts` defines 14 (6 BW + 8 colour).
+- Decision records #31 and #33 give older skyline style counts (15 and 18). They are history and are left as written; `src/skyline.ts` defines 19 (9 mono + 10 colour, #84).
 - Decision record #38 describes `/color/headlines` as disabled with a redirect to `/skyline`. That was reversed in #39: it is a live page with deterministic, non-LLM ranking, It was warmed by the 6-hourly cron until 2026-10-16, when the owner confirmed they had dropped it from the E1002 and the warm was retired (#82); the route still works on request.
 
 **Device experiment under consideration (2026-10-02, not started):** the owner is planning to flash Meta's open-source `muse-gadget-sdk` firmware onto the **E1001** temporarily, after a full 32 MB flash backup, and restore the stock firmware afterwards. The plan lives outside this repo. While that firmware is on the panel, the E1001 stops requesting pages, so `/weather` battery and indoor readings go stale and the E1001 routes see no traffic. That is expected, not a Worker fault, and the alert check does not fire because it watches the image cache, not the panel. If the device is later restored by re-pairing rather than from the backup, SenseCraft may assign a new device ID, and `E1001_DEVICE_ID` in `src/device.ts` would need updating. Ask the owner about the experiment's status before diagnosing a silent E1001.

@@ -42,8 +42,8 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
 | **World Cup 2026** | *Retired 2026-08-21 — routes now 404. Source and tests are preserved for 2030; see DECISIONS.md #61.* | — |
 | **World Skyline Series** | | |
-| `GET /skyline` | 800x480 HTML skyline page for E1002 with the PNG **inlined as a data URI** — one request, nothing for the renderer to cancel (DECISIONS #65). Always no-store. Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
-| `GET /skyline-bw` | 800x480 HTML skyline page for E1001 mono, BW styles only, PNG inlined the same way. Same text fallback as `/skyline` (DECISIONS #58, #65) | none |
+| `GET /skyline` | 800x480 HTML skyline page for the E1002 and (since 2026-10-16, #84) the home E1001, with the PNG **inlined as a data URI** — one request, nothing for the renderer to cancel (DECISIONS #65). Always no-store. Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
+| `GET /skyline-bw` | 800x480 HTML skyline page, mono art styles only; on no panel and not warmed since 2026-10-16 (#84), generates on request; PNG inlined the same way. Same text fallback as `/skyline` (DECISIONS #58, #65) | none |
 | `GET /skyline.png?mode=rotate\|daily\|random&rotateMin=N&bw=1` | 800x480 skyline PNG, full colour as-is with a black caption bar for both modes; the panels convert it (#81) (default: daily; `bw=1` restricts to BW styles; `mode=rotate` for 15-min rotation) | 24 hours |
 | `GET /skyline-test?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline HTML (forwards params to .png, requires `TEST_AUTH_KEY`) | none |
 | `GET /skyline-test.png?date=...&city=...&style=...&color=0\|1&mode=...&key=KEY` | Test skyline PNG with overrides (requires `TEST_AUTH_KEY`) | none |
@@ -121,7 +121,7 @@ npm run dry-run
 npx wrangler deploy
 ```
 
-Your worker URL will be printed. Cron schedule: daily at **04:35 and 05:35 UTC** (next-day image warm, DECISIONS.md #64) and every 6 hours (weather/device data, the desk panel's data + the failure-alert check; headlines no longer, DECISIONS.md #82). The World Cup `*/15` refresh was removed at retirement (DECISIONS.md #61).
+Your worker URL will be printed. Cron schedule: daily at **04:35 and 05:35 UTC** (next-day image warm, DECISIONS.md #64) and every 6 hours (weather/device data, the desk panel's data + the failure-alert check; headlines no longer, DECISIONS.md #82). The daily warm makes two pictures, the colour moment (or colour birthday portrait) and the colour skyline; `/fact.png`, `/fact1.png` and `/skyline-bw` are no longer warmed and generate only on request (DECISIONS.md #83, #84). The World Cup `*/15` refresh was removed at retirement (DECISIONS.md #61).
 
 > **Why does the daily warm fire before midnight, and twice?** Cache keys are dated in America/Chicago, which rolls over at 05:00 UTC in CDT and 06:00 UTC in CST. Each fire warms the date the panels are *about to ask for*: after noon Chicago that is tomorrow (04:35 UTC = 23:35 CDT / 22:35 CST), after midnight it is today (05:35 UTC = 00:35 CDT, the safety net; 23:35 CST is a no-op). So the keys are already filled when the date rolls and no device poll can ever be the generator. The earlier 05:05/06:05 schedule fired *after* the roll and left a 5–8 minute hole in which a poll generated on the request path, SenseCraft's renderer timed out, and the panel went white (DECISIONS.md #57, #64).
 >
@@ -148,6 +148,8 @@ open fact.png fact1.png
 ## Image Pipelines
 
 Two pipelines share the same LLM event selection (scene-only prompt), then each prepends its own art style and uses its own image model.
+
+> **Both home panels show the colour pictures since 2026-10-16 (DECISIONS #84).** The home E1001 shows `/color/moment` and `/skyline`, converted by the panel, so `/fact` (Pipeline A, with its mono birthday portrait) and `/skyline-bw` are no longer warmed; the routes still work. The style lists were opened up at the same time: the colour moment rotates through 18 styles and the skyline through 19, and the dithering-era limits (limited palette, simple background, empty sky, silhouette separation) are gone from the prompts.
 
 > **As-is since 2026-10-15 (DECISIONS #81).** Every picture the panels show (`/fact`, `/color/moment`, `/skyline`, `/skyline-bw`, both birthday portraits) is now the AI image cropped to 800x480 in full colour and otherwise untouched, with any caption burned in as solid black and white; each panel converts it itself, as the series does (#73). The 4-grey quantiser and our Spectra 6 Floyd-Steinberg step are no longer used for these. Only `/fact1.png` (1-bit by design, not on any panel) still converts. The prompts no longer carry the hints written for our conversion (palette, flat colour, no gradients, no micro-detail), except Pipeline B's. The desk pages' crest and planet pictures are full colour too. The diagrams below keep the older steps where noted, for history.
 
@@ -260,15 +262,15 @@ Photos go in `photos/portraits/` with naming: `{key}_0.jpg`, `{key}_1.jpg`, etc.
 
 ### Pipeline D: Color, as-is (`/color/moment`)
 
-Uses **FLUX.2 klein-9b** (fallback SDXL) with 5 daily-rotating art styles (originally tuned for our 6-colour dithering). Since #81 the picture goes to the E1002 untouched in full colour and the panel converts it.
+Uses **FLUX.2 klein-9b** (fallback SDXL) with 18 daily-rotating art styles (5 until #84, tuned for our old 6-colour dithering). Since #81 the picture goes untouched in full colour to the E1002 and, since #84, to the home E1001; each panel converts it. On family birthdays it shows the colour birthday portrait, which the cron now warms first (#84).
 
-**Styles** (rotate daily by `(dayOfYear - 1) % 5`): Gouache, Oil Painting, Graphic Novel, Ink + Wash, Color Woodblock. Test override: `/color/test-moment?m=7&d=20&style=ink_wash`.
+**Styles** (rotate daily by `(dayOfYear - 1) % 18`): Gouache, Oil Painting, Graphic Novel, Ink + Wash, Color Woodblock, Woodcut, Pencil Sketch, Charcoal, Pen + Ink, Ink Noir, Linocut, Etching, Watercolor, Impressionist, Pointillist, Art Nouveau, Art Deco, Pop Art. Test override: `/color/test-moment?m=7&d=20&style=ink_wash`.
 
 ```
 Shared Moment (from KV cache or LLM)
         │
         ▼
-Pick daily style (Gouache / Oil Painting / Graphic Novel / Ink+Wash / Woodblock)
+Pick daily style (18-style rotation, DECISIONS #84)
         │
         ▼
 Prepend style prompt + anti-text suffix (the old palette suffix for our dithering was dropped, DECISIONS #81)
@@ -296,7 +298,7 @@ KV cache (24h)
 
 - **Image models**: FLUX.2 klein-9b (Pipeline A, Skyline with ref photos), SDXL (Pipeline B, Skyline fallback)
 - **LLM**: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (scene-only prompts, no style baked in)
-- **Art styles**: Daily rotation for Pipeline A (Woodcut / Pencil Sketch / Charcoal); 6-style rotation for Pipeline B (Woodcut / Silhouette / Linocut / Noir / Pen & Ink / Charcoal Block); 5-style rotation for Pipeline D (Gouache / Oil Painting / Graphic Novel / Ink+Wash / Color Woodblock)
+- **Art styles**: Daily rotation for Pipeline A (Woodcut / Pencil Sketch / Charcoal); 6-style rotation for Pipeline B (Woodcut / Silhouette / Linocut / Noir / Pen & Ink / Charcoal Block); 18-style rotation for Pipeline D (the five painterly styles plus the mono styles of A and B, etching and the birthday painters, #84); 19 skyline styles (9 mono + 10 colour, #84)
 - **Panel pictures**: full-colour RGB PNG, the AI image untouched apart from crop/resize and a solid black-and-white caption; the panels convert (#81). (Until #81: 4-level grayscale for the mono panel, Spectra 6 Floyd-Steinberg for the colour panel.)
 - **1-bit output**: True 1-bit PNG with style-aware conversion (Bayer dithering or histogram threshold)
 - **PNG encoder/decoder**: Pure JavaScript using Web API `CompressionStream`/`DecompressionStream`
@@ -420,7 +422,7 @@ The reTerminal's SenseCraft HMI has a "Web Function" that screenshots a URL onto
 
 **Page 1: Moment Before**
 1. Click **Add Page** → choose **Web Function**
-2. URL: `https://YOUR-URL.workers.dev/fact`
+2. URL: `https://YOUR-URL.workers.dev/color/moment` (the colour picture; the mono panel converts it. `/fact` still works but is no longer warmed, #84)
 3. Click **Save**
 
 **The series** (any panel, added 2026-10-14): use the plain addresses, **never with `?key=`** (a key would show unapproved chapters): `https://YOUR-URL.workers.dev/desk/series` (desk E1001), `/series` (home E1001), `/color/series` (E1002).
@@ -457,7 +459,7 @@ v3.11.2 adds guardrails around expensive AI generation:
 - **KV operations are a tighter budget than neurons (DECISIONS.md #62)**: the free tier allows **1,000 writes/day** (and 1,000 lists) against 100,000 reads. A normal day already spends **~590 writes (~59%)**, mostly ephemeral weather/alert/device caches refreshed by two panels polling every 15 min — which is what triggers Cloudflare's "nearing the daily cap" emails. Cost any new per-request write path against ~400 spare writes/day. The #58 stale-cache lookup used to do one KV `list` per request while AI is blocked (~40/hour of outage, approaching the 1,000/day cap over a multi-day outage — the fallback could have exhausted the quota it depends on). Fixed: listings are memoised under `stale-idx:v1:<prefix>` for 6h, taking a simulated 24h outage from **480 list ops to 20**, with a healthy day still at zero. Nothing trusts the index blindly — every candidate is verified with a real read (DECISIONS.md #62).
 - **Neuron budget**: the Workers AI free tier is 10,000 neurons/day (resets 00:00 UTC). FLUX.2 klein-9b costs ~1,364 neurons/image and is effectively the entire bill; a healthy day is ~5,555 neurons. See [INCIDENT-2026-08-20-neuron-budget-blowout.md](INCIDENT-2026-08-20-neuron-budget-blowout.md) for the diagnosis runbook (including how to query real usage, since Cloudflare has a known false-4006 bug).
 - **AI budget pause** ends at the next 00:00 UTC — when Workers AI actually resets the free neuron allocation — instead of a fixed 6 hours. A block that lifted early just burned neurons on generations that were never going to be granted (DECISIONS.md #57).
-- **Failure alerting (v3.16.0)**: both August outages were found by looking at a physical panel — the Worker degraded as designed and said nothing. The every-6h cron now checks whether the day's images (four since DECISIONS.md #83) are actually in KV and whether the AI budget guard is armed, and emails on a change of state via **Cloudflare Email Routing's `send_email` binding** (no third-party service, API key or account). A KV fingerprint keeps it to one email per distinct problem, at most one reminder per 24h, plus a single recovery notice. The check skips Chicago hours below 3 so it can't race the daily image warm. See DECISIONS.md #60 and **Alert setup** below.
+- **Failure alerting (v3.16.0)**: both August outages were found by looking at a physical panel — the Worker degraded as designed and said nothing. The every-6h cron now checks whether the day's images (two since DECISIONS.md #84: colour moment and skyline) are actually in KV and whether the AI budget guard is armed, and emails on a change of state via **Cloudflare Email Routing's `send_email` binding** (no third-party service, API key or account). A KV fingerprint keeps it to one email per distinct problem, at most one reminder per 24h, plus a single recovery notice. The check skips Chicago hours below 3 so it can't race the daily image warm. See DECISIONS.md #60 and **Alert setup** below.
 - **An alert banner costs whitespace, not content (v3.16.3)**: `/weather` and `/color/weather` are a fixed 480px flex column in which `.hourly` is the only flexible item, so it absorbed the entire ~39px an alert/rain banner adds — shrinking the hourly cards below their content height and clipping the temperatures mid-glyph on both panels. The server now tags the body `has-banner` when it renders one, and the stylesheet reclaims 40px from margins and padding, so the cards keep the height they have on a quiet day. **These pages carry only 5-7px of vertical slack**: anything added to them comes out of the hourly cards first, and `overflow: hidden` hides the evidence — verify by measuring the deepest rendered element at 800x480, not `body.scrollHeight` (DECISIONS.md #63).
 - `/color/headlines` is back on without Workers AI; it ranks RSS/scraped sources deterministically and caches results as `headlines:v3:YYYY-MM-DD:PERIOD`. Since 2026-10-16 no panel shows it and the cron no longer warms it (DECISIONS.md #82).
 

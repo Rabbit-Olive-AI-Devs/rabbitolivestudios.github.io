@@ -36,12 +36,11 @@ Your job:
    should match the era (e.g., 1945 Dresden has baroque churches and half-timbered houses, not skyscrapers).
    Do NOT include any art style or rendering technique (no "woodcut", "pencil", "charcoal", etc.).
    The style will be applied separately.
-   The prompt MUST include: cinematic composition, strong silhouette separation,
-   simple background, dramatic lighting.
+   The prompt MUST include a cinematic composition and the lighting and mood that suit the moment.
    No text or lettering, no pens, no pencils, no drawing tools, no art supplies, no hands.
 
 Reply with ONLY valid JSON, no markdown fences, no explanation:
-{"year":1912,"title":"Sinking of the Titanic","location":"North Atlantic Ocean","scene":"The great ocean liner lists steeply to one side, its stern rising from the black water. Lifeboats dot the sea below as tiny figures cling to the tilting deck.","prompt":"A massive ocean liner tilting steeply into dark ocean water at night, stern rising, lifeboats scattered on the sea below, tiny figures on the slanting deck. Strong silhouette separation, dramatic lighting, cinematic wide-angle composition."}`;
+{"year":1912,"title":"Sinking of the Titanic","location":"North Atlantic Ocean","scene":"The great ocean liner lists steeply to one side, its stern rising from the black water. Lifeboats dot the sea below as tiny figures cling to the tilting deck.","prompt":"A massive ocean liner tilting steeply into dark ocean water at night, stern rising, lifeboats scattered on the sea below, tiny figures on the slanting deck, distress flares lighting the night sky. Cinematic wide-angle composition, cold moonlight, tense mood."}`;
 
 /**
  * Build the user message listing today's events for the LLM.
@@ -153,7 +152,7 @@ function fallbackFromEvent(event: { year: number; text: string }): MomentBeforeD
     scene: event.text,
     imagePrompt:
       `A dramatic depiction of a historical event from ${event.year}. ` +
-      `Strong silhouette separation, dramatic lighting, cinematic composition.`,
+      `Dramatic lighting, cinematic composition.`,
   };
 }
 
@@ -166,7 +165,7 @@ function fallback(): MomentBeforeData {
     imagePrompt:
       "A Saturn V rocket lifting off from the launch pad, enormous plume of fire and smoke billowing outward, " +
       "the rocket clearing the launch tower against a bright sky. " +
-      "Strong silhouette separation, dramatic lighting, cinematic composition.",
+      "Dramatic lighting, cinematic composition.",
   };
 }
 

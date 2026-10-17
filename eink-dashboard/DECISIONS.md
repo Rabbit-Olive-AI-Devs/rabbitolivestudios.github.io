@@ -3744,3 +3744,47 @@ bw" from `/skyline-bw` to `/skyline`; saved both and pressed Apply ("Applied to 
 panel stayed online with its other settings unchanged. The `/fact` picture and the B&W skyline are
 still generated every night so the trial can be undone at once; they are retired only after the
 owner's verdict.
+
+**Trial verdict (2026-10-16 evening):** the owner first reported "all is working fine", then "we
+keep the color versions". The page list stays as set; #84 retires the two mono pictures.
+
+## 84. Colour Pictures on Both Home Panels; Every Art Style Enabled (2026-10-16)
+
+The owner kept the trial in #83 and asked that every artistic style be enabled: "don't
+constrain ourselves into what we thought would work on the displays - they seem to handle
+everything!"
+
+**Retired from the cron (routes kept, like #82 and #83):** the `/fact` picture (Pipeline A,
+`fact4:v5`), its mono birthday portrait (`birthday:v2`) and the B&W skyline (`skyline:…:bw`). No
+panel shows them now. The nightly warm makes two pictures, the colour moment (or the colour
+birthday portrait) and the colour skyline. The alert check and `/health-detailed` watch those two.
+The cron used to skip the colour birthday because the E1002 made it on request; it now warms it
+first, through `buildColorMomentEntry` (shared with the page), because the home panel shows it too.
+That saves one FLUX image a night (~1,364 neurons, about a quarter of the budget) plus one SDXL
+call and two KV writes.
+
+**Every style, no display limits.** The style lists were tuned for our own dithering. That
+dithering went in #81, but the lists stayed:
+- **Colour moment.** It rotates through 18 styles by `(dayOfYear - 1) % 18`. The original five
+  stay; "limited color palette" is dropped from the woodblock prompt. Added are the mono styles of
+  `/fact` and `/fact1` (woodcut, pencil, charcoal, pen and ink, ink noir, linocut), etching, and
+  the birthday painters (watercolor, impressionist, pointillist, Art Nouveau, Art Deco, Pop Art).
+  The 1-bit hints ("no midtones", "designed for high contrast black and white") are left out.
+- **Skyline.** It has 19 styles. Pen and ink, pencil and etching come back; v3.11.0 had culled
+  them as "gray mush on 4-level". Watercolor and impressionist oil are added. The "limited
+  palette / minimal texture / high readability / very clean sky" limits are removed from the
+  colour styles. So are the dithering-era composition rules in both prompt builders: the large
+  empty sky, minimal foreground, one sun disc, 2-4 birds and 1-3 clouds.
+- **Scene prompt** (`src/moment.ts`, shared by every pipeline). The LLM was told to require
+  "strong silhouette separation, simple background", a rule from the 1-bit days. Now it only has
+  to give a cinematic composition and lighting and mood that suit the moment. The moment key is
+  **not** bumped: bumping it would replace today's already-chosen event mid-day. The change starts
+  with the next date the cron warms.
+
+Keys: `color-moment:v4`, `skyline:v5`. On the next panel request each is served stale while
+today's is regenerated (two extra FLUX calls on deploy day, within budget).
+
+**Not changed:** the birthday portrait styles (already ten unconstrained painters), Pipeline B's
+1-bit styles (its own conversion still needs them), the World Cup code (#61).
+To undo for one panel, put its old page back in SenseCraft. The routes still generate on request,
+and the cron warm can be restored from this commit's parent.
