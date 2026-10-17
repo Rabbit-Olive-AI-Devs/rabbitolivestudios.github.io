@@ -3960,3 +3960,17 @@ about 1,000 neurons per FLUX image, including 1280x768 portraits; SDXL still bil
 Not done: making the budget block smarter about the lag (for example, letting the 05:35 UTC fire
 retry). It would add code for a case that so far comes only from test runs, so it stays a manual
 rule unless it happens without tests.
+
+**Addendum (2026-10-17 ~03:15 UTC, owner: go-ahead):** the production pause was armed at 02:50 UTC
+by `color/moment`. #86 had changed the day's moment style to `low_poly`, so its key was cold,
+and the first panel poll asked for AI and got the lagging 4006. To give the 04:35/05:35 UTC warms a
+clean try without a background job, Claude copied the cached `color-moment:v4:2026-10-16:gouache`
+entry (the picture the panels were already showing through the stale fallback) to
+`color-moment:v4:2026-10-16:low_poly` with a 7-day TTL, then deleted `ai-budget:v1:block`. That was
+two KV writes. Afterwards `/color/moment` served from cache (200, no stale-while-generating) and
+`config.ai_budget` read `blocked: false`. If the warm is refused again, the pause comes back and
+the 17 October pictures wait for 00:00 UTC on 18 October.
+
+Lesson for deploys that change style picking: a change that alters the current day's colour-moment
+key turns it cold and makes the next poll generate. Do it after a clean quota day, or pre-fill
+today's key.
