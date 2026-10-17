@@ -47,6 +47,13 @@ export function skylineCacheKey(
   return `skyline:${SKYLINE_CACHE_VERSION}:${dateStr}:r${rotateMin}:b${bucket}${bwSuffix}`;
 }
 
+export const FAMILY_CACHE_VERSION = "v1";
+
+/** Family Memory picture for a date: Jarvis's repainting or the photo itself, caption burned in (#92). */
+export function familyCacheKey(dateStr: string): string {
+  return `family:${FAMILY_CACHE_VERSION}:${dateStr}`;
+}
+
 export const PLANET_CACHE_VERSION = "v1";
 
 /** Planet of the day for the desk panel (src/planet.ts). */

@@ -83,7 +83,7 @@ test("the brief on a holiday carries the holiday moment without an LLM call", as
   const env = {
     CACHE: { get: async () => null, put: async () => {} },
     AI: { run: async () => { throw new Error("no LLM on a holiday"); } },
-    PHOTOS: { get: async () => null },
+    PHOTOS: { get: async () => null, head: async () => null },
   };
   const brief = await buildArtBrief(env, "2026-11-26");
   const moment = brief.pictures.find((p) => p.kind === "moment");

@@ -28,8 +28,9 @@ import { finishSkylinePNG } from "./skyline-image";
 import { saveColorEntry } from "./pages/color-moment";
 import { encodePNGRGB, pngToBase64 } from "./png";
 import { WIDTH, HEIGHT } from "./image";
+import { familyPicture } from "./family";
 
-export type ArtKind = "moment" | "skyline" | "birthday";
+export type ArtKind = "moment" | "skyline" | "birthday" | "family";
 
 const ANTI_TEXT_SUFFIX = "no text, no words, no letters, no writing, no signage, no captions, no watermark";
 
@@ -142,6 +143,9 @@ export async function buildArtBrief(env: Env, dateStr: string): Promise<ArtBrief
     });
   }
   pictures.push(skylinePicture(dateStr));
+  // Family Memory (#92): only when the Mac mini put a photo up; never themed, birthdays included.
+  const family = await familyPicture(env, dateStr);
+  if (family) pictures.push(family);
   const week = holidayWeek(dateStr);
   return {
     date: dateStr, deliverBy: "22:30 America/Chicago the evening before the date", rules: [...ART_RULES], pictures,
