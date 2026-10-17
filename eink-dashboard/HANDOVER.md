@@ -346,6 +346,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 - Thiago's birthday on 20 October is the first real colour birthday portrait on both home panels (2026 style: Pointillist). Ask the owner how it looked.
 - The planet in colour on the desk panel is still unjudged (#81 addendum 4).
 - Refresh the birthday references about once a year, as the children grow (#87).
+- **Next project, designed and not built:** Jarvis makes the daily pictures through the series mailbox, and the mini's watcher uploads them into the same cache keys. Workers AI stays as the fallback (`docs/superpowers/specs/2026-10-17-jarvis-picture-pipeline-design.md`; owner questions listed there). Moving to the MacBook is optional (`docs/superpowers/plans/2026-10-17-move-to-macbook.md`). The mini does not system-sleep. It only locks, and all jobs kept running overnight (checked 2026-10-17).
 
 **Unconfirmed as of 2026-10-02:**
 
