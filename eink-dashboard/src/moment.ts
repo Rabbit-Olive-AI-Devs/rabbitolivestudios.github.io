@@ -12,6 +12,7 @@
 
 import type { Env, MomentBeforeData, CachedValue } from "./types";
 import { momentCacheKey } from "./cache-keys";
+import { holidayMoment, withHolidayMood } from "./holidays";
 
 const LLM_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast" as const;
 
@@ -183,12 +184,19 @@ export async function getOrGenerateMoment(
   events: Array<{ year: number; text: string }>,
   dateStr: string,
 ): Promise<MomentBeforeData> {
+  // On a holiday the picture is the holiday's own history, not the day's event: no LLM call
+  // (DECISIONS #91). In the week before, the event keeps its scene with the holiday's mood added;
+  // the cache holds the event as picked, so the mood never sticks to it.
+  const holiday = holidayMoment(dateStr);
+  if (holiday) return holiday;
+  const withMood = (m: MomentBeforeData): MomentBeforeData => ({ ...m, imagePrompt: withHolidayMood(dateStr, m.imagePrompt) });
+
   const cacheKey = momentCacheKey(dateStr);
 
   const cached = await env.CACHE.get<CachedValue<MomentBeforeData>>(cacheKey, "json");
   if (cached && Date.now() - cached.timestamp < MOMENT_CACHE_TTL_MS) {
     console.log("Moment: cache hit");
-    return cached.data;
+    return withMood(cached.data);
   }
 
   const moment = await generateMomentBefore(env, events);
@@ -198,5 +206,5 @@ export async function getOrGenerateMoment(
   if (moment.title !== "") {
     await env.CACHE.put(cacheKey, JSON.stringify({ data: moment, timestamp: Date.now() }), { expirationTtl: 604800 });
   }
-  return moment;
+  return withMood(moment);
 }

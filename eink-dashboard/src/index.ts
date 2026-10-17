@@ -440,9 +440,9 @@ async function handleSkylinePng(env: Env, url: URL, ctx?: ExecutionContext): Pro
   const style = pickSkylineStyle(parts, opts);
   const debug = skylineDebugHeaders(dateStr, mode, rotateMin, bucket, city, style.key, style.colorMode);
 
-  const refPrompt = buildSkylineRefPrompt(city, style);
-  const sdxlPrompt = buildSkylinePrompt(city, style);
-  const caption = formatSkylineCaption(city, parts.displayDate);
+  const refPrompt = buildSkylineRefPrompt(city, style, parts.dateStr);
+  const sdxlPrompt = buildSkylinePrompt(city, style, parts.dateStr);
+  const caption = formatSkylineCaption(city, parts.displayDate, parts.dateStr);
   const photoSeed = djb2(`${dateStr}|photo|${bucket}`);
 
   // mode=random → no cache
@@ -609,9 +609,9 @@ async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
   const style = (styleOverride ? findSkylineStyleByKey(styleOverride) : null) ?? pickSkylineStyle(parts, opts);
   const colorMode: SkylineColorMode = colorOverride === "1" ? "color" : colorOverride === "0" ? "bw" : style.colorMode;
 
-  const refPrompt = buildSkylineRefPrompt(city, { ...style, colorMode });
-  const sdxlPrompt = buildSkylinePrompt(city, { ...style, colorMode });
-  const caption = formatSkylineCaption(city, parts.displayDate);
+  const refPrompt = buildSkylineRefPrompt(city, { ...style, colorMode }, parts.dateStr);
+  const sdxlPrompt = buildSkylinePrompt(city, { ...style, colorMode }, parts.dateStr);
+  const caption = formatSkylineCaption(city, parts.displayDate, parts.dateStr);
   const photoSeed = djb2(`${parts.dateStr}|photo|${bucket}`);
   console.log(`Skyline test: ${city.name} | ${style.label} (${colorMode}) | ${parts.dateStr} | mode=${mode}`);
 
@@ -957,9 +957,9 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
         const skylineOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 };
         const skylineCity = pickSkylineCity(skylineParts, skylineOpts);
         const skylineStyle = pickSkylineStyle(skylineParts, skylineOpts);
-        const skylineRefPrompt = buildSkylineRefPrompt(skylineCity, skylineStyle);
-        const skylineSdxlPrompt = buildSkylinePrompt(skylineCity, skylineStyle);
-        const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate);
+        const skylineRefPrompt = buildSkylineRefPrompt(skylineCity, skylineStyle, dateStr);
+        const skylineSdxlPrompt = buildSkylinePrompt(skylineCity, skylineStyle, dateStr);
+        const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate, dateStr);
         const skylinePhotoSeed = djb2(`${dateStr}|photo|daily`);
         const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineSdxlPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
         await env.CACHE.put(skylineDailyKey, skylineResult.base64, { expirationTtl: 604800 });

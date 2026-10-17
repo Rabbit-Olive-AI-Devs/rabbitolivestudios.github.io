@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-17 · **Describes:** v3.22.0 (2026-10-17: #82-#90) (code: #90 the alert watches Jarvis's deliveries and the Mac mini; #89 Jarvis draws the daily pictures through the series mailbox, Workers AI as backup; #87 birthday references picked from the owner's Photos library; #86 one shared art-style library of 71 styles; #85 a birthday style per person, face-cropped reference photos, likeness prompt, no invented seals; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-17, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-17 · **Describes:** v3.22.0 (2026-10-17: #82-#90) + #91 holiday weeks theme the daily pictures (not yet a version) (code: #90 the alert watches Jarvis's deliveries and the Mac mini; #89 Jarvis draws the daily pictures through the series mailbox, Workers AI as backup; #87 birthday references picked from the owner's Photos library; #86 one shared art-style library of 71 styles; #85 a birthday style per person, face-cropped reference photos, likeness prompt, no invented seals; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-17, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -256,7 +256,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 295 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 302 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -399,6 +399,7 @@ This is separate from the Muse firmware experiment above, which concerns the fir
 | Colour pipeline | `src/pages/color-moment.ts`, `src/image-color.ts`, `src/dither-spectra6.ts`, `src/spectra6.ts` |
 | Skyline | `src/skyline.ts`, `src/skyline-image.ts`, `src/pages/skyline.ts` |
 | Art styles (shared) | `src/art-styles.ts` |
+| Holiday weeks (#91) | `src/holidays.ts` |
 | Birthday | `src/birthday.ts`, `src/birthday-image.ts`; references: `scripts/pick-portraits-from-photos.py` → `scripts/prepare-portraits.py` (+ `portrait-faces.swift`) → `npm run upload-photos` |
 | Weather | `src/weather.ts`, `src/weather-nws.ts`, `src/alerts.ts`, `src/device.ts`, `src/weather-ui.ts`, `src/pages/weather2.ts`, `src/pages/color-weather.ts` |
 | Caching and guards | `src/cache-keys.ts`, `src/cache-guard.ts`, `src/stale-cache.ts`, `src/with-budget.ts` |

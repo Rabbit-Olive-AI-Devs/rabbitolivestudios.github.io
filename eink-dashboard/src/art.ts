@@ -18,6 +18,7 @@ import { getOrGenerateMoment, eventCandidates } from "./moment";
 import { momentCacheKey, skylineCacheKey } from "./cache-keys";
 import { getAiBudgetBlock } from "./cache-guard";
 import { momentStyleFor } from "./art-styles";
+import { holidayMoment, holidayWeek, withHolidayMood } from "./holidays";
 import { getBirthdayToday, getBirthdayStyle } from "./birthday";
 import type { BirthdayPerson } from "./birthday";
 import { ageDescription, likenessPrompt } from "./birthday-image";
@@ -56,6 +57,7 @@ export interface ArtBrief {
   rules: string[];
   pictures: ArtPicture[];
   waiting?: ArtKind[];      // pictures that cannot be briefed yet (the day's event is not picked)
+  holiday?: string;         // a holiday week (#91): the prompts already carry its theme; this names it
 }
 
 /** Rules every picture follows; the panels convert full colour themselves (DECISIONS #81). */
@@ -86,7 +88,7 @@ export function skylinePicture(dateStr: string): ArtPicture {
     kind: "skyline",
     file: `${dateStr}-skyline.png`,
     style: { id: style.key, name: style.label },
-    prompt: buildSkylinePrompt(city, style),
+    prompt: buildSkylinePrompt(city, style, dateStr),
     subject: { city: city.name, landmarks: city.landmarks },
   };
 }
@@ -124,7 +126,7 @@ export async function buildArtBrief(env: Env, dateStr: string): Promise<ArtBrief
       kind: "moment",
       file: `${dateStr}-moment.png`,
       style: { id: style.id, name: style.name },
-      prompt: `${style.prompt}, [the scene you choose: the event itself at its defining moment of action], ${ANTI_TEXT_SUFFIX}`,
+      prompt: `${style.prompt}, ${withHolidayMood(dateStr, "[the scene you choose: the event itself at its defining moment of action]")}, ${ANTI_TEXT_SUFFIX}`,
       subject: { note: "choose the event from chooseEvent.candidates" },
       chooseEvent: { instructions: CHOOSE_EVENT, candidates },
     });
@@ -140,14 +142,18 @@ export async function buildArtBrief(env: Env, dateStr: string): Promise<ArtBrief
     });
   }
   pictures.push(skylinePicture(dateStr));
+  const week = holidayWeek(dateStr);
   return {
     date: dateStr, deliverBy: "22:30 America/Chicago the evening before the date", rules: [...ART_RULES], pictures,
     ...(waiting.length ? { waiting } : {}),
+    ...(week ? { holiday: week.isDay ? week.holiday.name : `${week.holiday.name} week` } : {}),
   };
 }
 
 /** The day's event for the brief, or null when it cannot be picked now. */
 async function briefMoment(env: Env, dateStr: string): Promise<MomentBeforeData | null> {
+  const holiday = holidayMoment(dateStr);   // a holiday's moment needs no LLM call (#91)
+  if (holiday) return holiday;
   if (!(await env.CACHE.get(momentCacheKey(dateStr))) && (await getAiBudgetBlock(env))) return null;
   const { events } = await getTodayEvents(env, dateStr);
   const moment = await getOrGenerateMoment(env, events, dateStr);
@@ -236,7 +242,7 @@ export async function storeJarvisSkyline(env: Env, dateStr: string): Promise<boo
   if (!rgb) return false;
   const parts = parseDateParts(dateStr);
   const city = pickSkylineCity(parts, { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 });
-  const png = await finishSkylinePNG(rgb, formatSkylineCaption(city, parts.displayDate));
+  const png = await finishSkylinePNG(rgb, formatSkylineCaption(city, parts.displayDate, dateStr));
   await env.CACHE.put(skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0), pngToBase64(png), { expirationTtl: 604800 });
   await env.PHOTOS.delete(artKey(dateStr, "skyline"));
   await markJarvisDrew(env, dateStr, "skyline");

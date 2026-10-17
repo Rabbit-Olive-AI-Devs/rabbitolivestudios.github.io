@@ -10,6 +10,7 @@
  */
 
 import { stylesFor, dailyPick, momentStyleFor } from "./art-styles";
+import { holidayWeek } from "./holidays";
 
 export const SKYLINE_SERIES_NAME = "World Skyline Series";
 
@@ -236,51 +237,55 @@ const ANTI_TEXT_SUFFIX =
 /**
  * Build prompt for text-only generation (SDXL fallback, no reference photo).
  */
-export function buildSkylinePrompt(city: SkylineCity, style: SkylineStyle): string {
+export function buildSkylinePrompt(city: SkylineCity, style: SkylineStyle, dateStr: string): string {
   const sceneBase =
     `iconic skyline of ${city.name} featuring ${city.landmarks}, ` +
     "viewed from a classic overlook (waterfront or park)";
 
-  const lighting =
-    style.colorMode === "color"
-      ? "golden-hour sunset or late afternoon daylight, soft warm sky"
-      : "clear daylight";
-
   // No palette, detail or composition limits: they were for our own dithering, retired in #81
   // (DECISIONS #84).
-  const parts: string[] = [style.promptPrefix, sceneBase, lighting, "avoid photographic realism", ANTI_TEXT_SUFFIX];
+  const parts: string[] = [style.promptPrefix, sceneBase, ...holidayDressing(style, dateStr), "avoid photographic realism", ANTI_TEXT_SUFFIX];
 
   return parts.join(", ");
+}
+
+/**
+ * The scene's light, and in a holiday week the city's holiday dressing in place of the usual
+ * golden hour (DECISIONS #91).
+ */
+function holidayDressing(style: SkylineStyle, dateStr: string): string[] {
+  const week = holidayWeek(dateStr);
+  if (week) return [week.holiday.skyline, week.holiday.lighting];
+  return [style.colorMode === "color" ? "golden-hour sunset or late afternoon daylight, soft warm sky" : "clear daylight"];
 }
 
 /**
  * Build prompt for FLUX.2 generation WITH a reference photo (input_image_0).
  * The reference anchors the composition; the style prompt handles artistic reinterpretation.
  */
-export function buildSkylineRefPrompt(city: SkylineCity, style: SkylineStyle): string {
+export function buildSkylineRefPrompt(city: SkylineCity, style: SkylineStyle, dateStr: string): string {
   const scene =
     `artistic reinterpretation of the scene in image 0 as an iconic ${city.name} skyline, ` +
     `featuring ${city.landmarks}`;
 
-  const lighting =
-    style.colorMode === "color"
-      ? "golden-hour sunset or late afternoon daylight, soft warm sky"
-      : "clear daylight";
-
-  const parts: string[] = [style.promptPrefix, scene, lighting, "avoid photographic realism", ANTI_TEXT_SUFFIX];
+  const parts: string[] = [style.promptPrefix, scene, ...holidayDressing(style, dateStr), "avoid photographic realism", ANTI_TEXT_SUFFIX];
 
   return parts.join(", ");
 }
 
 // --- Caption formatter (must match: City | World Skyline Series | Mon DD, YYYY) ---
-export function formatSkylineCaption(city: SkylineCity, displayDate: string): {
+// In a holiday week the centre names it: "World Skyline Series - Halloween Week", and on the day
+// "World Skyline Series - Halloween" (ASCII only: the caption font is the 8x8 bitmap).
+export function formatSkylineCaption(city: SkylineCity, displayDate: string, dateStr: string): {
   left: string;
   center: string;
   right: string;
 } {
+  const week = holidayWeek(dateStr);
+  const holiday = week ? ` - ${week.holiday.name}${week.isDay ? "" : " Week"}` : "";
   return {
     left: city.name,
-    center: SKYLINE_SERIES_NAME,
+    center: SKYLINE_SERIES_NAME + holiday,
     right: displayDate,
   };
 }

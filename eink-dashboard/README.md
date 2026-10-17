@@ -4,7 +4,7 @@ A Cloudflare Workers backend for the **reTerminal E1001** (ESP32-S3, 7.5" ePaper
 
 Every day it generates an AI illustration depicting a famous historical event at its most iconic, dramatic moment — the viewer sees the scene, the location, and the date.
 
-Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67). Since v3.22.0 the daily pictures are drawn by the owner's agent Jarvis from an evening brief, with Workers AI as the backup, in styles from one shared library of 71, and both home panels show them in full colour (DECISIONS.md #84-#90).
+Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67). Since v3.22.0 the daily pictures are drawn by the owner's agent Jarvis from an evening brief, with Workers AI as the backup, in styles from one shared library of 71, and both home panels show them in full colour (DECISIONS.md #84-#90). In the week before each holiday (Carnaval, Easter, Festa Junina, the Fourth of July, Halloween, Thanksgiving, Christmas, New Year) the skyline city is dressed for it and the moment leans its way; on the day itself the moment shows the holiday's own history (DECISIONS.md #91).
 
 ## The Concept
 
@@ -268,6 +268,8 @@ Photos go in `photos/portraits/` with naming: `{key}_0.jpg`, `{key}_1.jpg`, etc.
 Uses **FLUX.2 klein-9b** (fallback SDXL) with 18 daily-rotating art styles (5 until #84, tuned for our old 6-colour dithering). Since #81 the picture goes untouched in full colour to the E1002 and, since #84, to the home E1001; each panel converts it. On family birthdays it shows the colour birthday portrait, which the cron now warms first (#84).
 
 **Styles** (DECISIONS #86): the 70 scene styles of the shared library `src/art-styles.ts`, from gouache, fresco and Brazilian modernism to cordel woodcut, azulejo tiles, cyanotype, ligne claire, claymation and tintype. Each block of 70 days walks them in a fresh random order, so none repeats until all have had a day. Test override: `/color/test-moment?m=7&d=20&style=cordel`.
+
+**Holiday weeks** (DECISIONS #91, `src/holidays.ts`): for the 7 days up to each holiday the scene gets a mood line, and on the holiday itself the moment is a documented event from the holiday's history instead of the day's event (no LLM call). The skyline's city is dressed for the holiday in those weeks and its caption reads "World Skyline Series - Halloween Week". Birthday portraits are never themed.
 
 ```
 Shared Moment (from KV cache or LLM)

@@ -4069,3 +4069,37 @@ those pictures were stored before markers existed. Tests cover the quiet rule (2
 that never reported counts as quiet), the wording, and the date-free fingerprints.
 
 **Released as v3.22.0 (2026-10-17, owner's approval):** #82-#90: headlines and Pipeline B no longer warmed, colour pictures on both home panels, every art style in one shared library, birthday portraits with a style per person and likeness from face crops picked from the Photos library, Jarvis drawing the daily pictures with Workers AI as the backup, the event-pick fallback, and the alerts for a missed night or a quiet Mac mini.
+
+---
+
+## 91. Holiday Weeks Theme the Daily Pictures (2026-10-17)
+
+The owner picked "holiday weeks" from a list of ideas, and approved this shape. For the **7 days up
+to and including** each holiday, the pictures take on its theme (`src/holidays.ts`, pure):
+
+- **The skyline** does most of it: the day's city and style are picked as usual, but the city is
+  dressed for the holiday (Halloween: jack-o'-lanterns, fog, bats across a full moon) and the
+  holiday's light replaces the usual golden hour. The caption's centre reads
+  "World Skyline Series - Halloween Week", and on the day "- Halloween" (ASCII: the caption font is
+  the 8x8 bitmap; a long centre is trimmed by the existing layout). The dressing names no snow,
+  because half the cities are in the southern hemisphere.
+- **The moment** keeps the day's real event on the six days before, since dressing history up as a
+  holiday would be silly; only a mood line leans the holiday's way. It is added by
+  `getOrGenerateMoment` on the way out, so the cached event never carries it.
+- **On the holiday itself** the moment is a documented event from the holiday's own history
+  (Halloween: Anoka's 1920 parade; Christmas: the 1914 truce; New Year: the first Times Square ball
+  drop, 1908), returned without an LLM call, so it costs nothing and cannot be refused.
+- **Birthday portraits are never themed.** Their day comes first: 31 October is Álvaro's birthday,
+  so that day the colour picture is his portrait and only the skyline goes Halloween.
+- **Jarvis** gets the theme through the same brief: the prompts carry it, and the brief adds a
+  `holiday` field naming the week. Workers AI draws the same if he misses a night.
+
+Holidays (US and Brazil): Carnaval (Easter - 47), Easter, Festa Junina (24 June), the Fourth of July,
+Halloween, Thanksgiving (fourth Thursday of November), Christmas, New Year (its week starts on 26
+December). Día de los Muertos / Finados was proposed and taken out by the owner. A test checks
+that no two weeks overlap through 2040.
+
+**No cache-key bump**, on purpose. Outside holiday weeks every prompt is byte-for-byte unchanged, and
+the keys are per date; the first themed date (25 Oct) is not cached yet, as the warm only fills the
+next day. Bumping `color-moment` or `skyline` now would have thrown away today's pictures by Jarvis
+and made Workers AI redraw them.
