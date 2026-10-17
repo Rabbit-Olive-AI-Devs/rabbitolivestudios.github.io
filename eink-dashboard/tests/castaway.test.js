@@ -92,11 +92,11 @@ test("every calendar moment in a whole year fits and has glyphs (holidays, birth
 });
 
 test("easter eggs turn up: dated ones on their day, rare ones now and then", () => {
-  assert.ok(dayTimeline("2027-05-04", {}).some((m) => m.beat === DATED_EGGS[0].beat));
+  assert.ok(dayTimeline("2027-10-21", {}).some((m) => m.beat === DATED_EGGS[0].beat));
   let rare = 0;
   for (let i = 4; i < 370; i++) {
     const d = new Date(Date.UTC(2026, 9, 17 + i)).toISOString().slice(0, 10);
     if (dayTimeline(d, {}).some((m) => RARE_EGGS.includes(m.beat))) rare++;
   }
-  assert.ok(rare > 20 && rare < 70, `rare eggs in a year: ${rare}`);
+  assert.ok(rare > 10 && rare < 45, `rare eggs in a year: ${rare}`);
 });

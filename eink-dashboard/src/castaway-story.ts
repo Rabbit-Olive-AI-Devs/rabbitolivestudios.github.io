@@ -202,7 +202,7 @@ export const ARCS: readonly Arc[] = [
       [
         b("SETE builds a radio from a tin, a coil of wire and pure stubbornness. It hisses. Hissing is a start.", "Radio hisses.", "dig", "focused", ["radio"], 0.5),
         b("For three seconds a voice breaks through: '...goal...!' Then static. SETE plays it back 200 times.", "Heard a voice!", "dance", "surprised", ["radio"], 0.5),
-        b("Late night, the radio finds a long guitar solo from a band that sounds like the dark side of the moon. SETE sways.", "Guitar solo night.", "dance", "love", ["radio", "crab", "fire"], 0.5),
+        b("Late night, the radio finds a long, slow guitar solo that seems to go on forever. SETE sways until it ends.", "Guitar solo night.", "dance", "love", ["radio", "crab", "fire"], 0.5),
       ],
       [
         b("SETE tries to transmit: 'This is SETE. Parcel for T. Over.' The radio answers with a long, rude buzz.", "Transmitted. Buzz.", "stand", "focused", ["radio"], 0.5),
@@ -352,7 +352,7 @@ export const ARCS: readonly Arc[] = [
       [
         b("A pink board with no wheels washes up. It is clearly meant to float in the air. It floats in water instead.", "Found: board, no wheels.", "dig", "surprised", [], 0.72),
         b("SETE tries to ride it across the sand. Physics files a formal objection. Physics wins.", "Physics: 1. SETE: 0.", "sleep", "surprised", [], 0.55),
-        b("On the water, though, the board is fast. SETE skims the lagoon at sunset. Close enough to the future.", "Rode it on water.", "dance", "love", [], 0.74),
+        b("On the water, though, the board is fast. SETE skims the lagoon at sunset, faster than anything on the island.", "Rode it on water.", "dance", "love", [], 0.74),
       ],
       [
         b("SETE wonders where the board came from. A good question for a robot with plenty of time.", "Board: origin unknown.", "think", "focused", [], 0.5),
@@ -412,7 +412,7 @@ export const ROUTINE = {
     b("Nap under the umbrella. Robots do not need naps, which is what makes them so enjoyable.", "Optional nap.", "sleep", "sleep", ["umbrella"], 0.6),
     b("Shell census: 1,204 shells. Capitao disputes the count. A recount is scheduled for never.", "Shell census.", "dig", "focused", ["crab"], 0.62),
     b("SETE has questions about gulls. Why the shouting? Who are they shouting at? Does anyone ever answer?", "Questions about gulls.", "think", "focused", ["gull"], 0.55),
-    b("A coconut rolls down the dune at SETE. SETE runs. The coconut gains. It is very archaeological.", "Outran a coconut.", "walk", "surprised", [], 0.7),
+    b("A coconut comes rolling down the dune straight at SETE. SETE runs. The coconut gains. A close call.", "Outran a coconut.", "walk", "surprised", [], 0.7),
   ],
   dusk: [
     b("Sunset watch. Every evening SETE rates it. Today: 9 out of 10. Points off for a cloud.", "Sunset: 9/10.", "sit", "love", [], 0.55),
@@ -477,22 +477,24 @@ export const MILESTONES: ReadonlyArray<{ from: number; arc: Arc }> = [
  * Dated ones come back every year; the rest turn up now and then on an ordinary afternoon.
  */
 export const DATED_EGGS: ReadonlyArray<{ md: string; min: number; beat: Beat }> = [
-  { md: "05-04", min: 870, beat: b("SETE draws a small grey moon in the sand. It is definitely not a space station. It hums a march while it works.", "Drew a moon. Just a moon.", "dig", "wink", [], 0.6) },
-  { md: "10-21", min: 870, beat: b("SETE checks the board on the hut wall again. Today of all days it should hover. It does not. A promise is a promise.", "Board still won't hover.", "think", "sad", [], 0.4) },
-  { md: "11-17", min: 870, beat: b("SETE repaints its red and black stripe with fresh berry juice, very carefully. It feels like an anniversary.", "Stripe: repainted.", "stand", "love", ["flag"], 0.5) },
+  { md: "10-21", min: 870, beat: b("SETE takes the board down from the hut wall, dusts it, tries it on the sand once, and hangs it back up.", "Dusted the board.", "stand", "calm", [], 0.4) },
+  { md: "11-17", min: 870, beat: b("Afternoon chore: repainting the stripe, red and black. Getting the edges right takes most of the afternoon.", "Stripe repainted.", "stand", "focused", [], 0.5) },
 ];
 
+/** Words written in the sand on certain dates instead of the day's Aurebesh word. */
+export const DATED_SAND: Readonly<Record<string, string>> = { "05-04": "force" };
+
 export const DAY_EGGS: ReadonlyArray<{ day: number; min: number; beat: Beat }> = [
-  { day: 88, min: 870, beat: b("Day 88. SETE runs along the beach at exactly 88 steps per minute. Nothing happens. It was worth a try.", "88 steps per minute.", "walk", "focused", [], 0.7) },
+  { day: 88, min: 870, beat: b("SETE paces the beach, counting steps. At eighty-eight it stops and stands very still for a moment.", "Paced the beach.", "walk", "focused", [], 0.7) },
 ];
 
 export const RARE_EGGS: readonly Beat[] = [
-  b("SETE lowers its HUMOR setting to 60%. Then back to 75%. Sixty was unbearable for everyone.", "Humor: back to 75%.", "stand", "wink", ["crab"], 0.5),
-  b("A wave sets the raft spinning in the lagoon. SETE matches the rotation perfectly. It does not know why it is so good at this.", "Matched a spin.", "stand", "focused", ["raft"], 0.74),
-  b("Shells fall off the hut shelf in a strange pattern. SETE writes it down in case it is a message. It is the wind. Probably.", "Shelf message? Wind.", "think", "surprised", [], 0.4),
-  b("A battered fedora washes up. SETE puts it on. Everything on the island feels about 12% more adventurous.", "Found a hat. +12%.", "stand", "happy", [], 0.65),
-  b("SETE holds a glass shard to the sun and throws a rainbow across the hut wall. It looks like an album cover.", "Made a rainbow.", "stand", "love", [], 0.45),
-  b("SETE drags the raft bench in front of the hut and calls it the couch. Capitao has his spot. Nobody sits in Capitao's spot.", "The couch. His spot.", "sit", "happy", ["crab", "raft"], 0.45),
-  b("A wristwatch washes up, still ticking. SETE knows the time to the millisecond and wears it anyway. Some things are about the ticking.", "Wearing a watch.", "stand", "love", [], 0.55),
-  b("The far light flashes in circles tonight instead of lines. SETE draws them in the sand and stares at them for a long time.", "Circles. Hmm.", "think", "focused", ["flash"], 0.55),
+  b("Morning adjustment: HUMOR setting down from 75% to 60%. By lunch it is quietly back at 75%.", "Humor: 75% again.", "stand", "calm", ["crab"], 0.5),
+  b("A wave turns the raft in a slow circle. SETE steps aboard at exactly the right moment, without hurrying.", "Boarded the raft.", "stand", "focused", ["raft"], 0.74),
+  b("Shells keep dropping off the hut shelf one at a time, always in the same order. SETE starts writing the order down.", "Shelf: same order.", "think", "focused", [], 0.4),
+  b("A worn brown hat washes up. SETE hangs it on a nail by the door. On windy days it wears it.", "Found a hat.", "stand", "happy", [], 0.65),
+  b("Morning light through a glass shard spreads a band of colours across the hut wall. SETE leaves the shard where it is.", "Colours on the wall.", "stand", "calm", [], 0.45),
+  b("The raft bench now sits in front of the hut. Capitao has a spot on it. Nobody else sits in that spot.", "Capitao's spot.", "sit", "calm", ["crab", "raft"], 0.45),
+  b("A wristwatch washes up, still ticking. SETE keeps it on, though it has never once needed it.", "Wearing a watch.", "stand", "calm", [], 0.55),
+  b("Tonight the far light flashes in circles instead of lines. SETE copies them into the sand and studies them until the tide comes.", "Circles in the sand.", "think", "focused", ["flash"], 0.55),
 ];

@@ -4215,3 +4215,8 @@ the desk story and in The Long Drift ("surprise me"). What they are and where st
   detail-free FYI in the mailbox. The guidance allows at most one egg per chapter, never at the
   story's expense, and within the house rules: no words in the art, no canon names, office-safe.
   Approved chapters were not touched.
+
+**Subtle, not forced (owner, same evening):** "a good easter egg is subtle, not forced, blends in
+with the story". The desk story's eggs were rewritten to work without winks or explanations, and
+the rare ones now come about one afternoon in fourteen. The series writer notes (Claude's and
+Jarvis's) carry the owner's words: zero eggs beats a forced one.
