@@ -56,7 +56,7 @@ export interface ArtBrief {
 
 /** Rules every picture follows; the panels convert full colour themselves (DECISIONS #81). */
 export const ART_RULES: readonly string[] = [
-  "Landscape, at least 1600x960 pixels; the panel shows 800x480 (5:3) and crops anything wider or taller from the centre, so keep the subject in the middle.",
+  "Landscape, 3:2 or wider, at least 1536x1024 pixels; the panel shows 800x480 (5:3) and crops the rest from the centre, so keep the subject in the middle.",
   "Full colour, as rich as the style allows. Do not make it black and white for the mono panel: each panel converts the picture itself.",
   "Follow the style exactly; it is chosen by a schedule so that no style repeats.",
   "No text, letters, numbers, signatures, seals, logos or watermarks anywhere. The caption is added afterwards.",
