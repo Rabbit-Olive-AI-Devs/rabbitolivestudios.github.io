@@ -114,6 +114,20 @@ export async function fetchReferencePhotos(env: Env, key: string): Promise<Uint8
 }
 
 /**
+ * The portrait prompt when reference photos are given. Likeness first: the references are face
+ * crops (scripts/prepare-portraits.py), and the prompt asks for the face to be kept and only the
+ * medium to change (DECISIONS #85). Shared with Jarvis's brief (#89).
+ */
+export function likenessPrompt(imageRefs: string, ageLine: string, stylePrompt: string): string {
+  return `portrait of ${imageRefs}, ${ageLine}, rendered as ${stylePrompt}. ` +
+    "Keep their exact likeness from the photos: the same face shape, eyes, eyebrows, nose, mouth, smile, " +
+    "hairline, hairstyle, hair color, facial hair and skin tone, instantly recognizable. " +
+    "Only the artistic medium changes, not the face. Head and shoulders, centered, looking at the viewer, " +
+    "warm natural smile, eyes clearly visible, no sunglasses, no text, no words, no letters, no writing, " +
+    "no signature, no seal, no stamp, no calligraphy";
+}
+
+/**
  * Call FLUX.2 klein-9b via multipart FormData.
  * Steps are fixed at 4 for klein models.
  * Supports up to 4 reference images for better likeness.
@@ -136,14 +150,7 @@ export async function callFluxPortrait(
     const imageRefs = photos.length === 1
       ? "the person in image 0"
       : `the person shown in images ${photos.map((_, i) => i).join(", ")} (the same person in every photo)`;
-    // Likeness first: the references are face crops (scripts/prepare-portraits.py), and the
-    // prompt asks for the face to be kept and only the medium to change (DECISIONS #85).
-    prompt = `portrait of ${imageRefs}, ${ageLine}, rendered as ${stylePrompt}. ` +
-      "Keep their exact likeness from the photos: the same face shape, eyes, eyebrows, nose, mouth, smile, " +
-      "hairline, hairstyle, hair color, facial hair and skin tone, instantly recognizable. " +
-      "Only the artistic medium changes, not the face. Head and shoulders, centered, looking at the viewer, " +
-      "warm natural smile, eyes clearly visible, no sunglasses, no text, no words, no letters, no writing, " +
-      "no signature, no seal, no stamp, no calligraphy";
+    prompt = likenessPrompt(imageRefs, ageLine, stylePrompt);
   } else {
     prompt = `artistic portrait of ${ageLine}, ${stylePrompt}, head and shoulders, centered composition, looking at viewer, smiling, no text, no words, no letters, no writing`;
   }

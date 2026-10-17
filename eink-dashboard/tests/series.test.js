@@ -572,6 +572,8 @@ test("mailbox: APPROVE, DELIVERY and STYLE TEST first lines are parsed", () => {
   assert.deepEqual(mb.parseMessage("APPROVE season=0 chapter=1 revision=0123456789abcdef\n\nLooks good."), { kind: "APPROVE", season: 0, chapters: [1], revisions: ["0123456789abcdef"] });
   assert.deepEqual(mb.parseMessage("\napprove season=0 chapters=1,2 revisions=0123456789ABCDEF,fedcba9876543210"), { kind: "APPROVE", season: 0, chapters: [1, 2], revisions: ["0123456789abcdef", "fedcba9876543210"] });
   assert.deepEqual(mb.parseMessage("DELIVERY package=season-01-chapter-01.zip\nnotes"), { kind: "DELIVERY", package: "season-01-chapter-01.zip", replaceApproved: false });
+  assert.deepEqual(mb.parseMessage("ART DELIVERY date=2026-10-18\n\nmoment and skyline"), { kind: "ART DELIVERY", date: "2026-10-18" });
+  assert.equal(mb.parseMessage("ART DELIVERY date=tomorrow").kind, "INVALID");
   assert.deepEqual(mb.parseMessage("DELIVERY package=s01.zip replace-approved"), { kind: "DELIVERY", package: "s01.zip", replaceApproved: true });
   assert.deepEqual(mb.parseMessage("STYLE TEST folder=openai-1"), { kind: "STYLE TEST", folder: "openai-1" });
 });

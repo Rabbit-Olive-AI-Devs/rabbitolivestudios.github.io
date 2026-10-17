@@ -41,6 +41,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/test-birthday?name=KEY&style=N&key=KEY` | Generate color birthday portrait (requires `TEST_AUTH_KEY`) | none |
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
 | **World Cup 2026** | *Retired 2026-08-21 — routes now 404. Source and tests are preserved for 2030; see DECISIONS.md #61.* | — |
+| `GET /art/brief?date=YYYY-MM-DD` | What Jarvis draws for today or tomorrow (Chicago): the moment or birthday portrait and the skyline, with styles, prompts and look rules, as JSON (DECISIONS #89) | none |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for the E1002 and (since 2026-10-16, #84) the home E1001, with the PNG **inlined as a data URI** — one request, nothing for the renderer to cancel (DECISIONS #65). Always no-store. Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
 | `GET /skyline-bw` | 800x480 HTML skyline page, mono art styles only; on no panel and not warmed since 2026-10-16 (#84), generates on request; PNG inlined the same way. Same text fallback as `/skyline` (DECISIONS #58, #65) | none |
@@ -146,6 +147,8 @@ open fact.png fact1.png
 ---
 
 ## Image Pipelines
+
+> **Jarvis draws the daily pictures since 2026-10-17 (DECISIONS #89).** Every evening the Mac mini puts a brief in the series mailbox (`/art/brief`, as JSON). Jarvis draws the moment (or birthday portrait) and the skyline with GPT image generation and drops them back. The watcher puts them in R2, and the nightly warm crops and captions them like its own. Workers AI draws whatever Jarvis did not deliver, so a missed night never blanks a panel.
 
 The pipelines share the same LLM event selection (scene-only prompt), then each prepends its own art style and uses its own image model. Since DECISIONS #86 the colour moment, the skyline and the birthday portrait pick their styles from one shared library (`src/art-styles.ts`); `/fact.png` and `/fact1.png` keep their own lists.
 

@@ -189,6 +189,11 @@ export async function getOrGenerateMoment(
   }
 
   const moment = await generateMomentBefore(env, events);
-  await env.CACHE.put(cacheKey, JSON.stringify({ data: moment, timestamp: Date.now() }), { expirationTtl: 604800 });
+  // An empty title means the LLM failed and this is the generic stand-in (fallbackFromEvent).
+  // Caching it would fix "a historical event from 2000" for the whole day; leave the key empty so
+  // the next caller tries again (DECISIONS #89).
+  if (moment.title !== "") {
+    await env.CACHE.put(cacheKey, JSON.stringify({ data: moment, timestamp: Date.now() }), { expirationTtl: 604800 });
+  }
   return moment;
 }

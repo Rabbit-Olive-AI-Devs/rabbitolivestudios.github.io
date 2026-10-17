@@ -115,7 +115,7 @@ async function generateColorBirthday(
   return pngToBase64(png);
 }
 
-interface BirthdayCaptionInfo {
+export interface BirthdayCaptionInfo {
   name: string;
   age: number;
   styleName: string;
@@ -234,12 +234,25 @@ export async function buildColorMomentEntry(
     imageB64 = result.base64;
   }
 
+  await saveColorEntry(env, dateStr, birthday, { imageB64, moment, displayDate, birthdayInfo });
+  return { imageB64, moment, birthdayInfo };
+}
+
+/**
+ * Store a day's colour picture under its key: the birthday key on a family birthday, else the
+ * moment key for the day's style. Used for Workers AI pictures and Jarvis's alike (#89);
+ * `source` records which made it.
+ */
+export async function saveColorEntry(
+  env: Env,
+  dateStr: string,
+  birthday: BirthdayPerson | null,
+  entry: { imageB64: string; moment: MomentBeforeData; displayDate: string; birthdayInfo?: BirthdayCaptionInfo; source?: string },
+): Promise<void> {
   const cacheKey = birthday
     ? colorBirthdayCacheKey(dateStr)
     : colorMomentCacheKey(dateStr, getColorMomentStyle(dateStr).id);
-  const cacheData = JSON.stringify({ imageB64, moment, displayDate, birthdayInfo });
-  await env.CACHE.put(cacheKey, cacheData, { expirationTtl: 604800 });
-  return { imageB64, moment, birthdayInfo };
+  await env.CACHE.put(cacheKey, JSON.stringify(entry), { expirationTtl: 604800 });
 }
 
 /**

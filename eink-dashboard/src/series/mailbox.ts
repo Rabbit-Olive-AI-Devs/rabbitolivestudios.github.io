@@ -15,6 +15,7 @@ export type Message =
   | { kind: "APPROVE"; season: number; chapters: number[]; revisions: string[] }
   | { kind: "DELIVERY"; package: string; replaceApproved: boolean }
   | { kind: "STYLE TEST"; folder: string }
+  | { kind: "ART DELIVERY"; date: string }
   | { kind: "QUESTION" | "FYI" | "OTHER" }
   | { kind: "INVALID"; reason: string };
 
@@ -44,6 +45,12 @@ export function parseMessage(text: string): Message {
     if (!pkg) return { kind: "INVALID", reason: "DELIVERY needs package=<zip in packages/> on its first line" };
     if (!SAFE_NAME.test(pkg)) return { kind: "INVALID", reason: `package=${pkg} must be a plain file name in packages/` };
     return { kind: "DELIVERY", package: pkg, replaceApproved: /\breplace-approved\b/i.test(first) };
+  }
+  if (upper.startsWith("ART DELIVERY")) {
+    // Jarvis's daily pictures (DECISIONS #89): the files are to-claude/art/<date>-<kind>.<ext>.
+    const date = param("date");
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { kind: "INVALID", reason: "ART DELIVERY needs date=YYYY-MM-DD on its first line" };
+    return { kind: "ART DELIVERY", date };
   }
   if (upper.startsWith("STYLE TEST")) {
     const folder = param("folder");

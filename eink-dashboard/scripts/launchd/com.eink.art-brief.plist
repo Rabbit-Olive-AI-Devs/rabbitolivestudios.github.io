@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Jarvis's picture brief (DECISIONS #89). At 17:00, 19:00 and 21:00 (Mac local time, Chicago): writes tomorrow's brief (what to draw, as JSON) into from-claude/art/ and a note for Jarvis. A complete brief is sent once; a later run only replaces one that was waiting for the day's event.
+  Install: cp this file ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eink.art-brief.plist
+  Run now: launchctl kickstart gui/$(id -u)/com.eink.art-brief
+  Stop:    launchctl bootout gui/$(id -u)/com.eink.art-brief
+  Logs:    ~/Library/Logs/eink-series/ (mailbox.log, launchd-art-brief.log)
+  Started through materialize-exec.py like the other mailbox jobs (DECISIONS #72).
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.eink.art-brief</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/materialize-exec.py</string>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/series-mailbox.mjs</string>
+    <string>art-brief</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/Users/tboliveira/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CLOUDFLARE_ACCOUNT_ID</key><string>f22a506dedde3bb3837157cd47d5fe5c</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-art-brief.log</string>
+  <key>StandardErrorPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-art-brief.log</string>
+</dict>
+</plist>

@@ -309,8 +309,12 @@ export async function generateSkylineImage(
   sdxlOnly: boolean = false,
 ): Promise<SkylineImageResult> {
   const { jpeg, usedRef } = await generateSkylineJpeg(env, refPrompt, sdxlPrompt, cityKey, photoSeed, sdxlOnly);
-  const rgb = await jpegToRGB(env, jpeg);
-  drawSkylineCaptionRGB(rgb, caption.left, caption.center, caption.right);
-  const png = await encodePNGRGB(rgb, WIDTH, HEIGHT);
+  const png = await finishSkylinePNG(await jpegToRGB(env, jpeg), caption);
   return { png, base64: pngToBase64(png), colorMode, usedRef };
+}
+
+/** An 800x480 RGB skyline picture → the cached PNG with its caption bar. Also used for Jarvis's pictures (#89). */
+export async function finishSkylinePNG(rgb: Uint8Array, caption: { left: string; center: string; right: string }): Promise<Uint8Array> {
+  drawSkylineCaptionRGB(rgb, caption.left, caption.center, caption.right);
+  return encodePNGRGB(rgb, WIDTH, HEIGHT);
 }

@@ -1,6 +1,6 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-**Last verified:** 2026-10-17 · **Describes:** v3.21.0 at the documentation sweep after #87 (code: #87 birthday references picked from the owner's Photos library; #86 one shared art-style library of 71 styles; #85 a birthday style per person, face-cropped reference photos, likeness prompt, no invented seals; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-17, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
+**Last verified:** 2026-10-17 · **Describes:** v3.21.0 at the documentation sweep after #87 (code: #89 Jarvis draws the daily pictures through the series mailbox, Workers AI as backup; #87 birthday references picked from the owner's Photos library; #86 one shared art-style library of 71 styles; #85 a birthday style per person, face-cropped reference photos, likeness prompt, no invented seals; #84: both home panels show the colour pictures, every art style enabled; #83: Pipeline B not warmed; #82: headlines retired) (the proof export #78, Season 1 rules #79, the live countdown card #80, every panel picture as-is #81 with its follow-ups: dithering hints dropped from the colour moment, skyline and fact prompts, desk crest and planet in full colour; deployed 2026-10-17, see git log for the deploy id) (the series, DECISIONS #71–#77: full-colour pages converted by each panel, painted art, art direction, rhythm, teasers), which is what production runs.
 **Audience:** an AI agent picking this project up cold. Read this once end to end, then use the linked files as reference.
 **Maintenance:** this file is part of the mandatory documentation sweep in `CLAUDE.md`. When a change makes any statement here untrue, fix it in the same commit and update the line above.
 
@@ -9,7 +9,7 @@ This file is a map and a set of rules. It does not replace the three documents t
 | File | What it holds | Trust it for |
 |---|---|---|
 | `CLAUDE.md` | Session rules, obligations table, file map | How to work here |
-| `DECISIONS.md` | 88 numbered decision records, including every failed approach | *Why* things are the way they are |
+| `DECISIONS.md` | 89 numbered decision records, including every failed approach | *Why* things are the way they are |
 | `README.md` | Endpoints, pipelines, setup, troubleshooting table | What exists |
 | `INCIDENT-2026-08-20-neuron-budget-blowout.md` | Evidence, timeline and diagnosis runbook for the worst outage | What to do when AI pages fail |
 
@@ -256,7 +256,7 @@ This is the process the owner expects. It is written down in `CLAUDE.md`; this i
 ```bash
 # Verify (always, before committing)
 npm run typecheck
-npm run test:utils        # compiles to /tmp, runs node --test; 292 tests
+npm run test:utils        # compiles to /tmp, runs node --test; 293 tests
 npm run dry-run
 npm run desk-fonts        # only after changing fonts/desk or the face list; regenerates src/hud/fonts-data.ts
 
@@ -346,7 +346,7 @@ A FIFA World Cup 2026 dashboard was built for both panels and **retired on 2026-
 - Thiago's birthday on 20 October is the first real colour birthday portrait on both home panels (2026 style: Pointillist). Ask the owner how it looked.
 - The planet in colour on the desk panel is still unjudged (#81 addendum 4).
 - Refresh the birthday references about once a year, as the children grow (#87).
-- **Next project, designed and not built:** Jarvis makes the daily pictures through the series mailbox, and the mini's watcher uploads them into the same cache keys. Workers AI stays as the fallback (`docs/superpowers/specs/2026-10-17-jarvis-picture-pipeline-design.md`; owner questions listed there). Moving to the MacBook is optional (`docs/superpowers/plans/2026-10-17-move-to-macbook.md`). The mini does not system-sleep. It only locks, and all jobs kept running overnight (checked 2026-10-17).
+- **Built 2026-10-17 (#89):** Jarvis draws the daily pictures. The brief goes out at 17:00, 19:00 and 21:00 (`com.eink.art-brief`). Jarvis delivers to `to-claude/art/` with `ART DELIVERY date=…`, the watcher puts the files in R2 `art/<date>/<kind>`, and the warm uses them before Workers AI. Check that Jarvis set up his side and that the first deliveries landed (`/health-detailed`; colour entries carry `source: "jarvis"`). Moving to the MacBook is optional (`docs/superpowers/plans/2026-10-17-move-to-macbook.md`). The mini does not system-sleep. It only locks, and all jobs kept running overnight (checked 2026-10-17).
 
 **Unconfirmed as of 2026-10-02:**
 

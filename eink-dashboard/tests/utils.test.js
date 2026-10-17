@@ -331,3 +331,17 @@ test("one shared style library feeds the moment, skyline and portrait (DECISIONS
     assert.notEqual(sky.key, momentStyleFor(day(i)).id, day(i));
   }
 });
+
+test("Jarvis's skyline brief matches what the Worker would draw (DECISIONS #89)", () => {
+  const { skylinePicture, artKey, ART_RULES } = fromBuild("src/art.js");
+  const { momentStyleFor } = fromBuild("src/art-styles.js");
+  const p = skylinePicture("2026-10-18");
+  const parts = parseDateParts("2026-10-18");
+  const opts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 };
+  assert.equal(p.subject.city, pickSkylineCity(parts, opts).name);
+  assert.equal(p.style.id, pickSkylineStyle(parts, opts).key);
+  assert.notEqual(p.style.id, momentStyleFor("2026-10-18").id);
+  assert.equal(p.file, "2026-10-18-skyline.png");
+  assert.equal(artKey("2026-10-18", "moment"), "art/2026-10-18/moment");
+  assert.ok(ART_RULES.some((r) => /No text/.test(r)));
+});

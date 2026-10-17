@@ -57,6 +57,7 @@ import {
 } from "./skyline";
 import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } from "./skyline";
 import { generateSkylineImage } from "./skyline-image";
+import { buildArtBrief, storeJarvisColor, storeJarvisSkyline } from "./art";
 
 const VERSION = "3.21.0";
 
@@ -909,11 +910,15 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
       const colorCacheKey = birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id);
       // Skip if already cached: the day's other daily trigger, or a panel that beat
       // the cron to the new date, may have filled it (DECISIONS #57).
-      if (await env.CACHE.get(colorCacheKey)) {
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const colorDisplayDate = `${months[monthNum - 1]} ${dayNum}`;
+      // Jarvis's picture first, when he delivered one; it replaces any Workers AI picture (#89).
+      if (await storeJarvisColor(env, dateStr, birthday, yearNum, colorDisplayDate, sharedMoment)) {
+        console.log(`Cron: stored Jarvis's ${birthday ? "birthday portrait" : "moment"} for ${dateStr}`);
+      } else if (await env.CACHE.get(colorCacheKey)) {
         console.log(`Cron: colour picture already cached for ${dateStr}`);
       } else {
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        await buildColorMomentEntry(env, dateStr, birthday, yearNum, `${months[monthNum - 1]} ${dayNum}`);
+        await buildColorMomentEntry(env, dateStr, birthday, yearNum, colorDisplayDate);
         console.log(`Cron: cached ${birthday ? `colour birthday (${birthday.name})` : `colour moment (${colorStyle.name})`} for ${dateStr}`);
       }
     } catch (err) {
@@ -931,8 +936,9 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
   if (!budgetExhausted) {
     try {
       const skylineDailyKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0);
-      const existingSkyline = await env.CACHE.get(skylineDailyKey);
-      if (!existingSkyline) {
+      if (await storeJarvisSkyline(env, dateStr)) {
+        console.log(`Cron: stored Jarvis's skyline for ${dateStr}`);
+      } else if (!(await env.CACHE.get(skylineDailyKey))) {
         const skylineParts = parseDateParts(dateStr);
         const skylineOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 };
         const skylineCity = pickSkylineCity(skylineParts, skylineOpts);
@@ -1203,6 +1209,14 @@ export default {
         if (authBlockSTP) return authBlockSTP;
         return handleSkylineTestPage(url);
       }
+      case "/art/brief": {
+        // What Jarvis draws for a date (#89). Today or tomorrow (Chicago) only: each new date
+        // costs at most one LLM call for its event, which the warm would make anyway.
+        const today = getChicagoDateParts().dateStr;
+        const date = url.searchParams.get("date") ?? shiftDateStr(today, 1);
+        if (date !== today && date !== shiftDateStr(today, 1)) return errorResponse("date must be today or tomorrow (America/Chicago)", 400);
+        return jsonResponse(await buildArtBrief(env, date), 200, 0);
+      }
       case "/desk/test":
         return handleDeskTest();
       case "/desk/aurebesh":
@@ -1240,7 +1254,7 @@ export default {
             endpoints: [
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
-              "/skyline", "/skyline-bw", "/skyline.png", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo",
+              "/skyline", "/skyline-bw", "/skyline.png", "/art/brief", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo",
               "/desk/series", "/series", "/color/series",
               "/test-birthday.png", "/health", "/health-detailed",
             ],

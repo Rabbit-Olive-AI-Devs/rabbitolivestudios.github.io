@@ -3974,3 +3974,49 @@ the 17 October pictures wait for 00:00 UTC on 18 October.
 Lesson for deploys that change style picking: a change that alters the current day's colour-moment
 key turns it cold and makes the next poll generate. Do it after a clean quota day, or pre-fill
 today's key.
+
+## 89. Jarvis Draws the Daily Pictures; Workers AI Is the Backup (2026-10-17)
+
+The owner's agent Jarvis has GPT image generation through the owner's subscription. The owner
+asked for him to make the panels' daily pictures, starting at once, with the old way as backup.
+His answers to the design questions: the subscription allows an automated nightly job; family
+face photos may be sent for the birthday portraits; all pictures (moment, skyline, birthday)
+from the start; no trial week; Claude tells Jarvis the routine. Both Macs stay as they are, and
+the series mailbox carries the work (the owner's idea). The design draft is
+`docs/superpowers/specs/2026-10-17-jarvis-picture-pipeline-design.md`; what was built differs in
+one way. **No secret and no upload route:** the Mac mini's watcher already has a Cloudflare
+login, so it puts the pictures straight into R2.
+
+1. **Brief.** `GET /art/brief?date=` (public, today or tomorrow in Chicago only) returns JSON
+   from the Worker's own choices: the moment's event, style and full prompt (or, on a family
+   birthday, the person, age, style and likeness prompt) and the skyline's city, style and
+   prompt, plus the look rules. `src/art.ts` builds it.
+   - The moment needs the day's event, which can take one LLM call. When that is refused, the
+     moment is listed under `waiting` and the skyline goes out anyway.
+   - `com.eink.art-brief` on the mini (17:00, 19:00, 21:00 Chicago) runs
+     `series-mailbox.mjs art-brief`. It writes `from-claude/art/<date>-brief.json` and a note
+     headed `ART BRIEF date=…`, and on birthdays copies the four face crops from R2 as
+     `<date>-ref-N.jpg`. A complete brief is sent once; a later run only replaces one that was
+     waiting.
+2. **Draw.** Jarvis turns the JSON into his own image prompts. He saves
+   `to-claude/art/<date>-moment.png` (or `-birthday.png`) and `-skyline.png`, then sends a note
+   headed `ART DELIVERY date=…`.
+3. **Store.** The watcher handles `ART DELIVERY` by script, with no AI. It accepts only today or
+   tomorrow, checks each file's type, keeps it under 15 MB, and puts it in R2 at `art/<date>/<kind>`
+   in the `PHOTOS` bucket. Then it sends Jarvis a receipt.
+4. **Warm.** For each picture, the nightly warm first looks for Jarvis's file in R2. If one is
+   there, it crops it to 800x480 with Cloudflare Images (the same `jpegToRGB`), adds the caption
+   where that pipeline does (burned in for the skyline, HTML for the moment and birthday), stores
+   it under the usual key, and deletes the R2 file. It replaces any Workers AI picture, so a
+   delivery that lands between the 23:35 and 00:35 runs still wins. With no file, Workers AI
+   draws as before. Colour entries record `source: "jarvis"`.
+
+**A bug found on the way and fixed.** When the LLM that picks the day's event was refused,
+`getOrGenerateMoment` cached the generic stand-in ("a historical event from 2000") for the whole
+day. It now caches only a real pick, so the next caller tries again.
+
+Tested locally without AI: two fake deliveries were stored by the warm under
+`color-moment:v4:2026-10-17:fresco` and the skyline key, `source` read `jarvis`, and the R2 files
+were removed. In production the first brief (17 October) went out at 03:34 UTC with the skyline
+only, because the lagging quota (#88) still refused the event pick. Cost: no neurons for Jarvis's
+pictures. KV writes are the same as the warm's (one per picture). R2 gets a few writes and deletes a day.
