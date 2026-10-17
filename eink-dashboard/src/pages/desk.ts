@@ -25,6 +25,8 @@ import { drawTarsPage } from "../hud/tars-page";
 import type { ArchiveQuery } from "../planet";
 import { drawPlanetPage } from "../hud/planet-page";
 import { hudPageResponse } from "../hud/page";
+import { castawayView, loadCastawayContext } from "../castaway";
+import { drawCastawayPage, CASTAWAY_TITLE } from "../hud/castaway-page";
 import { drawTestCard } from "../hud/test-card";
 import { drawAurebeshSheet } from "../hud/aurebesh";
 import { getChicagoDateParts } from "../date-utils";
@@ -127,4 +129,17 @@ export async function handleDeskFlamengo(env: Env, ctx?: ExecutionContext, sourc
   const now = new Date();
   const view = flamengoView(await getFlamengo(env, { ctx, sources }), now.getTime());
   return hudPageResponse("Flamengo", () => drawFlamengoPage(view, now));
+}
+
+/**
+ * /desk/castaway: the self-playing island story (DECISIONS #93). Free: no AI, no KV writes; it
+ * reads the home weather, tonight's planet and the Flamengo board from the cache when present.
+ * `?at=` (ISO time) previews another moment.
+ */
+export async function handleDeskCastaway(env: Env, url: URL): Promise<Response> {
+  const at = url.searchParams.get("at");
+  const parsed = at ? new Date(at) : null;
+  const now = parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
+  const ctx = await loadCastawayContext(env, now);
+  return hudPageResponse(CASTAWAY_TITLE, () => drawCastawayPage(castawayView(now, ctx)));
 }

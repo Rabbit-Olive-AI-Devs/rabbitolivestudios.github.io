@@ -9,7 +9,7 @@ import { handleColorWeatherPage } from "./pages/color-weather";
 import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, buildColorMomentEntry, getColorMomentStyle } from "./pages/color-moment";
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
-import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo } from "./pages/desk";
+import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo, handleDeskCastaway } from "./pages/desk";
 import { handleSeries, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
 import { seriesHealth } from "./series/watch";
 import { getPlanetOfDay } from "./planet";
@@ -1260,6 +1260,8 @@ export default {
         return handleDeskPlanet(env, url, ctx);
       case "/desk/tars":
         return request.method === "POST" ? handleDeskTarsReport(request, env) : handleDeskTars(env, url);
+      case "/desk/castaway":
+        return handleDeskCastaway(env, url);
       case "/desk/flamengo":
         return handleDeskFlamengo(env, ctx);
       case "/desk/series":
@@ -1289,7 +1291,7 @@ export default {
             endpoints: [
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
-              "/skyline", "/skyline-bw", "/skyline.png", "/color/family", "/art/brief", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo",
+              "/skyline", "/skyline-bw", "/skyline.png", "/color/family", "/art/brief", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo", "/desk/castaway",
               "/desk/series", "/series", "/color/series",
               "/test-birthday.png", "/health", "/health-detailed",
             ],
