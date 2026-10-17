@@ -3737,3 +3737,10 @@ The owner also agreed a trial: the home E1001 shows `/color/moment` in place of 
 converted by the panel. If the owner likes it on the panel, the next step retires the `/fact`
 picture (one FLUX image, ~1,364 neurons a day) and the B&W skyline; if not, the page list goes
 back. Nothing in the code changes for the trial itself.
+
+**Trial started 2026-10-16 ~19:30 CT.** Claude changed the home E1001's SenseCraft pages through
+Claude in Chrome with the owner's go-ahead: "fact" from `/fact.png` to `/color/moment`, "skyline
+bw" from `/skyline-bw` to `/skyline`; saved both and pressed Apply ("Applied to device"). The
+panel stayed online with its other settings unchanged. The `/fact` picture and the B&W skyline are
+still generated every night so the trial can be undone at once; they are retired only after the
+owner's verdict.
