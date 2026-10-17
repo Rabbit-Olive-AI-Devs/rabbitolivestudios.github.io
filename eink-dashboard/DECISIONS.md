@@ -3851,3 +3851,7 @@ seal and lettering: a convention of that style that "no text" did not stop. The 
 now also forbids signatures, seals, stamps and calligraphy. Actual cost read from GraphQL
 `aiInferenceAdaptiveGroups`: about 1,000 neurons per portrait. That leaves room for roughly
 three tests a day next to the panels' own pictures.
+
+**Addendum (2026-10-17, owner on the examples page: "the likeness is MUCH better!!!"):** the
+face-cropped references and the likeness prompt are confirmed. Keep them; do not go back to
+whole-photo references.
