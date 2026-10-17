@@ -12,8 +12,8 @@ const { measureType } = fromBuild("src/hud/type.js");
 const { FACES } = fromBuild("src/hud/fonts-data.js");
 
 test("day numbers start on the epoch and storylines never repeat back to back", () => {
-  assert.equal(dayNumber("2026-10-18"), 1);
-  assert.equal(dayNumber("2027-10-18"), 366);
+  assert.equal(dayNumber("2026-10-17"), 1);
+  assert.equal(dayNumber("2027-10-17"), 366);
   assert.equal(arcFor(1).arc.id, "arrival");
   assert.equal(arcFor(3).arc.id, "arrival");
   assert.equal(arcFor(30).arc.id, "mast");
@@ -38,7 +38,7 @@ test("every beat fits the page and uses only glyphs the fonts have", () => {
 });
 
 test("the page draws at every quarter hour for two months, through holidays and birthdays", () => {
-  const start = Date.UTC(2026, 9, 18, 5);
+  const start = Date.UTC(2026, 9, 17, 5);
   for (let i = 0; i < 61 * 96; i += 7) {
     const v = castawayView(new Date(start + i * 15 * 60_000), { planet: "Kepler-22 b", weather: ["clear", "cloudy", "rain", "storm"][i % 4] });
     assert.ok(v.text.length > 0 && v.day >= 1);
@@ -47,7 +47,7 @@ test("the page draws at every quarter hour for two months, through holidays and 
 });
 
 test("day 1 begins with the arrival and has nothing earlier in the log", () => {
-  const v = castawayView(new Date("2026-10-18T12:00:00Z"));
+  const v = castawayView(new Date("2026-10-17T12:00:00Z"));
   assert.match(v.text, /crawls out of the surf/);
   assert.equal(v.log.length, 0);
 });

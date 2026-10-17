@@ -21,8 +21,8 @@ import { flamengoCacheKey, planetCacheKey } from "./cache-keys";
 import { FLAMENGO_ID } from "./flamengo";
 import type { FlaMatch, FlaState } from "./flamengo";
 
-/** Day 1: the first morning the page was on the panel. */
-export const CASTAWAY_EPOCH = "2026-10-18";
+/** Day 1: the day the page went live (the owner may first see it that evening). */
+export const CASTAWAY_EPOCH = "2026-10-17";
 
 export interface CastawayMatch {
   opponent: string;        // the other club's short name

@@ -4180,7 +4180,7 @@ do not describe the story to them.**
   from shapes (`src/hud/shapes.ts`). The island layer is composited with a white halo, so strokes
   stay readable on a night sky.
 - **The clock drives it.** Everything follows from the Chicago date and time: the day number since
-  2026-10-18, the storyline, the moment of the day, and the light. That gives about a dozen moments
+  2026-10-17, the storyline, the moment of the day, and the light. That gives about a dozen moments
   a day, which suits a panel that rotates several pages. Storylines run in shuffled cycles, with
   no back-to-back repeat, and a few milestone days are fixed in time.
 - **No AI and no KV writes.** It only reads what the Worker already caches: the home weather and
