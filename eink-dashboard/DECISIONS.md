@@ -4103,3 +4103,35 @@ that no two weeks overlap through 2040.
 the keys are per date; the first themed date (25 Oct) is not cached yet, as the warm only fills the
 next day. Bumping `color-moment` or `skyline` now would have thrown away today's pictures by Jarvis
 and made Workers AI redraw them.
+
+---
+
+## 92. Family Memory: a Family Photo From This Day, Redrawn as Art (2026-10-17, designed, not built)
+
+The owner's second pick from the idea list. A new colour page, `/color/family`, for the office E1002
+and the home E1001 (not the desk panel). Each day it shows one family photo taken on this date in an
+earlier year, redrawn by Jarvis in a style that is neither that day's moment nor skyline style, with
+the date and "N years ago" burned in. No names. The full design, approved by the owner the same day:
+`docs/superpowers/specs/2026-10-17-family-memory-design.md`.
+
+The owner's choices, in the order they were made:
+- **Colour only.** The panels convert it (#81).
+- **Wide photos only.** Tall phone photos would lose heads in the 5:3 crop.
+- **The source.** First the owner chose Favourites. Then they pointed at the curated shared album
+  "Coelhos de Oliveira", which is in the Photos library. The pick order is the album's exact day,
+  then a Favourites family photo from the exact day, then the album's closest day.
+- **No review before it airs.** The album and the Favourites are the curation.
+- **Repeats.** Every photo is shown once before any repeats.
+
+Constraints found while designing:
+- **The Mac mini is short of space,** so nothing is synced in bulk. The album's originals stay in
+  iCloud, and the library holds only 480 px previews. One photo a day is downloaded at 1600 px
+  through PhotoKit (tested on one album photo) and deleted after upload.
+- **The album's share link** is not written anywhere in the repo.
+- **No Workers AI spend:** if Jarvis misses a night, the panel shows the photo itself.
+- **KV:** one write a day.
+
+Rejected along the way:
+- **Reading the album from Apple's web service:** its photo list needs an iCloud sign-in, and the
+  web page is a private API that can change.
+- **Turning on Shared Albums sync:** it costs disk the mini does not have.

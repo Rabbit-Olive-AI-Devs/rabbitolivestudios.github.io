@@ -17,10 +17,9 @@ moment and skyline.
   the art cropped to 800x480 in full colour, untouched, and each panel converts it. The owner adds it
   to the **office E1002** and the **home E1001** (not the desk panel) in SenseCraft.
 - **Family photos only, from the owner's curated shared album "Coelhos de Oliveira"** (owner,
-  2026-10-17). It is a new-style iCloud shared album that the owner already shares with another
-  agent, and it is in the Photos library: `ZSHARE` row with `ZTITLE = 'Coelhos de Oliveira'`
-  (scope `SharedCollection-07996160-…`), its photos are the `ZASSET` rows whose `ZCOLLECTIONSHARE`
-  points at it. The album *is* the curation, so no face or People check is needed (its photos have
+  2026-10-17). It is a new-style iCloud shared album, and it is in the Photos library: the `ZSHARE`
+  row with `ZTITLE = 'Coelhos de Oliveira'`; its photos are the `ZASSET` rows whose
+  `ZCOLLECTIONSHARE` points at it. Never write the album's share link into the repo or the docs. The album *is* the curation, so no face or People check is needed (its photos have
   no face data anyway). Photos the owner adds later are picked up on the next evening. The album is
   one setting (its title), so the source can change without touching anything else.
 - **This date in an earlier year, in this order (owner, 2026-10-17):**
@@ -39,8 +38,7 @@ moment and skyline.
 - **Wide photos only (owner, 2026-10-17):** landscape photos (wider than tall, as displayed). They
   crop to the panel's 5:3 without cutting heads. Tall photos are never picked.
 - **Nobody reviews the photo before it airs**, including on the office panel; the album and the
-  owner's Favourites are the curation. The album's public link allows anyone who has it to add
-  photos; the owner knows and accepted it ("don't worry"), so no contributor filter.
+  owner's Favourites are the curation. No contributor filter (owner).
 - **Repeats (owner accepted the proposal):** every photo in the source is shown once before any
   photo repeats. After that, the photo shown longest ago comes back first, still choosing by the
   closest date.
