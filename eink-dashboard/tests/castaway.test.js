@@ -6,7 +6,7 @@ const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
 const fromBuild = (p) => require(path.join(buildDir, p));
 
 const { castawayView, dayTimeline, dayNumber, arcFor, islandWeather, matchOn, lightAt } = fromBuild("src/castaway.js");
-const { ARCS, ARRIVAL, ROUTINE, MILESTONES } = fromBuild("src/castaway-story.js");
+const { ARCS, ARRIVAL, ROUTINE, MILESTONES, DATED_EGGS, DAY_EGGS, RARE_EGGS } = fromBuild("src/castaway-story.js");
 const { drawCastawayPage, wrap } = fromBuild("src/hud/castaway-page.js");
 const { measureType } = fromBuild("src/hud/type.js");
 const { FACES } = fromBuild("src/hud/fonts-data.js");
@@ -28,7 +28,8 @@ test("day numbers start on the epoch and storylines never repeat back to back", 
 });
 
 test("every beat fits the page and uses only glyphs the fonts have", () => {
-  const beats = [...ARRIVAL.days.flat(), ...ARCS.flatMap((a) => a.days.flat()), ...MILESTONES.flatMap((m) => m.arc.days.flat()), ...Object.values(ROUTINE).flat()];
+  const beats = [...ARRIVAL.days.flat(), ...ARCS.flatMap((a) => a.days.flat()), ...MILESTONES.flatMap((m) => m.arc.days.flat()), ...Object.values(ROUTINE).flat(),
+    ...DATED_EGGS.map((e) => e.beat), ...DAY_EGGS.map((e) => e.beat), ...RARE_EGGS];
   for (const b of beats) {
     assert.ok(wrap("plex13r", b.text, 548).length <= 3, `too long: ${b.text}`);
     assert.ok(measureType("plex12m", b.log) <= 192, `log too long: ${b.log}`);
@@ -88,4 +89,14 @@ test("every calendar moment in a whole year fits and has glyphs (holidays, birth
       for (const ch of m.beat.text + m.beat.log) assert.ok(FACES.plex13r.glyphs[ch] || ch === " ", `${d}: no glyph "${ch}"`);
     }
   }
+});
+
+test("easter eggs turn up: dated ones on their day, rare ones now and then", () => {
+  assert.ok(dayTimeline("2027-05-04", {}).some((m) => m.beat === DATED_EGGS[0].beat));
+  let rare = 0;
+  for (let i = 4; i < 370; i++) {
+    const d = new Date(Date.UTC(2026, 9, 17 + i)).toISOString().slice(0, 10);
+    if (dayTimeline(d, {}).some((m) => RARE_EGGS.includes(m.beat))) rare++;
+  }
+  assert.ok(rare > 20 && rare < 70, `rare eggs in a year: ${rare}`);
 });

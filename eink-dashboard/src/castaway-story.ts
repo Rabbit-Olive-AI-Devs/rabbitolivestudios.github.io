@@ -471,3 +471,28 @@ export const MILESTONES: ReadonlyArray<{ from: number; arc: Arc }> = [
     },
   },
 ];
+
+/**
+ * Easter eggs (owner: "i love easter eggs and surprises"). Rare, quiet, never explained.
+ * Dated ones come back every year; the rest turn up now and then on an ordinary afternoon.
+ */
+export const DATED_EGGS: ReadonlyArray<{ md: string; min: number; beat: Beat }> = [
+  { md: "05-04", min: 870, beat: b("SETE draws a small grey moon in the sand. It is definitely not a space station. It hums a march while it works.", "Drew a moon. Just a moon.", "dig", "wink", [], 0.6) },
+  { md: "10-21", min: 870, beat: b("SETE checks the board on the hut wall again. Today of all days it should hover. It does not. A promise is a promise.", "Board still won't hover.", "think", "sad", [], 0.4) },
+  { md: "11-17", min: 870, beat: b("SETE repaints its red and black stripe with fresh berry juice, very carefully. It feels like an anniversary.", "Stripe: repainted.", "stand", "love", ["flag"], 0.5) },
+];
+
+export const DAY_EGGS: ReadonlyArray<{ day: number; min: number; beat: Beat }> = [
+  { day: 88, min: 870, beat: b("Day 88. SETE runs along the beach at exactly 88 steps per minute. Nothing happens. It was worth a try.", "88 steps per minute.", "walk", "focused", [], 0.7) },
+];
+
+export const RARE_EGGS: readonly Beat[] = [
+  b("SETE lowers its HUMOR setting to 60%. Then back to 75%. Sixty was unbearable for everyone.", "Humor: back to 75%.", "stand", "wink", ["crab"], 0.5),
+  b("A wave sets the raft spinning in the lagoon. SETE matches the rotation perfectly. It does not know why it is so good at this.", "Matched a spin.", "stand", "focused", ["raft"], 0.74),
+  b("Shells fall off the hut shelf in a strange pattern. SETE writes it down in case it is a message. It is the wind. Probably.", "Shelf message? Wind.", "think", "surprised", [], 0.4),
+  b("A battered fedora washes up. SETE puts it on. Everything on the island feels about 12% more adventurous.", "Found a hat. +12%.", "stand", "happy", [], 0.65),
+  b("SETE holds a glass shard to the sun and throws a rainbow across the hut wall. It looks like an album cover.", "Made a rainbow.", "stand", "love", [], 0.45),
+  b("SETE drags the raft bench in front of the hut and calls it the couch. Capitao has his spot. Nobody sits in Capitao's spot.", "The couch. His spot.", "sit", "happy", ["crab", "raft"], 0.45),
+  b("A wristwatch washes up, still ticking. SETE knows the time to the millisecond and wears it anyway. Some things are about the ticking.", "Wearing a watch.", "stand", "love", [], 0.55),
+  b("The far light flashes in circles tonight instead of lines. SETE draws them in the sand and stares at them for a long time.", "Circles. Hmm.", "think", "focused", ["flash"], 0.55),
+];

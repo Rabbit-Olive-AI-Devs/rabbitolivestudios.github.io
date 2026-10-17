@@ -4203,3 +4203,15 @@ do not describe the story to them.**
   - Add storylines over time; the bank holds about 50 days before a cycle repeats.
   - Some storylines assume an earlier state of the story. A later version can vary them by day
     number.
+
+**Easter eggs (owner's request, 2026-10-17).** The owner asked for easter eggs and surprises in
+the desk story and in The Long Drift ("surprise me"). What they are and where stays secret.
+- **Desk story:** dated ones that return every year, one tied to a day number, and rare ones on
+  about one afternoon in nine (`DATED_EGGS`, `DAY_EGGS`, `RARE_EGGS` in `src/castaway-story.ts`).
+  They pass the same fit and glyph tests.
+- **The Long Drift:** no story was written in the main conversation (#71/#72). Guidance went into
+  the private writer notes: Claude's `~/series-work/s00/bible-notes.md`, read by the weekly run,
+  and Jarvis's spoiler folder `/00_JARVIS_SPOILERS/easter-eggs-for-thiago.md`, with a
+  detail-free FYI in the mailbox. The guidance allows at most one egg per chapter, never at the
+  story's expense, and within the house rules: no words in the art, no canon names, office-safe.
+  Approved chapters were not touched.

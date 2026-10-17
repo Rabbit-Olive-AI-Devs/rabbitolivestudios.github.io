@@ -8,7 +8,7 @@
  */
 
 import type { Light, Prop, Scene, Weather } from "./hud/castaway-draw";
-import { ARCS, ARRIVAL, MILESTONES, ROUTINE, SETTINGS } from "./castaway-story";
+import { ARCS, ARRIVAL, DATED_EGGS, DAY_EGGS, MILESTONES, RARE_EGGS, ROUTINE, SETTINGS } from "./castaway-story";
 import type { Arc, Beat } from "./castaway-story";
 import { seededRandom, shuffledIndices } from "./art-styles";
 import { holidayWeek } from "./holidays";
@@ -151,6 +151,11 @@ export function dayTimeline(date: string, ctx: CastawayContext): Moment[] {
     t.push({ min: 510, beat: beat(`A bottle washes up with a note: 'TODAY IS ${name}'S BIRTHDAY.' SETE bakes a sand cake. Capitao adds candles.`, `Cake for ${name}!`, "dance", "love", ["cake", "bottle", "crab"], 0.55) });
     t.push({ min: 1200, beat: beat(`SETE sings happy birthday to ${name} across the sea. The far light blinks along, slightly off-key.`, `Sang for ${name}.`, "wave", "love", ["cake", "flash", "fire"], 0.55) });
   }
+
+  // Easter eggs: dated ones every year, one for a day number, and now and then a rare one.
+  for (const e of DATED_EGGS) if (date.slice(5) === e.md) t.push({ min: e.min, beat: e.beat });
+  for (const e of DAY_EGGS) if (day === e.day) t.push({ min: e.min, beat: e.beat });
+  if (day > 3 && hash(date + "egg") % 9 === 0) t.push({ min: 990, beat: pickFrom(RARE_EGGS, date, 9) });
 
   const week = holidayWeek(date);
   if (week) t.push(...holidayMoments(week.holiday.id, week.isDay));
