@@ -135,7 +135,7 @@ function handle(file, m) {
       const links = [];
       for (const f of fs.readdirSync(out).filter((n) => n.endsWith(".html")).sort()) {
         const image = f.replace(/\.html$/, "");
-        const put = spawnSync("npx", ["wrangler", "r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "text/html; charset=utf-8", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+        const put = wrangler(["r2", "object", "put", `eink-series/series/tests/${msg.folder}/${f}`, "--file", path.join(out, f), "--content-type", "text/html; charset=utf-8", "--remote"]);
         links.push(put.status === 0 ? `- ${image}: ${SITE}/series/test?folder=${msg.folder}&image=${image}&key=` : `- ${image}: upload failed`);
       }
       reply(`style-test-${msg.folder}`, `FYI: reply to ${file}\n\nEach picture, untouched and only cropped to the 800x480 screen, is in from-claude/style-tests/${msg.folder}/ as .png. The panels get the picture exactly like this and convert it themselves: the E1001s to black and white, the E1002 to its six colours.\n\n${r.out}\n\nTo see them on a real panel, add one of these as a temporary page in SenseCraft (HTML widget, 800x480) with your key at the end, and remove it afterwards. The same address works on every panel:\n${links.join("\n")}`);
@@ -248,6 +248,20 @@ function cmdRun() {
 
 const ART_OUT = path.join(OUTBOX, "art");
 const ART_IN = path.join(INBOX, "art");
+/**
+ * Runs a wrangler R2 command, once more after 10 s if it fails: Cloudflare's API fails
+ * transiently now and then (a request error, an auth 10000), and every call here is safe to
+ * repeat. Jarvis's 19 Oct 2026 pictures missed their upload that way.
+ */
+function wrangler(args) {
+  const run = () => spawnSync("npx", ["wrangler", ...args], { cwd: REPO, encoding: "utf8", env: process.env });
+  const first = run();
+  if (first.status === 0) return first;
+  log(`wrangler ${args.slice(0, 3).join(" ")} failed, retrying: ${(first.stderr ?? "").replace(/\x1b\[[0-9;]*m/g, "").slice(-200).replace(/\s+/g, " ")}`);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * 1000);
+  return run();
+}
+
 const ART_BUCKET = "eink-birthday-photos";
 const ART_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
 const ART_MAX_BYTES = 15 * 1024 * 1024;
@@ -308,7 +322,7 @@ function familyPhoto(date) {
       }
       const meta = path.join(FAMILY_TMP, "photo.json");
       fs.writeFileSync(meta, JSON.stringify({ taken: c.taken }));
-      const put = (file, key, type) => spawnSync("npx", ["wrangler", "r2", "object", "put", `${ART_BUCKET}/family/${date}/${key}`, "--file", file, "--content-type", type, "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+      const put = (file, key, type) => wrangler(["r2", "object", "put", `${ART_BUCKET}/family/${date}/${key}`, "--file", file, "--content-type", type, "--remote"]);
       if (put(jpg, "photo.jpg", "image/jpeg").status !== 0 || put(meta, "photo.json", "application/json").status !== 0) {
         log(`family ${date}: upload failed`);
         return;
@@ -351,7 +365,7 @@ async function cmdArtBrief() {
     const refs = [];
     for (let i = 0; i < 4; i++) {
       const dest = path.join(ART_OUT, `${date}-ref-${i}.jpg`);
-      const r = spawnSync("npx", ["wrangler", "r2", "object", "get", `${ART_BUCKET}/portraits/${key}_${i}.jpg`, "--file", dest, "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+      const r = wrangler(["r2", "object", "get", `${ART_BUCKET}/portraits/${key}_${i}.jpg`, "--file", dest, "--remote"]);
       if (r.status === 0 && fs.existsSync(dest) && fs.statSync(dest).size > 0) refs.push(path.basename(dest));
     }
     birthday.references = refs.length;
@@ -360,7 +374,7 @@ async function cmdArtBrief() {
   const family = brief.pictures.find((p) => p.kind === "family");
   if (family) {
     const dest = path.join(ART_OUT, `${date}-family-ref.jpg`);
-    const r = spawnSync("npx", ["wrangler", "r2", "object", "get", `${ART_BUCKET}/family/${date}/photo.jpg`, "--file", dest, "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+    const r = wrangler(["r2", "object", "get", `${ART_BUCKET}/family/${date}/photo.jpg`, "--file", dest, "--remote"]);
     const ok = r.status === 0 && fs.existsSync(dest) && fs.statSync(dest).size > 0;
     family.references = ok ? 1 : 0;
     family.referenceFiles = ok ? [`from-claude/art/${path.basename(dest)}`] : [];
@@ -392,14 +406,14 @@ function artDelivery(file, date) {
     const full = path.join(ART_IN, f);
     const buf = fs.readFileSync(full);
     if (buf.length > ART_MAX_BYTES || !looksLikeImage(buf, ext)) { lines.push(`- ${f}: not uploaded (not a ${ext} image, or over 15 MB)`); continue; }
-    const r = spawnSync("npx", ["wrangler", "r2", "object", "put", `${ART_BUCKET}/art/${date}/${kind}`, "--file", full, "--content-type", ART_TYPES[ext], "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+    const r = wrangler(["r2", "object", "put", `${ART_BUCKET}/art/${date}/${kind}`, "--file", full, "--content-type", ART_TYPES[ext], "--remote"]);
     if (r.status !== 0) { lines.push(`- ${f}: upload failed, I will look at it`); log(`art upload ${f}: ${(r.stderr ?? "").slice(-300)}`); continue; }
     fs.renameSync(full, path.join(ART_IN, "done", f));
     lines.push(`- ${f}: received`);
     if (kind === "moment" && chosen.title && Number.isInteger(chosen.year) && chosen.year > -5000 && chosen.year <= 2100) {
       const meta = path.join(ART_IN, "done", `${date}-moment.json`);
       fs.writeFileSync(meta, JSON.stringify({ title: chosen.title.slice(0, 80), year: chosen.year, place: (chosen.place ?? "").slice(0, 80) }));
-      const m = spawnSync("npx", ["wrangler", "r2", "object", "put", `${ART_BUCKET}/art/${date}/moment.json`, "--file", meta, "--content-type", "application/json", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+      const m = wrangler(["r2", "object", "put", `${ART_BUCKET}/art/${date}/moment.json`, "--file", meta, "--content-type", "application/json", "--remote"]);
       lines.push(m.status === 0 ? `  caption: ${chosen.title}, ${chosen.year}, ${chosen.place ?? ""}` : "  caption details could not be stored; the Worker's own caption is used");
     }
   }
@@ -413,7 +427,7 @@ function artDelivery(file, date) {
 // ---------------------------------------------------------------- weekly chapter
 
 function readSchedule() {
-  const r = spawnSync("npx", ["wrangler", "r2", "object", "get", "eink-series/series/schedule.json", "--pipe", "--remote"], { cwd: REPO, encoding: "utf8", env: process.env });
+  const r = wrangler(["r2", "object", "get", "eink-series/series/schedule.json", "--pipe", "--remote"]);
   if (r.status !== 0) throw new Error(`schedule unreadable: ${(r.stderr ?? "").slice(-500)}`);
   return JSON.parse(r.stdout);
 }

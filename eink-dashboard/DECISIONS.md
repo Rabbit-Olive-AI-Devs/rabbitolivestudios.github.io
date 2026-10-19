@@ -4226,3 +4226,10 @@ Jarvis's) carry the owner's words: zero eggs beats a forced one.
 the photo was one day short of its anniversary. The owner: that is 2 years ago. The photo is often
 from a nearby day (Favourites, closest day), so the caption now subtracts the years (at least 1).
 That day's KV entry was rebuilt by hand from Jarvis's painting with the new caption.
+
+**#89 addendum (2026-10-18): the watcher retries its R2 calls once.** Jarvis's 19 Oct pictures
+(moment and skyline) failed to upload at 17:15 CT with a transient request error and were only put
+up by hand in a session. Every `wrangler r2` call in `scripts/series-mailbox.mjs` (puts and gets,
+all safe to repeat) now goes through one helper that tries again after 10 s and logs the first
+failure to `mailbox.log`. A second failure still writes "upload failed" to Jarvis, and the alert
+(#90) still emails about a missed night.
