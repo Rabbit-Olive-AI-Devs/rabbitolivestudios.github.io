@@ -4260,3 +4260,40 @@ approval, so it waited for the owner, who confirmed the scope in a session on 20
   cards are not story, so neither is listed. Responses are `no-store`; an aired page never changes,
   but a cache gains little at FrameBot's rate. No KV, no AI, no cron. Letterboxing the 800x480
   page into FrameBot's 1280x800 stays on FrameBot's side.
+
+## 95. The Desk Story Page's Frames Are Kept for a Story Book (2026-10-19)
+
+The owner asked to "save each new frame of the Surprise page, as a way to have a story book
+later" and to keep the saves on Dropbox. The page is still a surprise (#93): the owner should not
+browse the folder, and nothing here describes what the frames show.
+
+- **Live capture, the frames as aired.** The LaunchAgent `com.eink.storybook` runs
+  `scripts/storybook.mjs live` every 10 minutes (the desk panel's refresh) and at load. It fetches
+  `/desk/castaway`, takes the PNG inlined in the page, and saves it only when its SHA-256 is not
+  already in that day's index. A failed fetch (one retry after 10 s, 30 s timeout) or the text
+  fallback page is logged and skipped, never saved. It starts through `materialize-exec.py` (#72),
+  because Dropbox may make the day's index online-only.
+- **Where.** Dropbox `00_STORYBOOK_SURPRISE_do_not_open/<YYYY-MM-DD>/<HHMM>.png` (Chicago time;
+  `HHMM-2.png` when the autumn DST hour repeats), with an append-only `index.jsonl` per day:
+  `time`, `at` (ISO), `day` (the page's day number), `file`, `sha256`, `bytes`, `source`
+  (`live` or `backfill`). Without the SSD's Dropbox folder the script logs and exits non-zero and
+  writes nothing elsewhere. Log: `~/Library/Logs/eink-series/storybook.log`, times and counts only.
+  Frames, indexes and logs are never committed.
+- **Backfill.** `scripts/storybook.mjs backfill [FROM] [TO]` filled 2026-10-17 to the morning of
+  2026-10-19 at 10-minute steps. It renders on the Mac mini with the Worker's own code, compiled
+  as `npm run test:utils` does, and the cached context the page reads (home weather, planet,
+  Flamengo board) from production KV as it was at backfill time (reads only). So backfilled frames
+  use the backfill day's context and story code, not exactly what aired; checked frames were
+  pixel-identical to the Worker's own render (only the PNG compression differs). A backfill skips
+  any minute the day already holds.
+- **Costs.** No AI, no KV writes, no Worker change. The live job is 144 requests a day to a page
+  the panel loads anyway; each frame is about 7 KB, so about 1 MB a day in Dropbox.
+- **The book is made later, on request:** an ebook (EPUB), one chapter per day, frames in order.
+  The index carries what that needs (day number, time, file name, in order). Not built yet.
+
+**Rejected / learned the hard way:** the first backfill fetched the live page with its `?at=`
+override, about 250 requests in ten minutes. The desk pages sit near the free plan's CPU limit,
+and the burst used up its tolerance: from 14:36 UTC that day, `/desk/castaway`, `/desk/planet` and
+`/desk/flamengo` were cut at about 20 ms of CPU with error 1102 (`exceededCpu`, 118 failed requests
+that hour, none in the 24 hours before). The backfill was stopped and moved to local rendering.
+**Never load-test or bulk-fetch a Worker-drawn page in production; render it locally.**
