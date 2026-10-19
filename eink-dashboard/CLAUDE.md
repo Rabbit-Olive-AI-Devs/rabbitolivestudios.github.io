@@ -352,6 +352,7 @@ eink-dashboard/
       banned.ts           — canon names the series must never print
       render.ts           — compose scene pages (+ replay) in full colour, untouched art (#73); teasers, before/after cards; encode PNGs
       build.ts            — one chapter: hold, crop, map anchors, render → R2 key → PNG
+      aired.ts            — which pages have aired (approved + due on the clock), for the public `/series/aired` archive (DECISIONS #94)
       watch.ts            — alert problems and /health-detailed snapshot for the series
       proof.ts            — proof export helpers: a chapter's 51 R2 keys, the PNG inside a page, SHA-256, the revision digest (DECISIONS #78)
       mailbox.ts          — parses mailbox first-line commands (APPROVE needs the export revision); dueClaudeChapter() for the weekly run (DECISIONS #72); CALENDAR + heartbeat() for the Monday note (#76)
@@ -421,7 +422,7 @@ eink-dashboard/
       skyline.ts          — /skyline + /skyline-bw (PNG inlined as a data URI, one request — DECISIONS #65) + /skyline-test HTML pages
       desk.ts             — /desk/test, /desk/aurebesh, /desk/planet, /desk/tars (view + report), /desk/flamengo handlers (DECISIONS #66–#70)
       family.ts           — /color/family: today's family picture inlined, else the latest earlier one, else the text page (#92)
-      series.ts           — /desk/series, /series, /color/series (one R2 page inlined; before a premiere the "coming soon" card is drawn live with a countdown, #80) and /series/proof (DECISIONS #71)
+      series.ts           — /desk/series, /series, /color/series (one R2 page inlined; before a premiere the "coming soon" card is drawn live with a countdown, #80), /series/proof (DECISIONS #71), and the public aired archive /series/aired (#94)
   photos/
     portraits/            — Birthday reference photos ({key}_0..3.jpg) + people.json (key → Photos name), hints.json (face positions), picks.json (manual face picks); all gitignored (#85, #87)
     skylines/             — Skyline reference photos source (30 cities, 65 photos)

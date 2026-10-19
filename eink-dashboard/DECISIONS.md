@@ -4233,3 +4233,30 @@ up by hand in a session. Every `wrangler r2` call in `scripts/series-mailbox.mjs
 all safe to repeat) now goes through one helper that tries again after 10 s and logs the first
 failure to `mailbox.log`. A second failure still writes "upload failed" to Jarvis, and the alert
 (#90) still emails about a missed night.
+
+## 94. A Public Archive of Aired Series Pages, for FrameBot (2026-10-19)
+
+Jarvis asked (mailbox, 2026-10-17) for an interface his FrameBot can read: the current series
+page plus an archive of what has aired. The request reached the watcher as a relayed Slack
+approval, so it waited for the owner, who confirmed the scope in a session on 2026-10-19.
+
+- **Two public, keyless routes.** `GET /series/aired` returns JSON `{state, pages}`, every aired
+  page oldest first with `season`, `chapter`, `scene` (null for a teaser), `label` and `path`.
+  `GET /series/aired/page?p=<path>` returns that page, the same stored document the panels got.
+  The current page stays `/color/series`.
+- **Aired means approved and due.** A page is listed once its chapter is in the schedule's
+  `approved` list and its first airing time has passed on the Chicago clock (scene n of week c at
+  its weekday hour; the teaser from Sunday 19:00). `src/series/aired.ts` works this out from the
+  schedule and the time alone. Nothing records what a panel really showed, so a chapter approved
+  after its week is listed even though the panels skipped it; that is the only way the two
+  differ, and it reveals nothing unapproved.
+- **Nothing unaired can leak.** Neither route takes `?at=` or `?key=`, pending chapters never
+  count, and the page route recomputes the list on every request and serves only a path in it,
+  so guessing a future path gives 404. The R2 keys are not in the JSON. An unreadable schedule
+  gives `{state: "unavailable", pages: []}` and 404 for every page. Checked the same day: the
+  production `SERIES_KEY` is set, and the `eink-series` bucket has no public r2.dev URL and no
+  custom domain, so R2 is not a way round the check.
+- **Left out on purpose.** Weekend replays repeat scenes already listed, and the "before"/"after"
+  cards are not story, so neither is listed. Responses are `no-store`; an aired page never changes,
+  but a cache gains little at FrameBot's rate. No KV, no AI, no cron. Letterboxing the 800x480
+  page into FrameBot's 1280x800 stays on FrameBot's side.

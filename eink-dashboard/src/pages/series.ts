@@ -4,11 +4,13 @@
  * one-request document: the Worker passes it through, with no image work, no KV and no
  * AI. Every panel gets the same full-colour page and converts it itself. Previews (?at=),
  * the proof page and style tests reveal unreleased work, so they need SERIES_KEY when set.
+ * The aired archive (/series/aired) is public and shows only what has already aired (#94).
  */
 
 import { hudPageHTML } from "../hud/page";
 import { pngToBase64 } from "../png";
 import { htmlResponse } from "../response";
+import { airedPages } from "../series/aired";
 import { chicagoParts, daysUntil, resolveSlot, seriesSlot } from "../series/clock";
 import { renderCard } from "../series/render";
 import { SCHEDULE_KEY, sceneKey, slotKey, teaserKey, testKey } from "../series/keys";
@@ -99,6 +101,31 @@ export async function handleSeries(env: Env, url: URL, now: Date = new Date()): 
   }
   if (!key) return textPage("The series has not started yet.");
   return storedPage(env, key, "This scene is not ready yet. It will appear at the next refresh.");
+}
+
+const json = (data: unknown) => new Response(JSON.stringify(data), {
+  headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+});
+
+/**
+ * Every page that has aired, oldest first, for outside readers (DECISIONS #94). Public and
+ * keyless: it takes no preview time and never lists pending chapters, so it ignores ?at=
+ * and ?key=. An unreadable schedule gives an empty list marked unavailable, never a guess.
+ */
+export async function handleSeriesAired(env: Env, now: Date = new Date()): Promise<Response> {
+  const schedule = await loadSchedule(env.SERIES);
+  if (!schedule) return json({ state: "unavailable", pages: [] });
+  const pages = airedPages(schedule, now).map(({ key: _key, ...page }) => page);
+  return json({ state: "ok", pages });
+}
+
+/** One aired page, the same document the panels got; 404 unless it has aired at this moment. */
+export async function handleSeriesAiredPage(env: Env, url: URL, now: Date = new Date()): Promise<Response> {
+  const p = url.searchParams.get("p") ?? "";
+  const schedule = await loadSchedule(env.SERIES);
+  const page = schedule ? airedPages(schedule, now).find((x) => x.path === p) : undefined;
+  if (!page) return notFound();
+  return storedPage(env, page.key, "This page is missing.");
 }
 
 /** Each scene is framed at panel size, one request per frame; inlining 26 pages would be too heavy. */

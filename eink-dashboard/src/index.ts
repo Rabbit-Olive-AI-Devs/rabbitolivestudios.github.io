@@ -10,7 +10,7 @@ import { handleColorMomentPage, handleColorTestMoment, handleColorTestBirthday, 
 import { handleColorHeadlinesPage } from "./pages/color-headlines";
 import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } from "./pages/skyline";
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo, handleDeskCastaway } from "./pages/desk";
-import { handleSeries, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
+import { handleSeries, handleSeriesAired, handleSeriesAiredPage, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
 import { seriesHealth } from "./series/watch";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
@@ -1270,6 +1270,10 @@ export default {
         return handleSeries(env, url); // every panel gets the same full-colour page (DECISIONS #73)
       case "/color/series":
         return handleSeries(env, url);
+      case "/series/aired":
+        return handleSeriesAired(env); // public: only pages already aired (DECISIONS #94)
+      case "/series/aired/page":
+        return handleSeriesAiredPage(env, url);
       case "/series/proof":
         return handleSeriesProof(env, url);
       case "/series/proof/page":
@@ -1292,7 +1296,7 @@ export default {
               "/weather", "/fact", "/weather.json", "/fact.json", "/fact.png", "/fact1.png",
               "/color/weather", "/color/moment", "/color/headlines",
               "/skyline", "/skyline-bw", "/skyline.png", "/color/family", "/art/brief", "/desk/test", "/desk/aurebesh", "/desk/planet", "/desk/flamengo", "/desk/castaway",
-              "/desk/series", "/series", "/color/series",
+              "/desk/series", "/series", "/color/series", "/series/aired",
               "/test-birthday.png", "/health", "/health-detailed",
             ],
           },

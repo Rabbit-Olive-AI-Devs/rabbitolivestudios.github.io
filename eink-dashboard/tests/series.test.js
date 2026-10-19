@@ -681,3 +681,78 @@ test("proof: the revision follows the page bytes, not their order", async () => 
   assert.notEqual(await proof.revisionOf([{ key: "a", sha256: "1" }, { key: "b", sha256: "3" }]), r);
   assert.equal(await proof.sha256Hex(new TextEncoder().encode("abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
 });
+
+// --- The aired archive for outside readers (DECISIONS #94) ---
+
+const aired = fromBuild("src/series/aired.js");
+
+test("nothing has aired before the premiere", () => {
+  assert.deepEqual(aired.airedPages(SCHEDULE, chi("2026-10-26T07:59:00", CDT)), []);
+});
+
+test("a scene is listed from its first airing hour, not a minute before", () => {
+  const at = (iso) => aired.airedPages(SCHEDULE, chi(iso, CDT)).map((p) => p.path);
+  assert.deepEqual(at("2026-10-26T08:00:00"), ["s00/c01/s01"]);
+  assert.deepEqual(at("2026-10-26T11:59:00"), ["s00/c01/s01", "s00/c01/s02"]);
+  assert.equal(at("2026-10-30T15:59:00").length, 24);
+  assert.equal(at("2026-10-30T16:00:00").length, 25);
+});
+
+test("the teaser is listed from Sunday 19:00, and replays never are", () => {
+  const sun = (hhmm) => aired.airedPages(SCHEDULE, chi(`2026-11-01T${hhmm}:00`, CST)).map((p) => p.path);
+  assert.equal(sun("18:59").length, 25);
+  assert.deepEqual(sun("19:00").slice(-1), ["s00/c01/teaser"]);
+  assert.ok(sun("19:00").every((p) => !/\/r\d\d$/.test(p)));
+});
+
+test("pending chapters are never listed, even when their week is long past", () => {
+  const pages = aired.airedPages(SCHEDULE, chi("2027-06-01T12:00:00", CDT));
+  assert.ok(pages.every((p) => !(p.season === 0 && p.chapter === 3)));
+  assert.deepEqual([...new Set(pages.map((p) => `${p.season}/${p.chapter}`))], ["0/1", "0/2", "1/1"]);
+  assert.equal(pages.length, 3 * 26);
+});
+
+test("aired pages carry labels, paths and the panels' R2 keys, oldest first", () => {
+  const [first] = aired.airedPages(SCHEDULE, chi("2026-10-26T08:00:00", CDT));
+  assert.deepEqual(first, {
+    season: 0, chapter: 1, scene: 1, label: "PROLOGUE, chapter 1, scene 1 (MON 08:00)",
+    path: "s00/c01/s01", key: "series/s00/c01/s01.html",
+  });
+});
+
+const seriesPages = fromBuild("src/pages/series.js");
+
+function fakeEnv(objects) {
+  return { SERIES: { get: async (k) => (k in objects ? { text: async () => objects[k] } : null) } };
+}
+const LIVE = { "series/schedule.json": JSON.stringify(SCHEDULE), "series/s00/c01/s01.html": "<p>one</p>", "series/s00/c03/s01.html": "<p>pending</p>" };
+
+test("/series/aired lists aired pages without their R2 keys and ignores preview params", async () => {
+  const res = await seriesPages.handleSeriesAired(fakeEnv(LIVE), chi("2026-10-26T09:00:00", CDT));
+  assert.equal(res.headers.get("Cache-Control"), "no-store");
+  const body = await res.json();
+  assert.equal(body.state, "ok");
+  assert.deepEqual(body.pages.map((p) => p.path), ["s00/c01/s01"]);
+  assert.equal(body.pages[0].key, undefined);
+});
+
+test("/series/aired is unavailable, and every page 404s, when the schedule cannot be read", async () => {
+  const env = fakeEnv({ "series/schedule.json": "not json" });
+  const now = chi("2026-10-26T09:00:00", CDT);
+  assert.deepEqual(await (await seriesPages.handleSeriesAired(env, now)).json(), { state: "unavailable", pages: [] });
+  const res = await seriesPages.handleSeriesAiredPage(env, new URL("https://x/series/aired/page?p=s00/c01/s01"), now);
+  assert.equal(res.status, 404);
+});
+
+test("/series/aired/page serves only aired pages, whatever key or time is asked for", async () => {
+  const env = { ...fakeEnv(LIVE), SERIES_KEY: "secret" };
+  const get = (q, iso) => seriesPages.handleSeriesAiredPage(env, new URL(`https://x/series/aired/page?${q}`), chi(iso, CDT));
+  const ok = await get("p=s00/c01/s01", "2026-10-26T08:00:00");
+  assert.equal(ok.status, 200);
+  assert.equal(await ok.text(), "<p>one</p>");
+  assert.equal((await get("p=s00/c01/s01", "2026-10-26T07:59:00")).status, 404);
+  assert.equal((await get("p=s00/c01/s02&key=secret&at=2026-12-01T08:00", "2026-10-26T08:00:00")).status, 404);
+  assert.equal((await get("p=s00/c03/s01", "2027-06-01T12:00:00")).status, 404); // pending chapter
+  assert.equal((await get("p=../schedule.json", "2027-06-01T12:00:00")).status, 404);
+  assert.equal((await get("p=s00/c01/r01", "2027-06-01T12:00:00")).status, 404); // replays are not listed
+});
