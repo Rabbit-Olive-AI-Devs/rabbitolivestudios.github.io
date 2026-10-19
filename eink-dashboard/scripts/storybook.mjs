@@ -1,17 +1,27 @@
 #!/usr/bin/env node
 /**
- * Keeps every new frame of the desk story page for a story book (DECISIONS #95). Runs on the
- * Mac mini:
+ * Keeps one frame per story moment of the desk story page for a story book (DECISIONS #95).
+ * Runs on the Mac mini:
  *
- *   node scripts/storybook.mjs live                 — fetch the page now; save its picture if new
+ *   node scripts/storybook.mjs live                 — if a new story moment has started, fetch the
+ *                                                     page once and save its picture
  *   node scripts/storybook.mjs backfill [FROM] [TO] — render past moments on this Mac with the
  *                                                     Worker's code, at 10-minute steps (Chicago
  *                                                     dates, default 2026-10-17 to now)
+ *   node scripts/storybook.mjs epub                 — rebuild the ebook (scripts/storybook-epub.py)
+ *   node scripts/storybook.mjs annotate [DATE...]   — add the moment key to every row of the
+ *                                                     saved days' indexes (backup: index.jsonl.bak)
  *
- * Frames go to Dropbox, `<BOOK>/<YYYY-MM-DD>/<HHMM>.png` (Chicago time), with one append-only
- * `index.jsonl` per day: {time, at, day, file, sha256, bytes, source}. A frame is saved only when
- * its SHA-256 is not already in that day's index. A failed fetch or the text fallback page is
- * logged and skipped, never saved. No AI, no KV writes: the page itself only reads the cache.
+ * Which moment is showing comes from the Worker's own story engine, compiled here as
+ * `npm run test:utils` does, with the cached context that moves moments (sunrise, sunset, a match
+ * day) read from production KV: reads only, never the Worker. So the live job checks every 10
+ * minutes for free and fetches the page only when a new moment starts. If the engine cannot say,
+ * it fetches once and saves only when the picture below the top bar changed.
+ *
+ * Frames go to Dropbox, `<BOOK>/<YYYY-MM-DD>/<HHMM>.png` (Chicago time), with one `index.jsonl`
+ * per day: {time, at, day, file, sha256, bytes, source, moment, moment_start}. `moment` is an
+ * opaque key (date and the moment's start time), `moment_start` its start (ISO). A failed fetch
+ * or the text fallback page is logged and skipped, never saved. No AI, no KV writes.
  *
  * Nothing here holds story, and the log says only times, sizes and hashes.
  * Log: ~/Library/Logs/eink-series/storybook.log. Started by launchd through materialize-exec.py
@@ -22,6 +32,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
@@ -36,6 +47,7 @@ const PAGE = process.env.STORYBOOK_URL ?? "https://eink-dashboard.thiago-oliveir
 const LOGS = path.join(os.homedir(), "Library", "Logs", "eink-series");
 export const EPOCH = "2026-10-17"; // the page's day 1 (CASTAWAY_EPOCH in src/castaway.ts)
 const STEP_MS = 10 * 60 * 1000;   // the desk panel's refresh interval
+const TOP_BAR_BOTTOM = 36;        // rows above this are the shared top bar, with its clock
 
 function log(s) {
   fs.mkdirSync(LOGS, { recursive: true });
@@ -132,57 +144,121 @@ async function fetchLive(at) {
   return png;
 }
 
+/** The rows below the top bar of a 1-bit or 8-bit PNG as written by src/png.ts, or null. */
+export function belowTopBar(png) {
+  let pos = 8, ihdr = null;
+  const idat = [];
+  while (pos + 8 <= png.length) {
+    const len = png.readUInt32BE(pos), type = png.toString("latin1", pos + 4, pos + 8);
+    const data = png.subarray(pos + 8, pos + 8 + len);
+    if (type === "IHDR") ihdr = data;
+    if (type === "IDAT") idat.push(data);
+    pos += 12 + len;
+  }
+  if (!ihdr || ihdr[12] !== 0) return null;   // interlaced: not what the page writes
+  const width = ihdr.readUInt32BE(0), height = ihdr.readUInt32BE(4);
+  const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[ihdr[9]] ?? 0;
+  const stride = 1 + Math.ceil((width * ihdr[8] * channels) / 8);
+  let raw;
+  try { raw = zlib.inflateSync(Buffer.concat(idat)); } catch { return null; }
+  if (!channels || raw.length < stride * height) return null;
+  // src/png.ts writes every row unfiltered; any other filter would need unfiltering to compare.
+  for (let y = TOP_BAR_BOTTOM; y < height; y++) if (raw[y * stride] !== 0) return null;
+  return raw.subarray(TOP_BAR_BOTTOM * stride, stride * height);
+}
+
+/** Whether the picture below the top bar differs (or cannot be compared). */
+export function pictureChanged(a, b) {
+  const x = a && belowTopBar(a), y = b && belowTopBar(b);
+  return !x || !y || !x.equals(y);
+}
+
 /**
- * Renders past moments on this Mac with the Worker's own code (compiled like `npm run test:utils`),
- * so a backfill costs the Worker nothing: an earlier version fetched `?at=` from the live page and
- * its burst used up the free plan's CPU allowance, which briefly failed every desk page with 1102.
- * The cached context the page reads (weather, planet, Flamengo board) comes from production KV as
- * it is now: reads only, once per key.
+ * The Worker's story engine and page drawing, compiled on this Mac (like `npm run test:utils`), with
+ * the cached context the page reads (weather, planet, Flamengo board) from production KV as it is
+ * now: reads only, once per key, never the Worker. A backfill renders here because an earlier
+ * version fetched `?at=` from the live page and its burst used up the free plan's CPU allowance,
+ * which briefly failed every desk page with 1102. `context(at)` throws when a key that moves moments
+ * (weather, Flamengo board) could not be read; the planet only changes words, so it may be missing.
  */
-function localRenderer() {
+function engine() {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "storybook-"));
-  execFileSync("npx", ["tsc", "-p", "tsconfig.test.json", "--outDir", out], { cwd: REPO, stdio: "ignore" });
-  const { loadCastawayContext, castawayView } = require(path.join(out, "src/castaway.js"));
-  const { drawCastawayPage } = require(path.join(out, "src/hud/castaway-page.js"));
-  const { canvasToPng } = require(path.join(out, "src/hud/page.js"));
-  const kv = new Map();
+  let castaway, page, hud;
+  try {
+    execFileSync("npx", ["tsc", "-p", "tsconfig.test.json", "--outDir", out], { cwd: REPO, stdio: "ignore" });
+    castaway = require(path.join(out, "src/castaway.js"));
+    page = require(path.join(out, "src/hud/castaway-page.js"));
+    hud = require(path.join(out, "src/hud/page.js"));
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+  const kv = new Map(), failed = new Set();
   const env = { CACHE: { get: async (key, type) => {
     if (!kv.has(key)) {
       let raw = null;
       try {
         raw = execFileSync("npx", ["wrangler", "kv", "key", "get", "--remote", "--namespace-id", KV_NAMESPACE, key],
           { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: ACCOUNT } });
-      } catch { /* missing key: the page draws without it */ }
+      } catch { failed.add(key); }
       kv.set(key, raw);
     }
     const raw = kv.get(key);
     return raw && type === "json" ? JSON.parse(raw) : raw;
   } } };
-  return async (at) => {
-    try {
-      return Buffer.from(await canvasToPng(drawCastawayPage(castawayView(at, await loadCastawayContext(env, at)))));
-    } catch (err) {
-      log(`backfill ${at.toISOString()}: render failed (${err.message}), skipped`);
-      return null;
-    }
+  const context = async (at, strict) => {
+    const ctx = await castaway.loadCastawayContext(env, at);
+    const missing = [...failed].filter((k) => !k.startsWith("planet:"));
+    if (strict && missing.length) throw new Error(`${missing.length} cache read(s) failed`);
+    return ctx;
+  };
+  return {
+    /** The moment showing at `at`: {key, start}. */
+    moment: async (at, strict = true) => castaway.castawayMoment(at, await context(at, strict)),
+    /** The page's picture at `at` and its moment, or null (logged) when drawing fails. */
+    render: async (at) => {
+      try {
+        const ctx = await context(at, false);
+        const png = Buffer.from(await hud.canvasToPng(page.drawCastawayPage(castaway.castawayView(at, ctx))));
+        return { png, moment: castaway.castawayMoment(at, ctx) };
+      } catch (err) {
+        log(`backfill ${at.toISOString()}: render failed (${err.message}), skipped`);
+        return { png: null, moment: null };
+      }
+    },
   };
 }
 
+/** Index rows with the moment key of each row's time added (`momentAt(at)` gives {key, start}). */
+export async function annotateRows(rows, momentAt) {
+  const out = [];
+  for (const r of rows) {
+    const m = await momentAt(new Date(r.at));
+    out.push({ ...r, moment: m.key, moment_start: m.start.toISOString() });
+  }
+  return out;
+}
+
+/** Whether the live job should fetch: no frame yet for this moment (or the moment is unknown). */
+export function needsFrame(index, moment) {
+  return !moment || !index.some((e) => e.moment === moment.key);
+}
+
 /**
- * Save one frame for instant `at` unless that day already holds it (same SHA-256, or for a
- * backfill a frame already kept at that minute). Returns "saved" | "same" | "skip".
+ * Save one frame for instant `at` unless that day already holds it (same SHA-256, same moment, or
+ * for a backfill a frame already kept at that minute). Returns "saved" | "same" | "skip".
  */
-async function keep(at, source, png) {
+function keep(at, source, png, moment) {
   if (!png) return "skip";
   const { date, time, stem } = chicagoStamp(at);
   const dir = path.join(BOOK, date);
   fs.mkdirSync(dir, { recursive: true });
   const index = readIndex(dir);
   const sha256 = crypto.createHash("sha256").update(png).digest("hex");
-  if (index.some((e) => e.sha256 === sha256 || (source === "backfill" && e.time === time))) return "same";
+  if (!needsFrame(index, moment) || index.some((e) => e.sha256 === sha256 || (source === "backfill" && e.time === time))) return "same";
   const file = frameName(stem, new Set(index.map((e) => e.file)));
   fs.writeFileSync(path.join(dir, file), png);
   const entry = { time, at: at.toISOString(), day: dayNumber(date), file, sha256, bytes: png.length, source };
+  if (moment) Object.assign(entry, { moment: moment.key, moment_start: moment.start.toISOString() });
   fs.appendFileSync(path.join(dir, "index.jsonl"), JSON.stringify(entry) + "\n");
   return "saved";
 }
@@ -195,17 +271,56 @@ async function main() {
   }
   if (cmd === "live") {
     const at = new Date();
-    const r = await keep(at, "live", await fetchLive(at));
-    log(`live ${chicagoStamp(at).date} ${chicagoStamp(at).time}: ${r === "same" ? "no change" : r}`);
+    const { date, time } = chicagoStamp(at);
+    let moment = null;
+    try {
+      moment = await engine().moment(at);
+    } catch (err) {
+      log(`live ${date} ${time}: moment unknown (${err.message}), comparing pictures instead`);
+    }
+    const dir = path.join(BOOK, date);
+    const index = readIndex(dir);
+    if (!needsFrame(index, moment)) {
+      log(`live ${date} ${time}: same moment, skipped`);
+      return;
+    }
+    const png = await fetchLive(at);
+    const last = index.slice().sort((a, b) => a.at.localeCompare(b.at)).at(-1);
+    const unchanged = png && !moment && last && !pictureChanged(fs.readFileSync(path.join(dir, last.file)), png);
+    const r = unchanged ? "same" : keep(at, "live", png, moment);
+    log(`live ${date} ${time}: ${r === "same" ? "no change" : r === "saved" && moment ? "new moment, saved" : r}`);
     process.exit(r === "skip" ? 1 : 0);
+  }
+  if (cmd === "epub") {
+    // Python started from here, not by launchd: macOS grants this job's Node access to the Dropbox
+    // volume, and a child inherits it; the system Python started directly is refused.
+    execFileSync("/usr/bin/python3", ["-I", path.join(REPO, "scripts", "storybook-epub.py")], { stdio: "inherit" });
+    return;
+  }
+  if (cmd === "annotate") {
+    const days = args.length ? args : fs.readdirSync(BOOK).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const { moment } = engine();
+    for (const d of days) {
+      const file = path.join(BOOK, d, "index.jsonl");
+      const rows = readIndex(path.join(BOOK, d));
+      if (!rows.length) continue;
+      fs.copyFileSync(file, `${file}.bak`);
+      const out = await annotateRows(rows, (at) => moment(at));
+      fs.writeFileSync(file, out.map((r) => JSON.stringify(r)).join("\n") + "\n");
+      const line = `annotate ${d}: ${out.length} rows, ${new Set(out.map((r) => r.moment)).size} moments`;
+      log(line);
+      console.log(line);
+    }
+    return;
   }
   if (cmd === "backfill") {
     const now = new Date();
     const from = args[0] ?? EPOCH, to = args[1] ?? chicagoStamp(now).date;
-    const render = localRenderer();
+    const { render } = engine();
     const counts = {};
     for (const at of backfillInstants(from, to, now)) {
-      const r = await keep(at, "backfill", await render(at));
+      const { png, moment } = await render(at);
+      const r = keep(at, "backfill", png, moment);
       const d = chicagoStamp(at).date;
       counts[d] ??= { saved: 0, same: 0, skip: 0 };
       counts[d][r]++;
@@ -217,7 +332,7 @@ async function main() {
     }
     return;
   }
-  console.error("usage: storybook.mjs live | backfill [FROM] [TO]");
+  console.error("usage: storybook.mjs live | backfill [FROM] [TO] | epub | annotate [DATE...]");
   process.exit(2);
 }
 

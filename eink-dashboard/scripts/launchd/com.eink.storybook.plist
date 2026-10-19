@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Story book frames (DECISIONS #95). Every 10 minutes (the desk panel's refresh): fetches /desk/castaway and keeps its picture in Dropbox 00_STORYBOOK_SURPRISE_do_not_open/<date>/<HHMM>.png when it is new.
+  Story book frames (DECISIONS #95). Every 10 minutes (the desk panel's refresh): works out the story moment locally; only when a new one has started, fetches /desk/castaway once and keeps its picture in Dropbox 00_STORYBOOK_SURPRISE_do_not_open/<date>/<HHMM>.png.
   Install: cp this file ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eink.storybook.plist
   Run now: launchctl kickstart gui/$(id -u)/com.eink.storybook
   Stop:    launchctl bootout gui/$(id -u)/com.eink.storybook

@@ -5,7 +5,7 @@ const test = require("node:test");
 const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
 const fromBuild = (p) => require(path.join(buildDir, p));
 
-const { castawayView, dayTimeline, dayNumber, arcFor, islandWeather, matchOn, lightAt } = fromBuild("src/castaway.js");
+const { castawayView, castawayMoment, chicagoParts, dayTimeline, dayNumber, arcFor, islandWeather, matchOn, lightAt } = fromBuild("src/castaway.js");
 const { ARCS, ARRIVAL, ROUTINE, MILESTONES, DATED_EGGS, DAY_EGGS, RARE_EGGS } = fromBuild("src/castaway-story.js");
 const { drawCastawayPage, wrap } = fromBuild("src/hud/castaway-page.js");
 const { measureType } = fromBuild("src/hud/type.js");
@@ -99,4 +99,23 @@ test("easter eggs turn up: dated ones on their day, rare ones now and then", () 
     if (dayTimeline(d, {}).some((m) => RARE_EGGS.includes(m.beat))) rare++;
   }
   assert.ok(rare > 10 && rare < 45, `rare eggs in a year: ${rare}`);
+});
+
+test("the moment key changes exactly when the story moves on, and gives its start", () => {
+  const ctx = { sunrise: 433, sunset: 1088 };
+  let prev = null;
+  for (let t = Date.UTC(2026, 9, 18, 5); t < Date.UTC(2026, 9, 21, 5); t += 60_000) {
+    const now = new Date(t);
+    const v = castawayView(now, ctx);
+    const story = JSON.stringify([v.text, v.log]);
+    const m = castawayMoment(now, ctx);
+    const p = chicagoParts(m.start);
+    assert.ok(m.start.getTime() <= t, now.toISOString());
+    assert.equal(m.key, `${p.date}T${String(Math.floor(p.min / 60)).padStart(2, "0")}:${String(p.min % 60).padStart(2, "0")}`);
+    if (prev) assert.equal(m.key !== prev.key, story !== prev.story, now.toISOString());
+    prev = { key: m.key, story };
+  }
+  // The context moves moments: a later sunrise starts the morning one later.
+  const at = new Date("2026-10-19T12:20:00Z");   // 07:20 Chicago
+  assert.notEqual(castawayMoment(at, { sunrise: 430 }).key, castawayMoment(at, { sunrise: 445 }).key);
 });

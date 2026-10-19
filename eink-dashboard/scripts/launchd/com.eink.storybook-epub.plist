@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Story book ebook (DECISIONS #95). Every night at 00:15 (Mac local time, Chicago), after the day's last moment: rebuilds
+  Dropbox 00_STORYBOOK_SURPRISE_do_not_open/storybook.epub from the saved frames. Reads Dropbox only; no Worker requests.
+  Install: cp this file ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eink.storybook-epub.plist
+  Run now: launchctl kickstart gui/$(id -u)/com.eink.storybook-epub
+  Stop:    launchctl bootout gui/$(id -u)/com.eink.storybook-epub
+  Logs:    ~/Library/Logs/eink-series/ (storybook.log, launchd-storybook-epub.log)
+  Started through materialize-exec.py like the mailbox jobs (DECISIONS #72): older frames may be online-only. Node runs the
+  Python builder: macOS lets this job's Node read the Dropbox volume but refused the system Python started directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.eink.storybook-epub</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/materialize-exec.py</string>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/storybook.mjs</string>
+    <string>epub</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard</string>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>15</integer></dict>
+  <key>StandardOutPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-storybook-epub.log</string>
+  <key>StandardErrorPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-storybook-epub.log</string>
+</dict>
+</plist>

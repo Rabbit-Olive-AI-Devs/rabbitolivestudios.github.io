@@ -34,3 +34,29 @@ test("storybook: backfill steps every 10 minutes from Chicago midnight and stops
   // The autumn DST day has 25 hours, so 150 steps.
   assert.equal(backfillInstants("2026-11-01", "2026-11-01", new Date("2027-01-01T00:00:00Z")).length, 150);
 });
+
+test("storybook: the live job fetches only when a new moment starts (or the moment is unknown)", async () => {
+  const { needsFrame, annotateRows } = await load();
+  const moment = { key: "2026-10-19T10:00", start: new Date("2026-10-19T15:00:00Z") };
+  assert.equal(needsFrame([], moment), true);
+  assert.equal(needsFrame([{ moment: "2026-10-19T07:12" }], moment), true);
+  assert.equal(needsFrame([{ moment: "2026-10-19T07:12" }, { moment: "2026-10-19T10:00" }], moment), false);
+  assert.equal(needsFrame([{ moment: "2026-10-19T10:00" }], null), true);
+  const rows = await annotateRows([{ at: "2026-10-19T15:10:00.000Z", file: "1010.png" }], async () => moment);
+  assert.deepEqual(rows, [{ at: "2026-10-19T15:10:00.000Z", file: "1010.png", moment: moment.key, moment_start: "2026-10-19T15:00:00.000Z" }]);
+});
+
+test("storybook: without the engine, a frame counts as new only when the picture below the top bar changed", async () => {
+  const { pictureChanged } = await load();
+  const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
+  const { encodePNG1Bit } = require(path.join(buildDir, "src/png.js"));
+  const frame = async (dots) => {
+    const px = new Uint8Array(800 * 480);
+    for (const [x, y] of dots) px[y * 800 + x] = 1;
+    return Buffer.from(await encodePNG1Bit(px, 800, 480));
+  };
+  const base = await frame([[5, 100]]);
+  assert.equal(pictureChanged(base, await frame([[5, 100], [300, 10]])), false);   // only the clock bar
+  assert.equal(pictureChanged(base, await frame([[5, 100], [300, 200]])), true);
+  assert.equal(pictureChanged(base, Buffer.from("not a png")), true);
+});

@@ -216,6 +216,32 @@ export function settingFor(date: string): { name: string; value: number } {
   return { name: SETTINGS[h % SETTINGS.length], value: 55 + ((h >>> 8) % 41) };
 }
 
+/** Index of the moment showing at minute `min`: the last one that has started. */
+const momentIndex = (today: Moment[], min: number) => today.reduce((acc, m, i) => (m.min <= min ? i : acc), 0);
+
+/** The UTC instant of a Chicago date and clock minute (the earlier one when the autumn hour repeats). */
+function chicagoInstant(date: string, min: number): Date {
+  for (const offsetH of [5, 6]) {
+    const t = new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)), offsetH, min));
+    const p = chicagoParts(t);
+    if (p.date === date && p.min === min) return t;
+  }
+  // The spring-forward hour does not exist on the clock: count from midnight in standard time.
+  return new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)), 6, min));
+}
+
+/**
+ * The story moment showing at an instant (DECISIONS #95): an opaque key, the date and the clock
+ * time it started, and when it started. Same choice as castawayView, so the key changes exactly
+ * when the story moves on. The context matters: sunrise, sunset and a match day move moments.
+ */
+export function castawayMoment(now: Date, ctx: CastawayContext = {}): { key: string; start: Date } {
+  const { date, min } = chicagoParts(now);
+  const today = dayTimeline(date, ctx);
+  const start = Math.max(0, today[momentIndex(today, min)].min);
+  return { key: `${date}T${hhmm(start)}`, start: chicagoInstant(date, start) };
+}
+
 /** The page at an instant. */
 export function castawayView(now: Date, ctx: CastawayContext = {}): CastawayView {
   const { date, min } = chicagoParts(now);
@@ -223,7 +249,7 @@ export function castawayView(now: Date, ctx: CastawayContext = {}): CastawayView
   const month = Number(date.slice(5, 7));
   const [sunrise, sunset] = [ctx.sunrise ?? SUN[month - 1][0], ctx.sunset ?? SUN[month - 1][1]];
   const today = dayTimeline(date, ctx);
-  const idx = today.reduce((acc, m, i) => (m.min <= min ? i : acc), 0);
+  const idx = momentIndex(today, min);
   const current = today[idx];
   const yesterday = day > 1 ? dayTimeline(shiftDateStr(date, -1), ctx).map((m) => ({ ...m, min: m.min - 1440 })) : [];
   const earlier = [...yesterday, ...today.slice(0, idx)];

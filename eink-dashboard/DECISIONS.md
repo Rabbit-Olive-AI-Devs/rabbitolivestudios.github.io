@@ -4309,3 +4309,36 @@ frames in time order with their time as caption. Consecutive frames differ eithe
 clock alone (about 0%) or by a real change (2-4% of the pixels below the bar), so a frame is kept
 when more than 0.2% of the pixels below the bar changed. First build: 238 of 350 frames, 3 chapters,
 `storybook.epub` in the same Dropbox folder. Run it again for a fresh copy; the owner chose to see it.
+
+**Addendum (2026-10-19, owner's choice): one frame per story moment, and a nightly ebook.** The
+pixel rule still kept frames that changed only in the light or the scene's small variations, and
+every 10-minute sample was "new" because of the top bar's clock. The owner chose one frame per
+story moment, at the times the page's own schedule moves the story on.
+- **What a moment is.** `castawayMoment(now, ctx)` in `src/castaway.ts` picks the moment exactly
+  as `castawayView` does (they share one index function, so the page draws the same) and returns
+  an opaque key (the Chicago date and the moment's start time) and its start instant. The key
+  depends on the cached context, because the schedule does: sunrise and sunset move some moments
+  and a match day adds some. A context-free key would land up to half an hour off and miss match
+  moments. A test checks over three days, minute by minute, that the key changes exactly when the
+  story text or log does.
+- **The live job no longer fetches between moments.** Every 10 minutes it compiles the engine
+  locally (about a second), reads the home weather and Flamengo board from production KV (reads
+  only, through the Cloudflare API, never the Worker), and works out the current moment. If that
+  moment already has a frame in today's index it logs "same moment, skipped" and stops. Only when
+  a new moment has started does it fetch `/desk/castaway` once and save the frame with `moment`
+  and `moment_start`. That is about one Worker request per moment, 12 to 15 a day instead of 144
+  (17 Oct, day 1, which starts part-way through: 9; 18 Oct: 15). If the engine or a KV read fails, it
+  fetches once and saves only when the picture below the top bar (rows 36 and down) changed from
+  the last saved frame, and logs "moment unknown".
+- **The archive.** `storybook.mjs annotate` added `moment` and `moment_start` to every row of the
+  saved days, computed locally with the same context the backfill used (backups `index.jsonl.bak`,
+  no frame deleted). Every moment of 17-19 Oct so far has at least one frame.
+- **The ebook** keeps the first saved frame of each moment, captioned with the moment's start
+  time; a row without a key (saved during a fallback) stands as its own frame. The pixel rule is
+  gone, and with it numpy and PIL, so the builder runs on the system Python (`python3 -I`).
+  Rebuilt: 28 moments from 351 frames, 3 chapters, about 194 KB.
+- **Nightly rebuild (owner's request).** LaunchAgent `com.eink.storybook-epub` runs at 00:15
+  Chicago, after the day's last moment, through `materialize-exec.py`, as `storybook.mjs epub`,
+  which starts the Python builder: macOS lets the jobs' Node read the Dropbox volume but refused
+  the system Python started directly by launchd ("Operation not permitted"). It reads only
+  Dropbox, makes no Worker requests, and logs one line of counts to `storybook.log`.

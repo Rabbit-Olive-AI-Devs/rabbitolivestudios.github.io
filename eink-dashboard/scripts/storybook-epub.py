@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Builds the desk story book (DECISIONS #95) as an EPUB from the frames the storybook job saved
-in Dropbox: one chapter per day, frames in time order. Frames ten minutes apart often differ
-only in the top bar's clock, so a frame is kept only when the picture below the bar changed
-from the last one kept. Prints counts only: the story is a surprise (#93).
+in Dropbox: one chapter per day, one frame per story moment (the first one saved for it, by the
+index's `moment` key), captioned with the moment's start time. A row without a moment key (saved
+while the story engine could not say) stands as its own frame. Prints counts only: the story is
+a surprise (#93). Runs every night (com.eink.storybook-epub) and by hand; reads only Dropbox.
 
-    python3 -E -P scripts/storybook-epub.py [FOLDER] [OUT.epub]
+    python3 -I scripts/storybook-epub.py [FOLDER] [OUT.epub]   (-I: also runs on the system Python 3.9)
 """
 
 import json
@@ -13,16 +14,14 @@ import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-
-import numpy as np
-from PIL import Image
+from zoneinfo import ZoneInfo
 
 FOLDER = Path(sys.argv[1] if len(sys.argv) > 1 else
               "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_STORYBOOK_SURPRISE_do_not_open")
 OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else FOLDER / "storybook.epub"
-TOP_BAR = 40          # rows ignored when comparing: the shared top bar holds the clock
-MIN_CHANGE = 0.002    # fraction of pixels below the bar that must differ to keep a frame
 TITLE = "The Desk Story"
+CHICAGO = ZoneInfo("America/Chicago")
+LOG = Path.home() / "Library" / "Logs" / "eink-series" / "storybook.log"
 
 
 def frames(day_dir: Path) -> list[dict]:
@@ -30,8 +29,19 @@ def frames(day_dir: Path) -> list[dict]:
     return sorted(rows, key=lambda r: r["at"])
 
 
-def changed(a: np.ndarray, b: np.ndarray) -> bool:
-    return np.count_nonzero(a[TOP_BAR:] != b[TOP_BAR:]) / a[TOP_BAR:].size >= MIN_CHANGE
+def one_per_moment(rows: list) -> list:
+    """The first saved frame of each moment, in time order, with its caption."""
+    kept, seen = [], set()
+    for r in rows:
+        key = r.get("moment") or r["file"]
+        if key in seen:
+            continue
+        seen.add(key)
+        start = r.get("moment_start")
+        caption = (datetime.fromisoformat(start.replace("Z", "+00:00")).astimezone(CHICAGO).strftime("%H:%M")
+                   if start else r["time"])
+        kept.append({**r, "caption": caption})
+    return kept
 
 
 def page(title: str, body: str) -> str:
@@ -42,16 +52,13 @@ def page(title: str, body: str) -> str:
 
 
 def main() -> None:
+    LOG.parent.mkdir(parents=True, exist_ok=True)
     days = sorted(d for d in FOLDER.iterdir() if d.is_dir() and (d / "index.jsonl").exists())
     chapters, images, total, kept_total = [], [], 0, 0
     for d in days:
-        kept, last = [], None
-        for r in frames(d):
-            total += 1
-            pixels = np.asarray(Image.open(d / r["file"]).convert("L"))
-            if last is None or changed(pixels, last):
-                kept.append(r)
-                last = pixels
+        rows = frames(d)
+        total += len(rows)
+        kept = one_per_moment(rows)
         if not kept:
             continue
         n = len(chapters) + 1
@@ -59,12 +66,12 @@ def main() -> None:
         for r in kept:
             name = f"img/{d.name}-{Path(r['file']).stem}.png"
             images.append((name, d / r["file"]))
-            figures.append(f'<figure><img src="{name}" alt="{r["time"]}"/><figcaption>{r["time"]}</figcaption></figure>')
+            figures.append(f'<figure><img src="{name}" alt="{r["caption"]}"/><figcaption>{r["caption"]}</figcaption></figure>')
         heading = f"Day {kept[0]['day']}"
         chapters.append((f"day{n:03d}.xhtml", heading,
                          page(heading, f'<h1>{heading}</h1><p class="date">{d.name}</p>{"".join(figures)}')))
         kept_total += len(kept)
-        print(f"{d.name}: {len(kept)} of {sum(1 for _ in frames(d))} frames kept")
+        print(f"{d.name}: {len(kept)} moments from {len(rows)} frames")
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     manifest = "".join(f'<item id="c{i}" href="{f}" media-type="application/xhtml+xml"/>' for i, (f, _, _) in enumerate(chapters))
@@ -95,7 +102,10 @@ def main() -> None:
             z.writestr(f"OEBPS/{f}", html, compress_type=zipfile.ZIP_DEFLATED)
         for name, src in images:
             z.write(src, f"OEBPS/{name}", compress_type=zipfile.ZIP_STORED)
-    print(f"{kept_total} of {total} frames in {len(chapters)} chapters -> {OUT} ({OUT.stat().st_size // 1024} KB)")
+    line = f"{kept_total} moments from {total} frames in {len(chapters)} chapters -> {OUT} ({OUT.stat().st_size // 1024} KB)"
+    print(line)
+    with open(LOG, "a") as f:
+        f.write(f"{datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')} epub: {line}\n")
 
 
 if __name__ == "__main__":
