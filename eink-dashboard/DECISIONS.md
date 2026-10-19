@@ -4302,3 +4302,10 @@ that hour, none in the 24 hours before). The backfill was stopped and moved to l
 with the URL could see future moments. The router now requires `TEST_AUTH_KEY` whenever `at` is
 given (404 otherwise, like the other test routes); the plain page the panel loads is unchanged.
 The story book job does not use the override.
+
+**Addendum (2026-10-19, the book so far):** `scripts/storybook-epub.py` builds the EPUB from the
+Dropbox frames on the Mac mini, with no Worker requests: one chapter per day ("Day N", the date),
+frames in time order with their time as caption. Consecutive frames differ either by the top bar's
+clock alone (about 0%) or by a real change (2-4% of the pixels below the bar), so a frame is kept
+when more than 0.2% of the pixels below the bar changed. First build: 238 of 350 frames, 3 chapters,
+`storybook.epub` in the same Dropbox folder. Run it again for a fresh copy; the owner chose to see it.
