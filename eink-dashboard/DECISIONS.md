@@ -4297,3 +4297,8 @@ and the burst used up its tolerance: from 14:36 UTC that day, `/desk/castaway`, 
 `/desk/flamengo` were cut at about 20 ms of CPU with error 1102 (`exceededCpu`, 118 failed requests
 that hour, none in the 24 hours before). The backfill was stopped and moved to local rendering.
 **Never load-test or bulk-fetch a Worker-drawn page in production; render it locally.**
+
+**Addendum (2026-10-19, owner agreed):** `/desk/castaway?at=` had been public since #93, so anyone
+with the URL could see future moments. The router now requires `TEST_AUTH_KEY` whenever `at` is
+given (404 otherwise, like the other test routes); the plain page the panel loads is unchanged.
+The story book job does not use the override.

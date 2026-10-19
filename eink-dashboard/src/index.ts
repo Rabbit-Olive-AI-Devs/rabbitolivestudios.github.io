@@ -1261,6 +1261,8 @@ export default {
       case "/desk/tars":
         return request.method === "POST" ? handleDeskTarsReport(request, env) : handleDeskTars(env, url);
       case "/desk/castaway":
+        // ?at= shows other moments, including future ones: test key only (DECISIONS #95)
+        if (url.searchParams.has("at")) { const denied = checkTestAuth(url, env); if (denied) return denied; }
         return handleDeskCastaway(env, url);
       case "/desk/flamengo":
         return handleDeskFlamengo(env, ctx);

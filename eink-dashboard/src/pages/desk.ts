@@ -134,7 +134,7 @@ export async function handleDeskFlamengo(env: Env, ctx?: ExecutionContext, sourc
 /**
  * /desk/castaway: the self-playing island story (DECISIONS #93). Free: no AI, no KV writes; it
  * reads the home weather, tonight's planet and the Flamengo board from the cache when present.
- * `?at=` (ISO time) previews another moment.
+ * `?at=` (ISO time) previews another moment; the router requires the test key for it (#95).
  */
 export async function handleDeskCastaway(env: Env, url: URL): Promise<Response> {
   const at = url.searchParams.get("at");
