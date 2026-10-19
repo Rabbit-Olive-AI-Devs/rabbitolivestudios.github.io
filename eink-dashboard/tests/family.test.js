@@ -51,7 +51,8 @@ test("the family style is never the day's moment or skyline style", () => {
 
 test("years ago and the caption", () => {
   assert.equal(yearsAgo("2019-10-15", "2026-10-17"), 7);
-  assert.equal(yearsAgo("2019-10-20", "2026-10-17"), 6);
+  assert.equal(yearsAgo("2019-10-20", "2026-10-17"), 7, "calendar years, not to the day");
+  assert.equal(yearsAgo("2024-10-19", "2026-10-18"), 2);
   assert.equal(yearsAgo("2025-11-20", "2026-10-17"), 1, "at least 1");
   assert.deepEqual(familyCaption("2019-10-15", "2026-10-17"), { left: "15 Oct 2019", center: "Family Memory", right: "7 years ago" });
   assert.equal(familyCaption("2025-10-17", "2026-10-17").right, "1 year ago");

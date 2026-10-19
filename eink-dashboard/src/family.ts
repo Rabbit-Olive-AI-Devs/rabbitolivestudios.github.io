@@ -44,10 +44,9 @@ export function familyStyleFor(date: string): ArtStyle {
 
 /** Whole years between the photo and the date, at least 1 (photos are at least 11 months old). */
 export function yearsAgo(taken: string, date: string): number {
-  const [ty, tm, td] = taken.split("-").map(Number);
-  const [y, m, d] = date.split("-").map(Number);
-  const years = y - ty - (m < tm || (m === tm && d < td) ? 1 : 0);
-  return Math.max(1, years);
+  // Calendar years, not full years to the day: the photo may be from a nearby day, and a
+  // 19 Oct 2024 photo shown on 18 Oct 2026 is "2 years ago" (owner, 2026-10-18).
+  return Math.max(1, Number(date.slice(0, 4)) - Number(taken.slice(0, 4)));
 }
 
 /** The burned-in caption: the photo's real date, the title, how long ago. No names. */

@@ -4220,3 +4220,9 @@ the desk story and in The Long Drift ("surprise me"). What they are and where st
 with the story". The desk story's eggs were rewritten to work without winks or explanations, and
 the rare ones now come about one afternoon in fourteen. The series writer notes (Claude's and
 Jarvis's) carry the owner's words: zero eggs beats a forced one.
+
+**#92 addendum (2026-10-18): "N years ago" counts calendar years.** The first picture showed a
+19 Oct 2024 photo on 18 Oct 2026 as "1 year ago": `yearsAgo` counted full years to the day, and
+the photo was one day short of its anniversary. The owner: that is 2 years ago. The photo is often
+from a nearby day (Favourites, closest day), so the caption now subtracts the years (at least 1).
+That day's KV entry was rebuilt by hand from Jarvis's painting with the new caption.
