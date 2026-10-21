@@ -74,3 +74,29 @@ test("serialPage: null (engine fallback) when anything is missing or broken", as
   // before the first beat of the first day
   assert.equal(await serialPage({ SERIES: bucket({ [d]: JSON.stringify(day("2026-10-21", "13:30")) }) }, new Date("2026-10-21T17:00:00Z")), null);
 });
+
+const { serialProblems, serialHealth } = fromBuild("src/serial.js");
+const dayFile = (date, built, planned, extra = {}) => JSON.stringify({ ...day(date, ...["07:00", "10:00", "13:00", "16:00", "19:00", "22:00"].slice(0, built)), planned, ...extra });
+// 2026-10-23 07:05 CDT
+const morning = new Date("2026-10-23T12:05:00Z");
+
+test("serialProblems: quiet when today is ready, on the first day, between seasons, or before any serial", async () => {
+  const k = serialDayKey;
+  assert.deepEqual(await serialProblems({ SERIES: bucket({ [k("2026-10-23")]: dayFile("2026-10-23", 6, 6) }) }, morning), []);
+  assert.deepEqual(await serialProblems({ SERIES: bucket({ [k("2026-10-23")]: dayFile("2026-10-23", 1, 4, { same_day: true }) }) }, morning), []);
+  assert.deepEqual(await serialProblems({ SERIES: bucket({ [k("2026-10-22")]: dayFile("2026-10-22", 6, 6, { season_end: true }) }) }, morning), []);
+  assert.deepEqual(await serialProblems({ SERIES: bucket({}) }, morning), []);
+});
+
+test("serialProblems: says how many pages are missing, without story", async () => {
+  const k = serialDayKey;
+  const [p] = await serialProblems({ SERIES: bucket({ [k("2026-10-23")]: dayFile("2026-10-23", 2, 6) }) }, morning);
+  assert.match(p, /2 of 6 pages ready for 2026-10-23/);
+  const [q] = await serialProblems({ SERIES: bucket({ [k("2026-10-22")]: dayFile("2026-10-22", 6, 6) }) }, morning);
+  assert.match(q, /no pages for 2026-10-23/);
+});
+
+test("serialHealth: ready/planned for today and tomorrow", async () => {
+  const h = await serialHealth({ SERIES: bucket({ [serialDayKey("2026-10-23")]: dayFile("2026-10-23", 2, 6) }) }, morning);
+  assert.deepEqual(h, { "2026-10-23": "2/6", "2026-10-24": "none" });
+});

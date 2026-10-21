@@ -13,6 +13,7 @@
 import type { Env } from "./types";
 import { getAiBudgetBlock } from "./cache-guard";
 import { seriesProblems } from "./series/watch";
+import { serialProblems } from "./serial";
 import { readState } from "./tars";
 import { jarvisDrew } from "./art";
 
@@ -249,7 +250,7 @@ export async function runAlertCheck(
     const [present, block, series, tars, drew] = await Promise.all([
       Promise.all(labels.map((l) => env.CACHE.get(opts.imageKeys[l], "stream"))),
       getAiBudgetBlock(env),
-      seriesProblems(env, new Date(now)),
+      Promise.all([seriesProblems(env, new Date(now)), serialProblems(env, new Date(now))]).then((p) => p.flat()),
       readState(env),
       Promise.all(kinds.map((k) => jarvisDrew(env, opts.dateStr, k))),
     ]);

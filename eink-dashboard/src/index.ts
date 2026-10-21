@@ -12,6 +12,7 @@ import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } f
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo, handleDeskCastaway } from "./pages/desk";
 import { handleSeries, handleSeriesAired, handleSeriesAiredPage, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
 import { seriesHealth } from "./series/watch";
+import { serialHealth } from "./serial";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
 import { getBirthdayToday, getBirthdayByKey, BIRTHDAY_STYLES } from "./birthday";
@@ -782,6 +783,8 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         device_desk:    ephemeralStatus(parseEphemeral(deviceDeskRaw),     390),
       },
       series: await seriesHealth(env, new Date()),
+      // The desk serial: pages ready/planned, today and tomorrow (Chicago).
+      serial: await serialHealth(env, new Date()),
       config: {
         test_auth_key: env.TEST_AUTH_KEY ? "configured" : "missing",
         series_key: env.SERIES_KEY ? "configured" : "missing",

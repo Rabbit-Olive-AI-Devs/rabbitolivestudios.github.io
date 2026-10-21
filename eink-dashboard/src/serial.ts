@@ -18,7 +18,14 @@ export interface SerialBeat {
 export interface SerialDay {
   date: string;
   day: number;
+  /** Only the beats that built and passed review; a later one appears when its picture lands. */
   beats: SerialBeat[];
+  /** Beats in the day's script. */
+  planned?: number;
+  /** Pictures due the same day (the first day only): not alerted on. */
+  same_day?: boolean;
+  /** The last day of a season: the break that follows is not a fault. */
+  season_end?: boolean;
 }
 
 export const serialDayKey = (date: string) => `serial/days/${date}.json`;
@@ -64,4 +71,31 @@ export async function serialPage(env: Env, now: Date): Promise<string | null> {
     console.error("serial: page read failed:", err);
     return null;
   }
+}
+
+/** Built and planned beats for one day, or null when there is no day file. */
+async function readiness(env: Env, date: string): Promise<{ built: number; planned: number; day: SerialDay } | null> {
+  const day = await readDay(env, date);
+  return day ? { built: day.beats.length, planned: day.planned ?? day.beats.length, day } : null;
+}
+
+/** Spoiler-free problems for the alert (DECISIONS #60): today's pages not all ready, or none at all mid-season. */
+export async function serialProblems(env: Env, now: Date): Promise<string[]> {
+  const { date } = chicagoParts(now);
+  const yesterday = shiftDateStr(date, -1);
+  const [today, before] = await Promise.all([readiness(env, date), readiness(env, yesterday)]);
+  if (!today) {
+    return before && !before.day.season_end ? [`The desk serial has no pages for ${date}; the panel shows the routine page`] : [];
+  }
+  if (today.day.same_day || today.built >= today.planned) return [];
+  return [`The desk serial has ${today.built} of ${today.planned} pages ready for ${date}; a missing beat leaves the previous one showing`];
+}
+
+/** For /health-detailed: pages ready against pages planned, today and tomorrow. */
+export async function serialHealth(env: Env, now: Date): Promise<Record<string, string>> {
+  const { date } = chicagoParts(now);
+  const tomorrow = shiftDateStr(date, 1);
+  const [a, b] = await Promise.all([readiness(env, date), readiness(env, tomorrow)]);
+  const show = (r: Awaited<ReturnType<typeof readiness>>) => (r ? `${r.built}/${r.planned}` : "none");
+  return { [date]: show(a), [tomorrow]: show(b) };
 }
