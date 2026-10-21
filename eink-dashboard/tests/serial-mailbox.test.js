@@ -91,3 +91,13 @@ test("checkDay: with a settings library, every beat names a known setting", asyn
   const p = checkDay(l, day, new Set(), new Set(), { p1: {} });
   assert.deepEqual(p, ["2026-10-22-2: scene.setting_id is not in the season's settings.json"]);
 });
+
+test("checkDay: picture text must be a few short ASCII strings", async () => {
+  const { checkDay } = await script();
+  const l = await lib();
+  const sign = (text) => beat(1, { scene: { focus: { fx: 0.5, fy: 0.5 }, text } });
+  assert.deepEqual(checkDay(l, { date: "2026-10-22", beats: [sign(["LANTERN BOOKS", "OPEN 9 TO 5"])] }, new Set(), new Set()), []);
+  for (const bad of [["x".repeat(41)], ["CAF\u00c9"], "LANTERN BOOKS", ["a", "b", "c", "d", "e"], [""]]) {
+    assert.match(checkDay(l, { date: "2026-10-22", beats: [sign(bad)] }, new Set(), new Set()).join("\n"), /scene.text/);
+  }
+});

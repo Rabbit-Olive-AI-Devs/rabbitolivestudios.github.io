@@ -7,7 +7,7 @@ Read these three files:
 
 Answer PASS unless one of these is clearly true:
 1. The picture does not show the scene note: the wrong setting, the wrong characters, or a different action or mood that would confuse the text.
-2. The picture contains readable text, letters or numbers, a watermark, or a signature.
+2. The picture's text is wrong. English text is allowed only where the scene note asks for it (`scene.text`, exact wording). That text must be spelled exactly as asked and readable on the page. Anything else is a fault: any other text, letters or numbers, Aurebesh or other invented script, garbled lettering, a watermark, or a signature.
 3. The picture is broken: glitches, a blank or flat image, mangled figures, or obvious artefacts.
 4. The crop on the page cuts off the subject the note's focus point names.
 5. It is not in the brick-built diorama style.

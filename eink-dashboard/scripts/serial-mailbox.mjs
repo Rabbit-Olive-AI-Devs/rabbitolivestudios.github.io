@@ -136,6 +136,10 @@ export function checkDay(lib, day, otherLines, engine, settings = null) {
     for (const ch of [b.title, b.log, ...b.text, ...(b.text_done ?? [])].join("")) {
       if (ch !== " " && !lib.fonts.FACES.plex13r.glyphs[ch]) problems.push(`${b.id}: no glyph for character code ${ch.charCodeAt(0)}`);
     }
+    const signs = b.scene?.text;
+    if (signs !== undefined && !(Array.isArray(signs) && signs.length <= 4 && signs.every((t) => typeof t === "string" && /^[\x20-\x7e]{1,40}$/.test(t)))) {
+      problems.push(`${b.id}: scene.text must be up to 4 short ASCII strings (40 characters each)`);
+    }
     if (settings && !settings[b.scene?.setting_id]) problems.push(`${b.id}: scene.setting_id is not in the season's settings.json`);
     if (!b.scene?.focus || !(b.scene.focus.fx >= 0 && b.scene.focus.fx <= 1 && b.scene.focus.fy >= 0 && b.scene.focus.fy <= 1)) problems.push(`${b.id}: focus missing or outside 0..1`);
     for (const line of [b.text.join(" "), b.log]) {

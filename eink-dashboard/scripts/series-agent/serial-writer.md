@@ -33,13 +33,14 @@ If the current season ends before {{THROUGH}}:
 - **ASCII only.**
 - **No line may repeat** one from another day or from the old engine.
 - **`scene.setting_id`:** every beat names its place from the season's settings library, `{{WORK}}/s<NN>/settings.json` (`{"settings": [{"id": "s01-<short-slug>", "setting": "...", "light": "...", "focus": {"fx": 0.5, "fy": 0.5}}]}`). Each place is painted once and stands in for any beat there whose own painting is late. Reuse places where the story returns to them. If a new day needs a new place, add it to `settings.json` and brief it in `{{SPOILERS}}/settings/brief.md` (append: id, note, focus). In the spoiler-free note, ask Jarvis to drop it as `{{INBOX}}/settings/<id>.png` by the same deadline as the day it first appears.
+- **Text in the picture (optional, sparingly):** Jarvis can paint short English text (shop signs, labels, a chalkboard). It was tested on 2026-10-21: three pieces of text, all exact and readable on the panel. A beat that wants it sets `scene.text`: an array of the exact strings, ASCII, each short (a sign, not a paragraph), and says in the note where each goes. Never Aurebesh or invented script. Without `scene.text`, the picture has no text at all.
 - **Match day (optional):** a beat may set `"live": "match"` with a `text_done` variant, used once the day's Flamengo match has finished, with `{{us}}`, `{{them}}` and `{{opponent}}` filled from the scoreboard. `text` must still work if the match hasn't finished or doesn't exist.
 
 **Check every day file:** `node {{REPO}}/scripts/serial-mailbox.mjs check <day.json>`. Fix it until it prints OK.
 
 **Brief Jarvis.** For each day, write `{{SPOILERS}}/<date>/brief.md`: each beat's id, start and scene note, with the focus point as fractions of the frame. Then write ONE spoiler-free note `{{OUTBOX}}/<YYYY-MM-DD-HHMM>-serial-brief-<from>-to-<through>.md`. Its first line is `SERIAL BRIEF date=<from>..<through>`, and it says:
 - where the briefs are;
-- to drop `<beat-id>.png` (brick-built diorama, full colour, no text, PNG, at least 1600x630) into `{{INBOX}}/<date>/`, creating the folder;
+- to drop `<beat-id>.png` (brick-built diorama, full colour, no text unless the beat's note gives exact `text`, PNG, at least 1600x630) into `{{INBOX}}/<date>/`, creating the folder;
 - the deadline: each day's pictures by 21:00 Chicago the evening before.
 
 Finish with a short spoiler-free summary: days written, beats, check results.

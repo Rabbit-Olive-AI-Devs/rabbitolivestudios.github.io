@@ -4454,3 +4454,10 @@ with no passed painting of its own (none delivered, or rejected), `run` puts it 
 painting and its own text, marked `stand_in` in the day file. When its real painting lands and passes,
 it replaces the stand-in. A rejected painting is remembered, so it is not reviewed again. The
 alert and `/health-detailed` count stand-ins as missing paintings ("5 of 6 paintings in").
+
+**Addendum (2026-10-21, text in the paintings):** the owner said Jarvis can paint English text.
+A non-story test (a shop front with three exact pieces of text) came back spelled exactly and
+readable at the panel's size, so the "no text" rule is relaxed. A beat may set `scene.text`:
+up to 4 exact ASCII strings of at most 40 characters, checked by `serial-mailbox.mjs check`. The
+reviewer passes only that text, spelled exactly; any other text, Aurebesh, invented script or
+garbled lettering is still a REVISE. The writer is told to use it sparingly (signs, labels).
