@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-desk-serial-design.md`
 
-**Status (2026-10-21):** Tasks 1-9 built and deployed (DECISIONS #96). Changed in building: the review gate lives offline (the day file lists only beats that passed review, so the Worker has no `airable` flag); the writer runs daily and fills any missing days, not only on Wednesdays; the live slot is a `text_done` variant for a finished match. Not built: the settings library.
+**Status (2026-10-21):** Tasks 1-9 built and deployed (DECISIONS #96). Changed in building: the review gate lives offline (the day file lists only beats that passed review, so the Worker has no `airable` flag); the writer runs daily and fills any missing days, not only on Wednesdays; the live slot is a `text_done` variant for a finished match. The settings library was built the same day (#96 addendum).
 
 ## Phasing
 

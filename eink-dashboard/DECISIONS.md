@@ -4445,3 +4445,12 @@ describe the story to the owner.**
 covers match results only. Breaks between seasons fall back to the routine engine. The settings
 library (spec §7) is not built yet: a late picture leaves the previous beat showing, which never
 repeats a picture.
+
+**Addendum (2026-10-21, the settings library, at the owner's request):** places painted once per
+season (`~/desk-serial-work/s<NN>/settings.json`, pictures in `to-claude/serial/settings/<id>.png`)
+are reviewed once against their note. Every beat names its place (`scene.setting_id`, checked by
+`serial-mailbox.mjs check` once a season has a library). When a beat is 10 minutes from its start
+with no passed painting of its own (none delivered, or rejected), `run` puts it up with its place's
+painting and its own text, marked `stand_in` in the day file. When its real painting lands and passes,
+it replaces the stand-in. A rejected painting is remembered, so it is not reviewed again. The
+alert and `/health-detailed` count stand-ins as missing paintings ("5 of 6 paintings in").
