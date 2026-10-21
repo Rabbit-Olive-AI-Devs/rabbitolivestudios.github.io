@@ -4483,3 +4483,8 @@ session, as with the EPUB (#93, #95).
 
 **Cost.** About 500 KB a frame since the serial (Jarvis's paintings in full colour), roughly
 2–3 MB a day in R2 (10 GB free) and a few R2 writes per new frame.
+
+**Addendum (2026-10-21, the same evening):** the owner hit the Worker's in-code rate limit (60
+requests a minute per visitor), because a day's page loads one picture per frame. Requests to
+`/storybook*` that carry the valid key now skip that limit. Each is a cheap R2 passthrough, and
+unkeyed requests are still counted and refused. Deployed bc5eb903; the owner confirmed it works.
