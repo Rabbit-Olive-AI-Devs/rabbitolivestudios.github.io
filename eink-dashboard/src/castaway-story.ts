@@ -658,6 +658,12 @@ export const PLANET_NIGHTS: ReadonlyArray<(planet: string) => Beat> = [
 ];
 
 /** The morning log's second line: a running joke with numbers that change every day. */
+/** Chapter-line headings once the serial runs and the engine plays routine moments only (one a day, in rotation). */
+export const ROUTINE_TITLES: readonly string[] = [
+  "ISLAND LIFE", "A QUIET DAY", "ODD JOBS", "ROUND THE ISLAND", "TIDES AND CHORES", "NOTHING TO REPORT",
+  "THE USUAL", "SAND AND SUN", "DAY BY DAY", "SMALL THINGS", "LOW TIDE", "ALL QUIET ON THE BEACH",
+];
+
 export const SETTINGS = ["HUMOR", "HONESTY", "OPTIMISM", "SAND IN JOINTS", "COURAGE", "PATIENCE"] as const;
 
 /** Big days at fixed points in the story, whatever storyline is running. */

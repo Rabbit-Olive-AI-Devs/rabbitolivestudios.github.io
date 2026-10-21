@@ -6,7 +6,7 @@ const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
 const fromBuild = (p) => require(path.join(buildDir, p));
 
 const { castawayView, castawayMoment, chicagoParts, dayTimeline, dayNumber, arcFor, islandWeather, matchOn, lightAt, rotate, SERIAL_START } = fromBuild("src/castaway.js");
-const { ARCS, ARRIVAL, ROUTINE, MILESTONES, DATED_EGGS, DAY_EGGS, RARE_EGGS, MORNING_LOGS, PLANET_NIGHTS, SETTINGS } = fromBuild("src/castaway-story.js");
+const { ARCS, ARRIVAL, ROUTINE, ROUTINE_TITLES, MILESTONES, DATED_EGGS, DAY_EGGS, RARE_EGGS, MORNING_LOGS, PLANET_NIGHTS, SETTINGS } = fromBuild("src/castaway-story.js");
 const { drawCastawayPage, wrap } = fromBuild("src/hud/castaway-page.js");
 const { measureType } = fromBuild("src/hud/type.js");
 const { FACES } = fromBuild("src/hud/fonts-data.js");
@@ -186,4 +186,26 @@ test("once the serial runs, the fallback plays no storyline moments; earlier day
   assert.equal(require("node:crypto").createHash("sha1").update(JSON.stringify(before)).digest("hex"), "e649fed0f56ccb3f185f3c3d674c7cb02b8f9d82");
   const { arc, index } = arcFor(dayNumber("2026-10-20"));
   for (const b of arc.days[index]) assert.ok(before.some((m) => m.beat === b));
+});
+
+test("once the serial runs, the chapter line shows a routine heading, never a storyline title", () => {
+  const storyTitles = new Set([ARRIVAL, ...ARCS, ...MILESTONES.map((m) => m.arc)].map((a) => a.title));
+  assert.ok(ROUTINE_TITLES.length >= 7);
+  for (const t of ROUTINE_TITLES) {
+    assert.ok(!storyTitles.has(t), t);
+    assert.ok(measureType("plex13s", t, 1) <= 548, t);
+    for (const ch of t) assert.ok(FACES.plex13s.glyphs[ch] || ch === " ", `no glyph "${ch}" in ${t}`);
+  }
+  const seen = new Set();
+  for (let i = 0; i < 120; i++) {
+    const d = new Date(Date.UTC(2026, 9, 21 + i, 17)).toISOString();
+    const v = castawayView(new Date(d));
+    assert.ok(ROUTINE_TITLES.includes(v.chapter), `${d}: ${v.chapter}`);
+    seen.add(v.chapter);
+  }
+  assert.equal(seen.size, ROUTINE_TITLES.length);
+  // Before the start: the storyline's title, as before.
+  for (const d of ["2026-10-17", "2026-10-19", "2026-10-20"]) {
+    assert.equal(castawayView(new Date(`${d}T17:00:00Z`)).chapter, arcFor(dayNumber(d)).arc.title, d);
+  }
 });

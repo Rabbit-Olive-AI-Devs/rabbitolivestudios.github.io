@@ -8,7 +8,7 @@
  */
 
 import type { Light, Prop, Scene, Weather } from "./hud/castaway-draw";
-import { ARCS, ARRIVAL, DATED_EGGS, DATED_SAND, DAY_EGGS, MILESTONES, MORNING_LOGS, PLANET_NIGHTS, RARE_EGGS, ROUTINE, SETTINGS } from "./castaway-story";
+import { ARCS, ARRIVAL, DATED_EGGS, DATED_SAND, DAY_EGGS, MILESTONES, MORNING_LOGS, PLANET_NIGHTS, RARE_EGGS, ROUTINE, ROUTINE_TITLES, SETTINGS } from "./castaway-story";
 import type { Arc, Beat } from "./castaway-story";
 import { seededRandom, shuffledIndices } from "./art-styles";
 import { holidayWeek } from "./holidays";
@@ -274,7 +274,8 @@ export function castawayView(now: Date, ctx: CastawayContext = {}): CastawayView
   // The log lists only story moments: routine slots come round too often to be worth a line.
   const earlier = [...yesterday, ...today.slice(0, idx)].filter((m) => !m.routine);
   const log = earlier.slice(-2).reverse().map((m) => ({ time: hhmm((m.min + 1440) % 1440), text: m.beat.log }));
-  const { arc } = arcFor(day);
+  // Once the serial runs no storyline plays, so the chapter line takes a routine heading instead.
+  const chapter = date < SERIAL_START ? arcFor(day).arc.title : rotate(ROUTINE_TITLES, day, 7);
   const light = lightAt(min, sunrise, sunset);
   const asleep = current.beat.pose === "sleep";
   const props: Prop[] = [...(current.beat.props ?? [])];
@@ -285,7 +286,7 @@ export function castawayView(now: Date, ctx: CastawayContext = {}): CastawayView
   return {
     day,
     clock: hhmm(min),
-    chapter: arc.title,
+    chapter,
     text: current.beat.text,
     log,
     setting: settingFor(date),
