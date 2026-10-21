@@ -168,6 +168,8 @@ function review(beat, pagePng, picture) {
     { cwd: dir, encoding: "utf8", timeout: 10 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 });
   fs.rmSync(dir, { recursive: true, force: true });
   const m = /VERDICT:\s*(PASS|REVISE)\s*:?\s*(.*)/.exec(r.stdout ?? "");
+  // stdout may hold story, so only the exit status and stderr's tail reach the log.
+  if (!m) log(`review of ${beat.id}: no verdict (exit ${r.status}${r.signal ? `, ${r.signal}` : ""}; ${String(r.stderr ?? "").replace(/\s+/g, " ").slice(-200) || "no stderr"})`);
   return m ? { verdict: m[1], reason: m[2].trim() } : null;
 }
 
