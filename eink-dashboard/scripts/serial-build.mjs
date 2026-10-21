@@ -25,7 +25,7 @@ const BUCKET = "eink-series";
 const ACCOUNT = "f22a506dedde3bb3837157cd47d5fe5c";
 
 /** The Worker's drawing code, compiled to a temp folder (like `npm run test:utils`). */
-function compile() {
+export function compile() {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "serial-build-"));
   execFileSync("npx", ["tsc", "-p", "tsconfig.test.json", "--outDir", out], { cwd: REPO, stdio: "ignore" });
   return load(out);
@@ -35,7 +35,7 @@ function compile() {
 export function load(out) {
   const from = (p) => require(path.join(out, p));
   return {
-    page: from("src/hud/castaway-page.js"), hud: from("src/hud/page.js"), art: from("src/series/art.js"),
+    page: from("src/hud/castaway-page.js"), castaway: from("src/castaway.js"), fonts: from("src/hud/fonts-data.js"), hud: from("src/hud/page.js"), art: from("src/series/art.js"),
     decode: from("src/png-decode.js"), png: from("src/png.js"), serial: from("src/serial.js"), title: from("src/hud/castaway-page.js").CASTAWAY_TITLE,
   };
 }
@@ -61,7 +61,7 @@ export async function buildBeat(lib, day, beat, earlier, bytes) {
   return { html: lib.hud.hudPageHTML(lib.title, lib.png.pngToBase64(await lib.hud.canvasToPng(canvas))) };
 }
 
-function put(key, file, type) {
+export function put(key, file, type) {
   const args = ["wrangler", "r2", "object", "put", `${BUCKET}/${key}`, "--remote", "--file", file, "--content-type", type];
   const env = { ...process.env, CLOUDFLARE_ACCOUNT_ID: ACCOUNT };
   try {

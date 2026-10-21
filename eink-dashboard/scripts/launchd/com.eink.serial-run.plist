@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The desk serial (DECISIONS #96), "run": every 2 minutes, builds, reviews and publishes beats as Jarvis's pictures land in to-claude/serial/<date>/.
+  Install: cp this file ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eink.serial-run.plist
+  Run now: launchctl kickstart gui/$(id -u)/com.eink.serial-run
+  Stop:    launchctl bootout gui/$(id -u)/com.eink.serial-run
+  Logs:    ~/Library/Logs/eink-series/
+  Started through materialize-exec.py so it can read Dropbox online-only files (DECISIONS #72).
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.eink.serial-run</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/materialize-exec.py</string>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard/scripts/serial-mailbox.mjs</string>
+    <string>run</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/tboliveira/Projetos/rabbitolivestudios.github.io/eink-dashboard</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/Users/tboliveira/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CLOUDFLARE_ACCOUNT_ID</key><string>f22a506dedde3bb3837157cd47d5fe5c</string>
+  </dict>
+  <key>StartInterval</key><integer>120</integer>
+  <key>StandardOutPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-serial-run.log</string>
+  <key>StandardErrorPath</key><string>/Users/tboliveira/Library/Logs/eink-series/launchd-serial-run.log</string>
+</dict>
+</plist>
