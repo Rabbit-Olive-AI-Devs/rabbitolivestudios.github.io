@@ -24,6 +24,12 @@ import type { FlaMatch, FlaState } from "./flamengo";
 /** Day 1: the day the page went live (the owner may first see it that evening). */
 export const CASTAWAY_EPOCH = "2026-10-17";
 
+/**
+ * From this Chicago date the desk serial carries the story and this engine is only its fallback:
+ * it plays routine and calendar moments, no storyline beats, which would contradict the serial.
+ */
+export const SERIAL_START = "2026-10-21";
+
 export interface CastawayMatch {
   opponent: string;        // the other club's short name
   kickoff: number;         // ms since the epoch
@@ -122,15 +128,20 @@ function hash(s: string): number {
 
 const beat = (text: string, log: string, pose: Beat["pose"], face: Beat["face"], props: Prop[] = [], at = 0.4): Beat => ({ text, log, pose, face, props, at });
 
-/** The day's moments in time order: the morning log, four routine slots, the storyline's three beats, and what the calendar adds. */
+/**
+ * The day's moments in time order: the morning log, four routine slots, the storyline's three
+ * beats (only before SERIAL_START), and what the calendar adds.
+ */
 export function dayTimeline(date: string, ctx: CastawayContext): Moment[] {
   const day = dayNumber(date);
   const month = Number(date.slice(5, 7));
   const [sunrise, sunset] = [ctx.sunrise ?? SUN[month - 1][0], ctx.sunset ?? SUN[month - 1][1]];
-  const { arc, index } = arcFor(day);
-  const [b0, b1, b2] = arc.days[index];
+  // Before the serial, the storyline's three beats; after it, none (null slots are dropped).
+  const storyline = date < SERIAL_START;
+  const [b0, b1, b2]: Array<Beat | null> = storyline ? (({ arc, index }) => arc.days[index])(arcFor(day)) : [null, null, null];
   const setting = settingFor(date);
   const routine = (min: number, beat: Beat): Moment => ({ min, beat, routine: true });
+  const story = (min: number, beat: Beat | null): Moment | null => (beat ? { min, beat } : null);
   const planet = (name: string): Beat => {
     const p = rotate(PLANET_NIGHTS, day, 6)(name.toUpperCase());
     return day > 12 ? { ...p, props: [...(p.props ?? []), "telescope"] } : p;
@@ -139,16 +150,16 @@ export function dayTimeline(date: string, ctx: CastawayContext): Moment[] {
   const t: Moment[] = [
     routine(0, rotate(ROUTINE.night, day, 1)),
     routine(sunrise, rotate(MORNING_LOGS, day, 2)({ day, battery: 40 + (hash(date) % 25), setting: setting.name, value: setting.value })),
-    { min: 600, beat: b0 },
+    story(600, b0),
     routine(825, rotate(ROUTINE.afternoon, day, 3)),
-    { min: 930, beat: b1 },
+    story(930, b1),
     routine(sunset - 20, rotate(ROUTINE.dusk, day, 4)),
-    { min: Math.max(1155, sunset + 50), beat: b2 },
+    story(Math.max(1155, sunset + 50), b2),
     routine(1260, ctx.planet ? planet(ctx.planet) : rotate(ROUTINE.evening, day, 5)),
-  ];
+  ].filter((m): m is Moment => m !== null);
 
   // Day 1 starts when SETE washes up: nothing happened on the island before that.
-  if (day === 1) {
+  if (day === 1 && b0) {
     const from = t.findIndex((m) => m.beat === b0);
     t.splice(0, from + 1, { min: 0, beat: b0 });
   }

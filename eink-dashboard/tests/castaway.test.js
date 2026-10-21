@@ -5,7 +5,7 @@ const test = require("node:test");
 const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
 const fromBuild = (p) => require(path.join(buildDir, p));
 
-const { castawayView, castawayMoment, chicagoParts, dayTimeline, dayNumber, arcFor, islandWeather, matchOn, lightAt, rotate } = fromBuild("src/castaway.js");
+const { castawayView, castawayMoment, chicagoParts, dayTimeline, dayNumber, arcFor, islandWeather, matchOn, lightAt, rotate, SERIAL_START } = fromBuild("src/castaway.js");
 const { ARCS, ARRIVAL, ROUTINE, MILESTONES, DATED_EGGS, DAY_EGGS, RARE_EGGS, MORNING_LOGS, PLANET_NIGHTS, SETTINGS } = fromBuild("src/castaway-story.js");
 const { drawCastawayPage, wrap } = fromBuild("src/hud/castaway-page.js");
 const { measureType } = fromBuild("src/hud/type.js");
@@ -162,4 +162,28 @@ test("the log lists only story moments", () => {
     const story = [...yesterday, ...today.slice(0, idx)].filter((m) => !m.routine).map((m) => m.beat.log);
     assert.deepEqual(castawayView(now, ctx).log.map((e) => e.text), story.slice(-2).reverse(), at);
   }
+});
+
+test("once the serial runs, the fallback plays no storyline moments; earlier days are unchanged", () => {
+  assert.equal(SERIAL_START, "2026-10-21");
+  const storyBeats = new Set([...ARRIVAL.days.flat(), ...ARCS.flatMap((a) => a.days.flat()), ...MILESTONES.flatMap((m) => m.arc.days.flat())]);
+  const ctx = { planet: "Kepler-22 b" };
+  for (const d of ["2026-10-21", "2026-10-22", "2026-11-15", "2026-11-16", "2027-03-01"]) {
+    const t = dayTimeline(d, ctx);
+    assert.ok(t.length >= 5, d);
+    for (const m of t) assert.ok(!storyBeats.has(m.beat), `${d}: storyline moment at ${m.min}`);
+    assert.equal(t.filter((m) => m.routine).length, 5, d);
+  }
+  // Every moment of a day after the start, at every quarter hour, shows no storyline beat.
+  for (let t = Date.UTC(2026, 9, 22, 5); t < Date.UTC(2026, 9, 24, 5); t += 15 * 60_000) {
+    const v = castawayView(new Date(t), ctx);
+    assert.ok(![...storyBeats].some((b) => b.text === v.text), new Date(t).toISOString());
+    for (const e of v.log) assert.ok(![...storyBeats].some((b) => b.log === e.text), e.text);
+  }
+  // Before the start: exactly as before (snapshot taken before the change).
+  const before = dayTimeline("2026-10-20", ctx);
+  assert.deepEqual(before.map((m) => m.min), [0, 420, 510, 600, 825, 930, 1075, 1155, 1200, 1260]);
+  assert.equal(require("node:crypto").createHash("sha1").update(JSON.stringify(before)).digest("hex"), "e649fed0f56ccb3f185f3c3d674c7cb02b8f9d82");
+  const { arc, index } = arcFor(dayNumber("2026-10-20"));
+  for (const b of arc.days[index]) assert.ok(before.some((m) => m.beat === b));
 });
