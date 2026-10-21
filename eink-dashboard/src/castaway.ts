@@ -8,7 +8,7 @@
  */
 
 import type { Light, Prop, Scene, Weather } from "./hud/castaway-draw";
-import { ARCS, ARRIVAL, DATED_EGGS, DATED_SAND, DAY_EGGS, MILESTONES, RARE_EGGS, ROUTINE, SETTINGS } from "./castaway-story";
+import { ARCS, ARRIVAL, DATED_EGGS, DATED_SAND, DAY_EGGS, MILESTONES, MORNING_LOGS, PLANET_NIGHTS, RARE_EGGS, ROUTINE, SETTINGS } from "./castaway-story";
 import type { Arc, Beat } from "./castaway-story";
 import { seededRandom, shuffledIndices } from "./art-styles";
 import { holidayWeek } from "./holidays";
@@ -51,7 +51,8 @@ export interface CastawayView {
   scene: Scene;
 }
 
-interface Moment { min: number; beat: Beat }
+/** `routine`: a routine slot (not the storyline or the calendar); the log leaves those out. */
+interface Moment { min: number; beat: Beat; routine?: boolean }
 
 /** Chicago calendar date and minutes after midnight for an instant. */
 export function chicagoParts(now: Date): { date: string; min: number } {
@@ -104,6 +105,15 @@ export function lightAt(min: number, sunrise: number, sunset: number): Light {
 const hhmm = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 const pickFrom = <T,>(pool: readonly T[], date: string, salt: number): T => pool[Math.floor(seededRandom(hash(date) + salt)() * pool.length)];
 
+/**
+ * A routine pool's line for a day: the pool goes round in one fixed seeded order, a line a day,
+ * so a line comes back exactly `pool.length` days later and never sooner. Stateless.
+ */
+export function rotate<T>(pool: readonly T[], day: number, salt: number): T {
+  const order = shuffledIndices(pool.length, seededRandom(0x7a11 + salt * 104729));
+  return pool[order[(((day - 1) % pool.length) + pool.length) % pool.length]];
+}
+
 function hash(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -112,7 +122,7 @@ function hash(s: string): number {
 
 const beat = (text: string, log: string, pose: Beat["pose"], face: Beat["face"], props: Prop[] = [], at = 0.4): Beat => ({ text, log, pose, face, props, at });
 
-/** The day's moments in time order: routine, the storyline's three beats, and what the calendar adds. */
+/** The day's moments in time order: the morning log, four routine slots, the storyline's three beats, and what the calendar adds. */
 export function dayTimeline(date: string, ctx: CastawayContext): Moment[] {
   const day = dayNumber(date);
   const month = Number(date.slice(5, 7));
@@ -120,23 +130,21 @@ export function dayTimeline(date: string, ctx: CastawayContext): Moment[] {
   const { arc, index } = arcFor(day);
   const [b0, b1, b2] = arc.days[index];
   const setting = settingFor(date);
-  const r = (key: keyof typeof ROUTINE, salt: number) => pickFrom(ROUTINE[key], date, salt);
+  const routine = (min: number, beat: Beat): Moment => ({ min, beat, routine: true });
+  const planet = (name: string): Beat => {
+    const p = rotate(PLANET_NIGHTS, day, 6)(name.toUpperCase());
+    return day > 12 ? { ...p, props: [...(p.props ?? []), "telescope"] } : p;
+  };
 
   const t: Moment[] = [
-    { min: 0, beat: r("night", 1) },
-    { min: sunrise, beat: beat(`DAY ${day}. Battery ${40 + (hash(date) % 25)}%. ${setting.name} setting: ${setting.value}%. All systems ready. Mostly.`, "Morning log.", "charge", "happy", [], 0.55) },
-    { min: sunrise + 75, beat: r("morning", 2) },
+    routine(0, rotate(ROUTINE.night, day, 1)),
+    routine(sunrise, rotate(MORNING_LOGS, day, 2)({ day, battery: 40 + (hash(date) % 25), setting: setting.name, value: setting.value })),
     { min: 600, beat: b0 },
-    { min: 735, beat: r("noon", 3) },
-    { min: 825, beat: r("afternoon", 4) },
+    routine(825, rotate(ROUTINE.afternoon, day, 3)),
     { min: 930, beat: b1 },
-    { min: Math.min(1020, sunset - 75), beat: r("afternoon", 5) },
-    { min: sunset - 20, beat: r("dusk", 6) },
+    routine(sunset - 20, rotate(ROUTINE.dusk, day, 4)),
     { min: Math.max(1155, sunset + 50), beat: b2 },
-    { min: 1260, beat: ctx.planet
-      ? beat(`Stargazing. SETE finds the star of ${ctx.planet.toUpperCase()}, tonight's planet, and waves at it. Just in case.`, "Waved at a planet.", "sit", "love", day > 12 ? ["telescope"] : [], 0.45)
-      : r("evening", 7) },
-    { min: 1350, beat: r("night", 8) },
+    routine(1260, ctx.planet ? planet(ctx.planet) : rotate(ROUTINE.evening, day, 5)),
   ];
 
   // Day 1 starts when SETE washes up: nothing happened on the island before that.
@@ -252,7 +260,8 @@ export function castawayView(now: Date, ctx: CastawayContext = {}): CastawayView
   const idx = momentIndex(today, min);
   const current = today[idx];
   const yesterday = day > 1 ? dayTimeline(shiftDateStr(date, -1), ctx).map((m) => ({ ...m, min: m.min - 1440 })) : [];
-  const earlier = [...yesterday, ...today.slice(0, idx)];
+  // The log lists only story moments: routine slots come round too often to be worth a line.
+  const earlier = [...yesterday, ...today.slice(0, idx)].filter((m) => !m.routine);
   const log = earlier.slice(-2).reverse().map((m) => ({ time: hhmm((m.min + 1440) % 1440), text: m.beat.log }));
   const { arc } = arcFor(day);
   const light = lightAt(min, sunrise, sunset);

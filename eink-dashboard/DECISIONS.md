@@ -4234,6 +4234,34 @@ all safe to repeat) now goes through one helper that tries again after 10 s and 
 failure to `mailbox.log`. A second failure still writes "upload failed" to Jarvis, and the alert
 (#90) still emails about a missed night.
 
+**#93 addendum (2026-10-21, owner approved "option A"): fewer routine moments, much bigger pools,
+no repeats.** Measured before: about 12.6 moments a day, of which about 8 were routine slots plus
+the morning log; the routine pools held 2 to 7 lines each, the morning log and the nightly planet
+line had one wording each, and 63-64% of the next 30 days' moments repeated an earlier day's (80%
+over 90 days); the most repeated line came back 30 times a month.
+- **Four routine slots a day** (night, afternoon, dusk, evening/planet) besides the morning log,
+  down from eight. The storylines have exactly three beats a day, so the freed time simply makes
+  the remaining moments longer: about 8.6 moments a day (8 on an ordinary day, up to about 12 with calendar moments).
+- **Pools about ten times bigger:** 20 routine lines became 172 across the four slots (45, 62, 45,
+  and 20 for the evening line, which shows only when tonight's planet is unknown), and the morning
+  log and the planet line have 32 wordings each. Night lines are all asleep, since the night slot
+  runs from midnight to sunrise. Every line passes the existing fit and glyph tests; the templated
+  ones are tested at their widest (a four-digit day, the longest setting, a 20-character planet).
+- **No repeat until a pool is used up.** `rotate()` in `src/castaway.ts` walks each pool in one
+  fixed seeded order, one line a day by day number, so a line comes back exactly pool-size days
+  later and never sooner (shortest gap now 32 days). A fresh shuffle per cycle was rejected: it can
+  put the same line at the end of one cycle and the start of the next. Stateless, no KV, a handful
+  of small shuffles per render.
+- **The EARLIER log lists only story moments** (storyline beats and calendar moments), not routine
+  slots; the layout is unchanged (two entries).
+- **Measured after** (next 30 days / next 90 days, with tonight's planet known): 97% / 49% of
+  moments distinct (before 32% / 16%); 3% / 51% repeat an earlier day's (before 64% / 80%; over 90
+  days the storyline cycle of about 50 days dominates). A routine line now appears at most once a
+  month (before up to 30 times). Days already shown render differently now; the story book keeps
+  its saved frames, and its job now sees about 8 to 12 new moments a day instead of 12 to 15.
+- **Tests:** four routine slots plus the morning log on every ordinary day for 200 days, every
+  pool's rotation shows each line once per cycle, and the log matches the last story moments.
+
 ## 94. A Public Archive of Aired Series Pages, for FrameBot (2026-10-19)
 
 Jarvis asked (mailbox, 2026-10-17) for an interface his FrameBot can read: the current series
