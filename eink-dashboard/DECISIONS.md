@@ -4342,3 +4342,15 @@ story moment, at the times the page's own schedule moves the story on.
   which starts the Python builder: macOS lets the jobs' Node read the Dropbox volume but refused
   the system Python started directly by launchd ("Operation not permitted"). It reads only
   Dropbox, makes no Worker requests, and logs one line of counts to `storybook.log`.
+
+**Addendum (2026-10-21): the hourly "1 cache read(s) failed" was wrangler's token refresh.** The
+live job logged `moment unknown (1 cache read(s) failed)` about once an hour, always on the first
+read (`weather:60540:v2`). The wrangler debug logs (`~/Library/Preferences/.wrangler/logs/`) showed
+a `401: Unauthorized` from the KV API in every case, each in a run that had just refreshed the
+hourly OAuth token: 34 such 401s in October, all right after a refresh, out of 86 refreshes. A
+freshly issued token is sometimes refused for a moment, and the next run works. The job lost no
+frames (it fell back to comparing pictures), but it fetched the Worker each time. Each KV read in
+`storybook.mjs` now retries once after 10 s, like the mailbox watcher's `wrangler()` helper, and
+logs `kv get <key> failed, retrying: <status>`. Not chosen: a long-lived API token in place of
+OAuth (an owner setup step for a cosmetic fault), or a wrangler upgrade (4.92 is pinned by the
+repo; untested whether newer versions wait for the token).

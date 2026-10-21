@@ -193,13 +193,20 @@ function engine() {
     fs.rmSync(out, { recursive: true, force: true });
   }
   const kv = new Map(), failed = new Set();
+  const read = (key) => execFileSync("npx", ["wrangler", "kv", "key", "get", "--remote", "--namespace-id", KV_NAMESPACE, key],
+    { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: ACCOUNT } });
   const env = { CACHE: { get: async (key, type) => {
     if (!kv.has(key)) {
       let raw = null;
       try {
-        raw = execFileSync("npx", ["wrangler", "kv", "key", "get", "--remote", "--namespace-id", KV_NAMESPACE, key],
-          { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: ACCOUNT } });
-      } catch { failed.add(key); }
+        raw = read(key);
+      } catch (err) {
+        // Wrangler refreshes its hourly sign-in token on the first call after it expires, and the
+        // new token is sometimes refused with a 401 for a moment; a retry 10 s later gets through.
+        log(`kv get ${key} failed, retrying: ${String(err.stderr ?? "").replace(/\x1b\[[0-9;]*m/g, "").match(/\d{3}: \w+/)?.[0] ?? "error"}`);
+        await new Promise((r) => setTimeout(r, 10_000));
+        try { raw = read(key); } catch { failed.add(key); }
+      }
       kv.set(key, raw);
     }
     const raw = kv.get(key);
