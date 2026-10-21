@@ -27,6 +27,8 @@ import { drawPlanetPage } from "../hud/planet-page";
 import { hudPageResponse } from "../hud/page";
 import { castawayView, loadCastawayContext } from "../castaway";
 import { drawCastawayPage, CASTAWAY_TITLE } from "../hud/castaway-page";
+import { serialPage } from "../serial";
+import { htmlResponse } from "../response";
 import { drawTestCard } from "../hud/test-card";
 import { drawAurebeshSheet } from "../hud/aurebesh";
 import { getChicagoDateParts } from "../date-utils";
@@ -140,6 +142,9 @@ export async function handleDeskCastaway(env: Env, url: URL): Promise<Response> 
   const at = url.searchParams.get("at");
   const parsed = at ? new Date(at) : null;
   const now = parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
+  // The serial's stored page when a beat is showing (built offline); otherwise the engine.
+  const serial = await serialPage(env, now);
+  if (serial) return htmlResponse(serial, "no-store");
   const ctx = await loadCastawayContext(env, now);
   return hudPageResponse(CASTAWAY_TITLE, () => drawCastawayPage(castawayView(now, ctx)));
 }
