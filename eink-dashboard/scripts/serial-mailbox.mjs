@@ -31,6 +31,8 @@ const LOGS = path.join(HOME, "Library", "Logs", "eink-series");
 const KV_NAMESPACE = "de97776d35af4df08b13fd2158acebdc";
 const ACCOUNT = "f22a506dedde3bb3837157cd47d5fe5c";
 const REVIEW_TRIES = 3;
+/** After REVIEW_TRIES failed reviews in a row (Claude unavailable, a usage limit), wait this long and try again. */
+const REVIEW_RETRY_MS = 30 * 60 * 1000;
 /** How long before a beat's start its stand-in goes up, when its own painting is missing (minutes). */
 const STAND_IN_LEAD = 10;
 
@@ -75,11 +77,16 @@ export function beatText(beat, match) {
   return { text: beat.text, variant: "default" };
 }
 
-/** Whether a beat needs (re)building: a new picture, new live text, or a review still owed. */
-export function needsBuild(prev, sha, variant) {
+/**
+ * Whether a beat needs (re)building: a new picture, new live text, or a review still owed. A
+ * review that could not run is retried at once up to REVIEW_TRIES times, then every
+ * REVIEW_RETRY_MS: never given up, or a usage limit would keep a painting off the air for good.
+ */
+export function needsBuild(prev, sha, variant, now = Date.now()) {
   if (!prev || prev.sha !== sha) return true;
   if (prev.verdict === "PASS") return prev.variant !== variant;
-  return prev.verdict === "UNREVIEWED" && (prev.tries ?? 0) < REVIEW_TRIES;
+  if (prev.verdict !== "UNREVIEWED") return false;
+  return (prev.tries ?? 0) < REVIEW_TRIES || now - (prev.at ?? 0) >= REVIEW_RETRY_MS;
 }
 
 /**
@@ -238,9 +245,9 @@ async function cmdRun() {
     let verdict = prev?.sha === s && prev.verdict === "PASS" ? { verdict: "PASS", reason: "live text" } : review(b, png, picture(d, b));
     if (!verdict) {
       const tries = (prev?.sha === s ? prev.tries ?? 0 : 0) + 1;
-      state[b.id] = { sha: s, verdict: "UNREVIEWED", tries, variant };
+      state[b.id] = { sha: s, verdict: "UNREVIEWED", tries, variant, at: Date.now() };
       log(`${b.id}: review did not finish (try ${tries})`);
-      if (tries >= REVIEW_TRIES) fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's review could not run for beat ${b.id}; it is not airing. Please open a session.\n`);
+      if (tries === REVIEW_TRIES) fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's review could not run for beat ${b.id}; it retries every 30 minutes meanwhile.\n`);
       continue;
     }
     state[b.id] = { sha: s, verdict: verdict.verdict, variant, reason: verdict.verdict === "PASS" ? undefined : verdict.reason };
@@ -272,7 +279,7 @@ async function cmdRun() {
     const png = path.join(pages, `setting-${id}.png`);
     fs.writeFileSync(png, Buffer.from(r.html.split("base64,")[1].split('"')[0], "base64"));
     const v = review(place, png, libPic(id));
-    if (!v) { state[`set:${id}`] = { sha: s, verdict: "UNREVIEWED", tries: (prev?.sha === s ? prev.tries ?? 0 : 0) + 1 }; continue; }
+    if (!v) { state[`set:${id}`] = { sha: s, verdict: "UNREVIEWED", tries: (prev?.sha === s ? prev.tries ?? 0 : 0) + 1, at: Date.now() }; continue; }
     state[`set:${id}`] = { sha: s, verdict: v.verdict, reason: v.verdict === "PASS" ? undefined : v.reason };
     log(`setting ${id}: ${v.verdict}`);
     if (v.verdict === "PASS") received.push(`setting ${id}`);
@@ -294,8 +301,10 @@ async function cmdRun() {
     const html = path.join(pages, `${b.id}.html`);
     fs.writeFileSync(html, r.html);
     put(lib.serial.serialPageKey(b.id), html, "text/html; charset=utf-8");
-    // Keep the sha of a rejected painting, so it is not reviewed again; a new one replaces the stand-in.
-    state[b.id] = { sha: state[b.id]?.sha ?? `library:${id}`, verdict: "STAND_IN", variant, setting: id };
+    // A rejected painting keeps its sha, so it is not reviewed again; a painting whose review only
+    // failed to run does not, so it is reviewed again and replaces the stand-in when it passes.
+    const rejected = ["REVISE", "ERROR"].includes(state[b.id]?.verdict) ? state[b.id].sha : null;
+    state[b.id] = { sha: rejected ?? `library:${id}`, verdict: "STAND_IN", variant, setting: id };
     dirtyDays.add(today);
     log(`${b.id}: stand-in from setting ${id}`);
   }
