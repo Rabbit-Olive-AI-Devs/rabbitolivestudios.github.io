@@ -13,6 +13,8 @@ export interface SerialBeat {
   /** Chicago clock, "HH:MM". */
   start: string;
   key: string;
+  /** Shown with its setting's library painting until its own painting lands (design §7). */
+  stand_in?: boolean;
 }
 
 export interface SerialDay {
@@ -76,7 +78,7 @@ export async function serialPage(env: Env, now: Date): Promise<string | null> {
 /** Built and planned beats for one day, or null when there is no day file. */
 async function readiness(env: Env, date: string): Promise<{ built: number; planned: number; day: SerialDay } | null> {
   const day = await readDay(env, date);
-  return day ? { built: day.beats.length, planned: day.planned ?? day.beats.length, day } : null;
+  return day ? { built: day.beats.filter((b) => !b.stand_in).length, planned: day.planned ?? day.beats.length, day } : null;
 }
 
 /** Spoiler-free problems for the alert (DECISIONS #60): today's pages not all ready, or none at all mid-season. */
@@ -88,7 +90,7 @@ export async function serialProblems(env: Env, now: Date): Promise<string[]> {
     return before && !before.day.season_end ? [`The desk serial has no pages for ${date}; the panel shows the routine page`] : [];
   }
   if (today.day.same_day || today.built >= today.planned) return [];
-  return [`The desk serial has ${today.built} of ${today.planned} pages ready for ${date}; a missing beat leaves the previous one showing`];
+  return [`The desk serial has ${today.built} of ${today.planned} paintings in for ${date}; a missing one shows its place's library painting, or leaves the previous beat showing`];
 }
 
 /** For /health-detailed: pages ready against pages planned, today and tomorrow. */

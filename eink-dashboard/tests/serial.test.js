@@ -91,7 +91,7 @@ test("serialProblems: quiet when today is ready, on the first day, between seaso
 test("serialProblems: says how many pages are missing, without story", async () => {
   const k = serialDayKey;
   const [p] = await serialProblems({ SERIES: bucket({ [k("2026-10-23")]: dayFile("2026-10-23", 2, 6) }) }, morning);
-  assert.match(p, /2 of 6 pages ready for 2026-10-23/);
+  assert.match(p, /2 of 6 paintings in for 2026-10-23/);
   const [q] = await serialProblems({ SERIES: bucket({ [k("2026-10-22")]: dayFile("2026-10-22", 6, 6) }) }, morning);
   assert.match(q, /no pages for 2026-10-23/);
 });
@@ -99,4 +99,13 @@ test("serialProblems: says how many pages are missing, without story", async () 
 test("serialHealth: ready/planned for today and tomorrow", async () => {
   const h = await serialHealth({ SERIES: bucket({ [serialDayKey("2026-10-23")]: dayFile("2026-10-23", 2, 6) }) }, morning);
   assert.deepEqual(h, { "2026-10-23": "2/6", "2026-10-24": "none" });
+});
+
+test("serialProblems and health: a stand-in is not counted as a painting", async () => {
+  const k = serialDayKey("2026-10-23");
+  const d = JSON.parse(dayFile("2026-10-23", 6, 6));
+  d.beats[5].stand_in = true;
+  const env = { SERIES: bucket({ [k]: JSON.stringify(d) }) };
+  assert.match((await serialProblems(env, morning))[0], /5 of 6 paintings/);
+  assert.equal((await serialHealth(env, morning))["2026-10-23"], "5/6");
 });

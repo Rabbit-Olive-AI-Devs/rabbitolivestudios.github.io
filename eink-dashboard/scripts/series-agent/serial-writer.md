@@ -32,6 +32,7 @@ If the current season ends before {{THROUGH}}:
 - **`log`** is a very short line (it fits about 26 characters) shown under "EARLIER" for later beats.
 - **ASCII only.**
 - **No line may repeat** one from another day or from the old engine.
+- **`scene.setting_id`:** every beat names its place from the season's settings library, `{{WORK}}/s<NN>/settings.json` (`{"settings": [{"id": "s01-<short-slug>", "setting": "...", "light": "...", "focus": {"fx": 0.5, "fy": 0.5}}]}`). Each place is painted once and stands in for any beat there whose own painting is late. Reuse places where the story returns to them. If a new day needs a new place, add it to `settings.json` and brief it in `{{SPOILERS}}/settings/brief.md` (append: id, note, focus). In the spoiler-free note, ask Jarvis to drop it as `{{INBOX}}/settings/<id>.png` by the same deadline as the day it first appears.
 - **Match day (optional):** a beat may set `"live": "match"` with a `text_done` variant, used once the day's Flamengo match has finished, with `{{us}}`, `{{them}}` and `{{opponent}}` filled from the scoreboard. `text` must still work if the match hasn't finished or doesn't exist.
 
 **Check every day file:** `node {{REPO}}/scripts/serial-mailbox.mjs check <day.json>`. Fix it until it prints OK.

@@ -61,3 +61,30 @@ test("checkDay: a match beat must also fit with the widest score", async () => {
   const b = beat(1, { live: "match", text_done: ["x ".repeat(150) + "{{opponent}}"] });
   assert.match(checkDay(await lib(), { date: "2026-10-22", beats: [b] }, new Set(), new Set()).join("\n"), /story text longer/);
 });
+
+test("standInDue: only near the start, only without a painting, only with a passed library place", async () => {
+  const { standInDue } = await script();
+  const b = beat(1, { start: "13:00", scene: { setting_id: "p1", focus: { fx: 0.5, fy: 0.5 } } });
+  const ok = () => true;
+  assert.equal(standInDue(b, 12 * 60 + 49, undefined, ok), false); // 11 min early
+  assert.equal(standInDue(b, 12 * 60 + 50, undefined, ok), true);
+  assert.equal(standInDue(b, 14 * 60, { verdict: "REVISE" }, ok), true);
+  assert.equal(standInDue(b, 14 * 60, { verdict: "PASS" }, ok), false);
+  assert.equal(standInDue(b, 14 * 60, { verdict: "STAND_IN" }, ok), false);
+  assert.equal(standInDue(b, 14 * 60, undefined, () => false), false);
+  assert.equal(standInDue(beat(1, { start: "13:00" }), 14 * 60, undefined, ok), false); // no setting
+});
+
+test("needsBuild: a stand-in waits for a new painting, never re-reviews a rejected one", async () => {
+  const { needsBuild } = await script();
+  assert.equal(needsBuild({ sha: "library:p1", verdict: "STAND_IN" }, "new", "default"), true);
+  assert.equal(needsBuild({ sha: "rejected", verdict: "STAND_IN" }, "rejected", "default"), false);
+});
+
+test("checkDay: with a settings library, every beat names a known setting", async () => {
+  const { checkDay } = await script();
+  const l = await lib();
+  const day = { date: "2026-10-22", beats: [beat(1, { scene: { setting_id: "p1", focus: { fx: 0.5, fy: 0.5 } } }), beat(2)] };
+  const p = checkDay(l, day, new Set(), new Set(), { p1: {} });
+  assert.deepEqual(p, ["2026-10-22-2: scene.setting_id is not in the season's settings.json"]);
+});

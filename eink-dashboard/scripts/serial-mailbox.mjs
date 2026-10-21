@@ -31,6 +31,8 @@ const LOGS = path.join(HOME, "Library", "Logs", "eink-series");
 const KV_NAMESPACE = "de97776d35af4df08b13fd2158acebdc";
 const ACCOUNT = "f22a506dedde3bb3837157cd47d5fe5c";
 const REVIEW_TRIES = 3;
+/** How long before a beat's start its stand-in goes up, when its own painting is missing (minutes). */
+const STAND_IN_LEAD = 10;
 
 const log = (s) => {
   fs.mkdirSync(LOGS, { recursive: true });
@@ -80,6 +82,31 @@ export function needsBuild(prev, sha, variant) {
   return prev.verdict === "UNREVIEWED" && (prev.tries ?? 0) < REVIEW_TRIES;
 }
 
+/**
+ * The settings library (design §7): places painted once per season, keyed by id, from every
+ * `~/desk-serial-work/s<NN>/settings.json` ({settings: [{id, ..., focus: {fx, fy}}]}).
+ */
+export function settingsLibrary(work = WORK) {
+  const out = {};
+  for (const season of fs.existsSync(work) ? fs.readdirSync(work).filter((d) => /^s\d+$/.test(d)) : []) {
+    const f = path.join(work, season, "settings.json");
+    if (fs.existsSync(f)) for (const st of JSON.parse(fs.readFileSync(f, "utf8")).settings ?? []) out[st.id] = st;
+  }
+  return out;
+}
+
+/**
+ * Whether a beat should go up with its setting's library painting now: it starts within
+ * STAND_IN_LEAD minutes (or has started), has no passed painting of its own and no stand-in yet,
+ * and its setting has a passed library painting.
+ */
+export function standInDue(beat, nowMin, prev, libraryPassed) {
+  const start = Number(beat.start.slice(0, 2)) * 60 + Number(beat.start.slice(3, 5));
+  if (start - nowMin > STAND_IN_LEAD) return false;
+  if (prev?.verdict === "PASS" || prev?.verdict === "STAND_IN") return false;
+  return Boolean(beat.scene?.setting_id && libraryPassed(beat.scene.setting_id));
+}
+
 /** Every string literal in the engine's story bank, to keep the serial from repeating it. */
 function engineLines() {
   const src = fs.readFileSync(path.join(REPO, "src", "castaway-story.ts"), "utf8");
@@ -87,7 +114,7 @@ function engineLines() {
 }
 
 /** Problems with one day file: fit, glyphs, and lines repeated from other days or the engine. */
-export function checkDay(lib, day, otherLines, engine) {
+export function checkDay(lib, day, otherLines, engine, settings = null) {
   const problems = [];
   const beats = day.beats.slice().sort((a, b) => a.start.localeCompare(b.start));
   const seen = new Set();
@@ -102,6 +129,7 @@ export function checkDay(lib, day, otherLines, engine) {
     for (const ch of [b.title, b.log, ...b.text, ...(b.text_done ?? [])].join("")) {
       if (ch !== " " && !lib.fonts.FACES.plex13r.glyphs[ch]) problems.push(`${b.id}: no glyph for character code ${ch.charCodeAt(0)}`);
     }
+    if (settings && !settings[b.scene?.setting_id]) problems.push(`${b.id}: scene.setting_id is not in the season's settings.json`);
     if (!b.scene?.focus || !(b.scene.focus.fx >= 0 && b.scene.focus.fx <= 1 && b.scene.focus.fy >= 0 && b.scene.focus.fy <= 1)) problems.push(`${b.id}: focus missing or outside 0..1`);
     for (const line of [b.text.join(" "), b.log]) {
       const k = line.trim().toLowerCase();
@@ -164,10 +192,17 @@ async function cmdRun() {
   for (const d of dates) {
     for (const b of days[d].beats) if (fs.existsSync(picture(d, b))) work.push({ d, b, sha: sha(picture(d, b)) });
   }
+  const settings = settingsLibrary();
+  const libPic = (id) => path.join(INBOX, "settings", `${id}.png`);
+  const library = Object.keys(settings).filter((id) => fs.existsSync(libPic(id))).map((id) => ({ id, sha: sha(libPic(id)) }));
+  const libraryPassed = (id) => state[`set:${id}`]?.verdict === "PASS" && fs.existsSync(libPic(id));
+  const nowMin = Number(chicago().stamp.slice(11, 13)) * 60 + Number(chicago().stamp.slice(13, 15));
+  const standIns = (days[today]?.beats ?? []).filter((b) => standInDue(b, nowMin, state[b.id], libraryPassed));
   // A day not yet published (today or tomorrow) goes up even with no beats, so the alert sees what is planned.
   const unpublished = dates.filter((d) => d <= shift(today, 1) && state[`day:${d}`] === undefined);
   // On a match day the live text can change at any run, so the build runs every time.
-  const anything = live || unpublished.length > 0 || work.some((w) => needsBuild(state[w.b.id], w.sha, "default"));
+  const anything = live || unpublished.length > 0 || standIns.length > 0 || work.some((w) => needsBuild(state[w.b.id], w.sha, "default"))
+    || library.some((l) => needsBuild(state[`set:${l.id}`], l.sha, "default"));
   if (!anything) return;
 
   const lib = compile();
@@ -219,8 +254,53 @@ async function cmdRun() {
       dirtyDays.add(d);
     }
   }
+  // The library: each place's painting is reviewed once, against its note, with no text on the page.
+  const received = [];
+  for (const { id, sha: s } of library) {
+    const prev = state[`set:${id}`];
+    if (!needsBuild(prev, s, "default")) continue;
+    const place = { id, start: "00:00", title: "", text: [""], log: "", scene: settings[id] };
+    const r = await buildBeat(lib, { day: 0 }, place, [], new Uint8Array(fs.readFileSync(libPic(id))));
+    if (r.error) {
+      state[`set:${id}`] = { sha: s, verdict: "ERROR", reason: r.error };
+      log(`setting ${id}: not built (${r.error})`);
+      reply(`serial-revise-${id}`, `SERIAL REVISE setting=${id}\n\nThis settings-library picture could not be used (${r.error}). Please replace ${id}.png in to-claude/serial/settings/.`);
+      continue;
+    }
+    const png = path.join(pages, `setting-${id}.png`);
+    fs.writeFileSync(png, Buffer.from(r.html.split("base64,")[1].split('"')[0], "base64"));
+    const v = review(place, png, libPic(id));
+    if (!v) { state[`set:${id}`] = { sha: s, verdict: "UNREVIEWED", tries: (prev?.sha === s ? prev.tries ?? 0 : 0) + 1 }; continue; }
+    state[`set:${id}`] = { sha: s, verdict: v.verdict, reason: v.verdict === "PASS" ? undefined : v.reason };
+    log(`setting ${id}: ${v.verdict}`);
+    if (v.verdict === "PASS") received.push(`setting ${id}`);
+    else {
+      fs.mkdirSync(path.join(SPOILERS, "settings"), { recursive: true });
+      fs.writeFileSync(path.join(SPOILERS, "settings", `review-${id}.md`), `Claude's review of setting ${id}: REVISE.\n\n${v.reason}\n\nPlease send a new picture with the same name.\n`);
+      reply(`serial-revise-${id}`, `SERIAL REVISE setting=${id}\n\nClaude's review asks for a new picture for this place; the reason is in your spoiler folder (desk-serial/settings/review-${id}.md). Replace ${id}.png in to-claude/serial/settings/.`);
+    }
+  }
+  // Stand-ins: a beat about to start without its own painting goes up with its place's library
+  // painting and its own text. Its real painting replaces it when it lands and passes.
+  for (const b of standIns) {
+    const id = b.scene.setting_id;
+    const beats = days[today].beats.slice().sort((x, y) => x.start.localeCompare(y.start));
+    const earlier = beats.slice(0, beats.findIndex((x) => x.id === b.id));
+    const { text, variant } = beatText(b, board ? lib.castaway.matchOn(JSON.parse(board), today) : null);
+    const r = await buildBeat(lib, days[today], { ...b, text, scene: { ...b.scene, focus: settings[id].focus ?? b.scene.focus } }, earlier, new Uint8Array(fs.readFileSync(libPic(id))));
+    if (r.error) { log(`${b.id}: stand-in not built (${r.error})`); continue; }
+    const html = path.join(pages, `${b.id}.html`);
+    fs.writeFileSync(html, r.html);
+    put(lib.serial.serialPageKey(b.id), html, "text/html; charset=utf-8");
+    // Keep the sha of a rejected painting, so it is not reviewed again; a new one replaces the stand-in.
+    state[b.id] = { sha: state[b.id]?.sha ?? `library:${id}`, verdict: "STAND_IN", variant, setting: id };
+    dirtyDays.add(today);
+    log(`${b.id}: stand-in from setting ${id}`);
+  }
+
   for (const d of dirtyDays) {
-    const passed = days[d].beats.filter((b) => state[b.id]?.verdict === "PASS").map((b) => ({ id: b.id, start: b.start, key: lib.serial.serialPageKey(b.id) }));
+    const passed = days[d].beats.filter((b) => ["PASS", "STAND_IN"].includes(state[b.id]?.verdict))
+      .map((b) => ({ id: b.id, start: b.start, key: lib.serial.serialPageKey(b.id), ...(state[b.id].verdict === "STAND_IN" ? { stand_in: true } : {}) }));
     const body = { date: d, day: days[d].day, planned: days[d].beats.length, beats: passed, ...(days[d].same_day ? { same_day: true } : {}), ...(days[d].season_end ? { season_end: true } : {}) };
     const file = path.join(WORK, "uploaded", `${d}.json`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -230,6 +310,7 @@ async function cmdRun() {
     log(`${d}: ${passed.length} of ${body.planned} beats published`);
   }
   fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
+  if (received.length) reply(`serial-received-settings-${received.length}`, `SERIAL RECEIVED\n\nSettings-library pictures reviewed and kept:\n${received.map((p) => `- ${p}`).join("\n")}`);
   if (published.length) reply(`serial-received-${published.length}`, `SERIAL RECEIVED\n\nBuilt, reviewed and published:\n${published.map((p) => `- ${p}`).join("\n")}`);
 }
 
@@ -269,7 +350,8 @@ function cmdWeekly() {
 function cmdCheck() {
   const file = process.argv[3];
   const day = JSON.parse(fs.readFileSync(file, "utf8"));
-  const problems = checkDay(compile(), day, linesOfOtherDays(day.date), engineLines());
+  const lib = settingsLibrary();
+  const problems = checkDay(compile(), day, linesOfOtherDays(day.date), engineLines(), Object.keys(lib).length ? lib : null);
   console.log(problems.length ? problems.join("\n") : `${day.date}: ${day.beats.length} beats OK`);
   process.exit(problems.length ? 1 : 0);
 }
