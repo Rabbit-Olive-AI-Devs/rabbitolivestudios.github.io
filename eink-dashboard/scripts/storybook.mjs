@@ -183,12 +183,13 @@ export function pictureChanged(a, b) {
  */
 function engine() {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "storybook-"));
-  let castaway, page, hud;
+  let castaway, page, hud, serial;
   try {
     execFileSync("npx", ["tsc", "-p", "tsconfig.test.json", "--outDir", out], { cwd: REPO, stdio: "ignore" });
     castaway = require(path.join(out, "src/castaway.js"));
     page = require(path.join(out, "src/hud/castaway-page.js"));
     hud = require(path.join(out, "src/hud/page.js"));
+    serial = require(path.join(out, "src/serial.js"));
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }
@@ -219,8 +220,8 @@ function engine() {
     return ctx;
   };
   return {
-    /** The moment showing at `at`: {key, start}. */
-    moment: async (at, strict = true) => castaway.castawayMoment(at, await context(at, strict)),
+    /** The moment showing at `at`: {key, start}. A serial beat, when one is published, else the engine's. */
+    moment: async (at, strict = true) => serialMoment(serial, castaway, at) ?? castaway.castawayMoment(at, await context(at, strict)),
     /** The page's picture at `at` and its moment, or null (logged) when drawing fails. */
     render: async (at) => {
       try {
@@ -233,6 +234,27 @@ function engine() {
       }
     },
   };
+}
+
+/**
+ * The serial beat showing at `at`, from the Mac mini's copy of each published day file
+ * (scripts/serial-mailbox.mjs writes ~/desk-serial-work/uploaded/<date>.json): {key, start} or null.
+ */
+export function serialMoment(serial, castaway, at, uploaded = path.join(os.homedir(), "desk-serial-work", "uploaded")) {
+  const { date, min } = castaway.chicagoParts(at);
+  const read = (d) => { try { return JSON.parse(fs.readFileSync(path.join(uploaded, `${d}.json`), "utf8")); } catch { return null; } };
+  const prev = new Date(at.getTime() - 24 * 3600 * 1000);
+  const beat = serial.currentBeat(read(date), read(castaway.chicagoParts(prev).date), min);
+  if (!beat) return null;
+  const day = beat.id.slice(0, 10);
+  // The beat's Chicago wall time as an instant: read the wall clock Chicago shows at that UTC time,
+  // and shift by the difference (the zone offset, which is the same an hour either side of the start).
+  const guess = Date.parse(`${day}T${beat.start}:00Z`);
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(guess)).map((x) => [x.type, x.value]));
+  const wall = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
+  return { key: `serial:${beat.id}`, start: new Date(guess + (guess - wall)) };
 }
 
 /** Index rows with the moment key of each row's time added (`momentAt(at)` gives {key, start}). */

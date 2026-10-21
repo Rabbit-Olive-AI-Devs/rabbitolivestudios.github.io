@@ -60,3 +60,22 @@ test("storybook: without the engine, a frame counts as new only when the picture
   assert.equal(pictureChanged(base, await frame([[5, 100], [300, 200]])), true);
   assert.equal(pictureChanged(base, Buffer.from("not a png")), true);
 });
+
+test("serialMoment: the published beat showing, keyed by its id, starting at its Chicago time", async () => {
+  const fs = require("node:fs");
+  const os = require("node:os");
+  const { serialMoment } = await load();
+  const build = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
+  const serial = require(path.join(build, "src/serial.js"));
+  const castaway = require(path.join(build, "src/castaway.js"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "uploaded-"));
+  fs.writeFileSync(path.join(dir, "2026-10-21.json"), JSON.stringify({ date: "2026-10-21", day: 5, beats: [{ id: "2026-10-21-1", start: "13:30", key: "k" }] }));
+  // 14:00 CDT = 19:00 UTC
+  const m = serialMoment(serial, castaway, new Date("2026-10-21T19:00:00Z"), dir);
+  assert.equal(m.key, "serial:2026-10-21-1");
+  assert.equal(m.start.toISOString(), "2026-10-21T18:30:00.000Z");
+  // overnight, the next day: still that beat
+  assert.equal(serialMoment(serial, castaway, new Date("2026-10-22T08:00:00Z"), dir).key, "serial:2026-10-21-1");
+  // before the first beat: no serial moment, the engine decides
+  assert.equal(serialMoment(serial, castaway, new Date("2026-10-21T17:00:00Z"), dir), null);
+});
