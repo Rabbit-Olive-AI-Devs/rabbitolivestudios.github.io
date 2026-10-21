@@ -13,6 +13,7 @@ import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, h
 import { handleSeries, handleSeriesAired, handleSeriesAiredPage, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
 import { seriesHealth } from "./series/watch";
 import { serialHealth } from "./serial";
+import { handleStorybook, handleStorybookFrame } from "./storybook";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
 import { getBirthdayToday, getBirthdayByKey, BIRTHDAY_STYLES } from "./birthday";
@@ -1289,6 +1290,10 @@ export default {
         return handleSeriesTest(env, url);
       case "/color/series/test":
         return handleSeriesTest(env, url);
+      case "/storybook":
+        return handleStorybook(env, url); // private: needs STORYBOOK_KEY (DECISIONS #97)
+      case "/storybook/frame":
+        return handleStorybookFrame(env, url);
       case "/health":
         return handleHealth();
       case "/health-detailed":

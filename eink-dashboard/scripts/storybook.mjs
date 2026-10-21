@@ -145,7 +145,7 @@ async function fetchLive(at) {
 }
 
 /** The rows below the top bar of a 1-bit or 8-bit PNG as written by src/png.ts, or null. */
-export function belowTopBar(png) {
+export function belowTopBar(png, from = TOP_BAR_BOTTOM) {
   let pos = 8, ihdr = null;
   const idat = [];
   while (pos + 8 <= png.length) {
@@ -163,8 +163,72 @@ export function belowTopBar(png) {
   try { raw = zlib.inflateSync(Buffer.concat(idat)); } catch { return null; }
   if (!channels || raw.length < stride * height) return null;
   // src/png.ts writes every row unfiltered; any other filter would need unfiltering to compare.
-  for (let y = TOP_BAR_BOTTOM; y < height; y++) if (raw[y * stride] !== 0) return null;
-  return raw.subarray(TOP_BAR_BOTTOM * stride, stride * height);
+  for (let y = from; y < height; y++) if (raw[y * stride] !== 0) return null;
+  return raw.subarray(from * stride, stride * height);
+}
+
+const SCENE_BOTTOM = 352;         // the story text and log are drawn below this row (castaway-page.ts)
+const BOOK_STATE = path.join(os.homedir(), ".config", "eink", "storybook-r2.json");
+
+/**
+ * The frames the book keeps for one day, as the EPUB builder keeps them (storybook-epub.py): the
+ * first frame of each moment in time order, captioned with the moment's Chicago start, leaving
+ * out a frame whose text and log match the last kept one's. `read(file)` gives a frame's PNG.
+ */
+export function bookFrames(rows, read) {
+  const kept = [], seen = new Set();
+  let lastText = null;
+  for (const r of rows.slice().sort((a, b) => a.at.localeCompare(b.at))) {
+    const key = r.moment || r.file;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const text = belowTopBar(read(r.file), SCENE_BOTTOM);
+    if (text && lastText && text.equals(lastText)) continue;
+    lastText = text;
+    const caption = r.moment_start ? chicagoStamp(new Date(r.moment_start)).time.slice(0, 5) : r.time;
+    kept.push({ file: r.file, caption });
+  }
+  return kept;
+}
+
+function r2Put(key, file, type) {
+  const args = ["wrangler", "r2", "object", "put", `eink-series/${key}`, "--remote", "--file", file, "--content-type", type];
+  const env = { ...process.env, CLOUDFLARE_ACCOUNT_ID: ACCOUNT };
+  try { execFileSync("npx", args, { cwd: REPO, stdio: "ignore", env }); } catch {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10_000); // a fresh wrangler token is sometimes refused for a moment
+    execFileSync("npx", args, { cwd: REPO, stdio: "ignore", env });
+  }
+}
+
+/**
+ * The web copy of the book (/storybook, DECISIONS #97): upload each day's kept frames not yet
+ * uploaded, the day's list, and the list of days, to the private series bucket. Reads only Dropbox.
+ */
+export function publish(dates) {
+  const state = fs.existsSync(BOOK_STATE) ? JSON.parse(fs.readFileSync(BOOK_STATE, "utf8")) : { uploaded: {}, days: {} };
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "storybook-web-"));
+  for (const date of dates) {
+    const dir = path.join(BOOK, date);
+    const frames = bookFrames(readIndex(dir), (f) => fs.readFileSync(path.join(dir, f)));
+    if (!frames.length) continue;
+    for (const f of frames) {
+      const key = `storybook/frames/${date}/${f.file}`;
+      if (state.uploaded[key]) continue;
+      r2Put(key, path.join(dir, f.file), "image/png");
+      state.uploaded[key] = true;
+    }
+    const dayFile = path.join(tmp, `${date}.json`);
+    fs.writeFileSync(dayFile, JSON.stringify({ date, day: dayNumber(date), frames }));
+    r2Put(`storybook/days/${date}.json`, dayFile, "application/json");
+    state.days[date] = frames.length;
+    log(`publish ${date}: ${frames.length} pages`);
+  }
+  const list = path.join(tmp, "days.json");
+  fs.writeFileSync(list, JSON.stringify(Object.entries(state.days).sort().map(([date, frames]) => ({ date, day: dayNumber(date), frames }))));
+  r2Put("storybook/days.json", list, "application/json");
+  fs.mkdirSync(path.dirname(BOOK_STATE), { recursive: true });
+  fs.writeFileSync(BOOK_STATE, JSON.stringify(state));
+  fs.rmSync(tmp, { recursive: true, force: true });
 }
 
 /** Whether the picture below the top bar differs (or cannot be compared). */
@@ -318,6 +382,9 @@ async function main() {
     const unchanged = png && !moment && last && !pictureChanged(fs.readFileSync(path.join(dir, last.file)), png);
     const r = unchanged ? "same" : keep(at, "live", png, moment);
     log(`live ${date} ${time}: ${r === "same" ? "no change" : r === "saved" && moment ? "new moment, saved" : r}`);
+    if (r === "saved") {
+      try { publish([date]); } catch (err) { log(`publish ${date} failed: ${err.message}`); }
+    }
     process.exit(r === "skip" ? 1 : 0);
   }
   if (cmd === "epub") {
@@ -359,9 +426,16 @@ async function main() {
       log(line);
       console.log(line);
     }
+    publish(Object.keys(counts).filter((d) => counts[d].saved > 0));
     return;
   }
-  console.error("usage: storybook.mjs live | backfill [FROM] [TO] | epub | annotate [DATE...]");
+  if (cmd === "publish") {
+    const days = args.length ? args : fs.readdirSync(BOOK).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    publish(days);
+    console.log(`published ${days.length} days`);
+    return;
+  }
+  console.error("usage: storybook.mjs live | backfill [FROM] [TO] | epub | annotate [DATE...] | publish [DATE...]");
   process.exit(2);
 }
 

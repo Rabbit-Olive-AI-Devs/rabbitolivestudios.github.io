@@ -4461,3 +4461,25 @@ readable at the panel's size, so the "no text" rule is relaxed. A beat may set `
 up to 4 exact ASCII strings of at most 40 characters, checked by `serial-mailbox.mjs check`. The
 reviewer passes only that text, spelled exactly; any other text, Aurebesh, invented script or
 garbled lettering is still a REVISE. The writer is told to use it sparingly (signs, labels).
+
+## 97. The Story Book on the Web, Current All Day (2026-10-21)
+
+**Why.** The owner reads the story book (#95), but Apple Books keeps its own copy of an imported
+EPUB, so the nightly rebuild never reaches it. Of a nightly PDF in Dropbox, a private web page
+and a nightly Send-to-Kindle, the owner chose the web page.
+
+**How.** The Mac mini's story book job remains the only source. When it saves a frame it also
+publishes the day (`storybook.mjs publish`, also run after `backfill`). It applies the EPUB's own
+rule (first frame per moment or serial beat, a page whose text and log repeat the last kept one's
+left out; `bookFrames`, which matched the EPUB builder's counts on every day) and uploads each new
+frame, the day's list and the list of days to the private series bucket under `storybook/`.
+Uploads are tracked in `~/.config/eink/storybook-r2.json`. The Worker's `/storybook` shows the
+contents and one page per day, and `/storybook/frame` streams each PNG from R2. It is a read and
+a passthrough: no KV, no drawing, no AI. The page is phone-friendly HTML, not a panel page. It sits
+behind the secret `STORYBOOK_KEY`, set by the owner with `scripts/storybook-set-key.sh`, and
+returns 404 without it or while it is unset. It can only show frames that have already aired,
+because the job saves nothing else. Spoilers: the page is the owner's to read. Never open it in a
+session, as with the EPUB (#93, #95).
+
+**Cost.** About 500 KB a frame since the serial (Jarvis's paintings in full colour), roughly
+2–3 MB a day in R2 (10 GB free) and a few R2 writes per new frame.

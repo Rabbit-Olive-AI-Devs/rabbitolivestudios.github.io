@@ -79,3 +79,26 @@ test("serialMoment: the published beat showing, keyed by its id, starting at its
   // before the first beat: no serial moment, the engine decides
   assert.equal(serialMoment(serial, castaway, new Date("2026-10-21T17:00:00Z"), dir), null);
 });
+
+test("bookFrames: first frame per moment, repeats of the last page's text left out, Chicago captions", async () => {
+  const { bookFrames } = await load();
+  const build = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
+  const { encodePNG1Bit } = require(path.join(build, "src/png.js"));
+  // A 1-bit page (like the drawn pages) with a stripe at column `scene` above row 352 and at
+  // column `text` below it, where the story text and log are.
+  const pageOf = async (scene, text) => {
+    const px = new Uint8Array(800 * 480).fill(1);
+    for (let y = 0; y < 480; y++) px[y * 800 + (y < 352 ? scene : text)] = 0;
+    return Buffer.from(await encodePNG1Bit(px, 800, 480));
+  };
+  const files = { a: await pageOf(10, 100), b: await pageOf(20, 100), c: await pageOf(30, 200), d: await pageOf(40, 300) };
+  const rows = [
+    { file: "c", at: "2026-10-21T18:00:00Z", moment: "m2", moment_start: "2026-10-21T18:00:00Z", time: "13:00" },
+    { file: "a", at: "2026-10-21T12:00:00Z", moment: "m1", moment_start: "2026-10-21T12:00:00Z", time: "07:00" },
+    { file: "a2", at: "2026-10-21T12:10:00Z", moment: "m1", time: "07:10" },          // same moment: skipped
+    { file: "b", at: "2026-10-21T13:00:00Z", time: "08:00" },                          // no key, same text as a: a repeat
+    { file: "d", at: "2026-10-21T20:00:00Z", time: "15:00" },                          // no key, new text: kept, its own time
+  ];
+  const kept = bookFrames(rows, (f) => files[f] ?? files.a);
+  assert.deepEqual(kept, [{ file: "a", caption: "07:00" }, { file: "c", caption: "13:00" }, { file: "d", caption: "15:00" }]);
+});

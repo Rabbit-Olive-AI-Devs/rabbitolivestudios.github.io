@@ -18,6 +18,8 @@ export interface Env {
   // previews and the showrunner's proof page (they reveal unreleased chapters).
   SERIES: R2Bucket;
   SERIES_KEY?: string;
+  /** Opens /storybook, the story book on the web (DECISIONS #97). */
+  STORYBOOK_KEY?: string;
 }
 
 // --- Moment Before types ---
