@@ -13,7 +13,7 @@ import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, h
 import { handleSeries, handleSeriesAired, handleSeriesAiredPage, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
 import { seriesHealth } from "./series/watch";
 import { serialHealth } from "./serial";
-import { handleStorybook, handleStorybookFrame } from "./storybook";
+import { bookKeyOk, handleStorybook, handleStorybookFrame } from "./storybook";
 import { getPlanetOfDay } from "./planet";
 import { getFlamengo } from "./flamengo";
 import { getBirthdayToday, getBirthdayByKey, BIRTHDAY_STYLES } from "./birthday";
@@ -1028,9 +1028,11 @@ export default {
       });
     }
 
-    // Rate limiting
+    // Rate limiting. The story book with its key is exempt: one day's page loads a picture per
+    // frame (up to ~15), each a cheap R2 passthrough, so reading a few days ran past 60 a minute.
     const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    if (!checkRateLimit(ip)) {
+    const keyedBook = path.startsWith("/storybook") && bookKeyOk(env, url);
+    if (!keyedBook && !checkRateLimit(ip)) {
       return errorResponse("Rate limit exceeded. Try again in a minute.", 429);
     }
 
