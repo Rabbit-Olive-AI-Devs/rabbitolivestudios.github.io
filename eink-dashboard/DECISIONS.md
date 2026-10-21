@@ -4396,3 +4396,52 @@ frames and indexes stay as they were and a future fallback cannot repeat a page 
 the fix: 17 Oct 9, 18 Oct 15, 19 Oct 12, 20 Oct 15 pages. Not chosen: re-keying the old rows
 with `annotate`, which recomputes every row's moment from today's cached context, and moment
 boundaries move with that context.
+
+## 96. The Desk Story Page Becomes a Weekly-Written Serial, Painted by Jarvis (2026-10-21)
+
+**Why.** The owner read the story book and found the page repetitive: most moments were routine
+lines from tiny pools, and the storylines cycled every ~50 days with no arc. Option A (#93 addendum,
+2026-10-21) cut the routine repetition. The owner then chose a real serial: "a little story that
+moves forward each day", read in a few glances, in seasons with proper endings, written weekly by
+Claude, painted by Jarvis as brick-built dioramas in full colour, with current events and the
+owner's interests as optional seasoning. Anti-goal: repeated lines or pictures. Design:
+`docs/superpowers/specs/2026-10-21-desk-serial-design.md`; plan: `docs/superpowers/plans/2026-10-21-desk-serial.md`.
+First beat aired 2026-10-21 13:30 Chicago (the owner's start time). **Spoilers as #93: never
+describe the story to the owner.**
+
+**How it works.**
+- **Private story files.** The writer's day files (`{date, day, beats: [{id, start, title, text[], log, scene}]}`)
+  and season plans live in `~/desk-serial-work/s<NN>/`, never in the repo. Jarvis's briefs live in
+  Dropbox `00_JARVIS_SPOILERS/desk-serial/<date>/`, with a style and cast sheet beside them.
+- **Writing.** `com.eink.serial-weekly` runs daily at 09:15 and writes any days still missing up to
+  the Sunday of the week starting 12 or more days ahead, through `claude -p` with
+  `scripts/series-agent/serial-writer.md`. It checks each day with `serial-mailbox.mjs check`
+  (fit, glyphs, no line repeated from another day or the old engine) and briefs Jarvis with a
+  spoiler-free `SERIAL BRIEF` note. Pictures are due by 21:00 the evening before.
+- **Publishing.** `com.eink.serial-run` runs every 2 minutes. When `to-claude/serial/<date>/<beat-id>.png`
+  lands, it builds the beat's page offline with the Worker's own drawing code (`scripts/serial-build.mjs`:
+  the painting cropped to 800x315 around the note's focus point, in full colour, with the page's
+  real-font text and the two previous beats in "EARLIER"). A background Claude review
+  (`serial-review.md`) checks the picture against its note: no text in the picture, not broken,
+  the crop, the style. Only a PASS is uploaded to R2 `eink-series/serial/pages/<id>.html`. A
+  REVISE puts the reason in Jarvis's spoiler folder and sends a `SERIAL REVISE` note; a PASS sends
+  `SERIAL RECEIVED`. The day file `serial/days/<date>.json` lists only passed beats, plus `planned`,
+  and `same_day`/`season_end` where they apply. The review gate therefore lives offline, and the
+  Worker needs no "airable" flag.
+- **Match days.** A beat may set `live: "match"` with a `text_done` variant. When the Flamengo
+  board says the day's match ended, `run` rebuilds the beat with the score (no second review).
+- **Serving.** `/desk/castaway` reads today's day file (and yesterday's before today's first beat)
+  and returns the current beat's stored HTML: a passthrough, with no drawing, AI or KV. With no beat
+  showing, or anything missing, it draws the engine page. From `SERIAL_START` (2026-10-21) the engine
+  plays routine, calendar and live moments only, under a rotating neutral chapter heading, because
+  the old storylines would contradict the serial.
+- **Watching.** `/health-detailed` shows `serial: {today: ready/planned, tomorrow: …}`. The alert
+  reports a day with fewer pages than planned, or none mid-season (not on a `same_day` day, nor
+  after `season_end`). The story book (#95) keys its frames by `serial:<beat-id>`.
+- **Host.** The Mac mini (owner's choice, 2026-10-21): it never sleeps, and already runs the
+  mailbox, art and story book jobs.
+
+**Limits and follow-ups.** The first day's pictures were due the same day (`same_day`). The live slot
+covers match results only. Breaks between seasons fall back to the routine engine. The settings
+library (spec §7) is not built yet: a late picture leaves the previous beat showing, which never
+repeats a picture.

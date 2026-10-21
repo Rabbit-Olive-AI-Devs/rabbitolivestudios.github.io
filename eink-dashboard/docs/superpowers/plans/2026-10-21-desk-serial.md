@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-desk-serial-design.md`
 
+**Status (2026-10-21):** Tasks 1-9 built and deployed (DECISIONS #96). Changed in building: the review gate lives offline (the day file lists only beats that passed review, so the Worker has no `airable` flag); the writer runs daily and fills any missing days, not only on Wednesdays; the live slot is a `text_done` variant for a finished match. Not built: the settings library.
+
 ## Phasing
 
 - **Phase 1 (today, first beat 13:30 Chicago, 2026-10-21):** Tasks 1–3, plus a manual run of the writer (background helper, already started) and of the build script once Jarvis's pictures land. This airs today's episode.
