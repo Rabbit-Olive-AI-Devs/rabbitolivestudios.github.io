@@ -28,8 +28,8 @@ test("needsBuild: new picture, changed live text, or a review still owed", async
   assert.equal(needsBuild({ sha: "a", verdict: "ERROR" }, "a", "default"), false);
   assert.equal(needsBuild({ sha: "a", verdict: "UNREVIEWED", tries: 1 }, "a", "default"), true);
   const now = Date.parse("2026-10-21T20:00:00Z");
-  assert.equal(needsBuild({ sha: "a", verdict: "UNREVIEWED", tries: 3, at: now - 60_000 }, "a", "default", now), false);
-  assert.equal(needsBuild({ sha: "a", verdict: "UNREVIEWED", tries: 3, at: now - 31 * 60_000 }, "a", "default", now), true);
+  assert.equal(needsBuild({ sha: "a", verdict: "UNREVIEWED", tries: 3, at: now - 4 * 60_000 }, "a", "default", now), false);
+  assert.equal(needsBuild({ sha: "a", verdict: "UNREVIEWED", tries: 3, at: now - 5 * 60_000 }, "a", "default", now), true);
   assert.equal(needsBuild({ sha: "a", verdict: "UNREVIEWED", tries: 7 }, "a", "default", now), true); // no time recorded: retry
 });
 

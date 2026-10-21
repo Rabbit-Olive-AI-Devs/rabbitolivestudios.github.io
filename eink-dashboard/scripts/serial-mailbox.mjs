@@ -32,7 +32,7 @@ const KV_NAMESPACE = "de97776d35af4df08b13fd2158acebdc";
 const ACCOUNT = "f22a506dedde3bb3837157cd47d5fe5c";
 const REVIEW_TRIES = 3;
 /** After REVIEW_TRIES failed reviews in a row (Claude unavailable, a usage limit), wait this long and try again. */
-const REVIEW_RETRY_MS = 30 * 60 * 1000;
+const REVIEW_RETRY_MS = 5 * 60 * 1000;
 /** How long before a beat's start its stand-in goes up, when its own painting is missing (minutes). */
 const STAND_IN_LEAD = 10;
 
@@ -247,7 +247,7 @@ async function cmdRun() {
       const tries = (prev?.sha === s ? prev.tries ?? 0 : 0) + 1;
       state[b.id] = { sha: s, verdict: "UNREVIEWED", tries, variant, at: Date.now() };
       log(`${b.id}: review did not finish (try ${tries})`);
-      if (tries === REVIEW_TRIES) fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's review could not run for beat ${b.id}; it retries every 30 minutes meanwhile.\n`);
+      if (tries === REVIEW_TRIES) fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's review could not run for beat ${b.id}; it retries every 5 minutes meanwhile.\n`);
       continue;
     }
     state[b.id] = { sha: s, verdict: verdict.verdict, variant, reason: verdict.verdict === "PASS" ? undefined : verdict.reason };
