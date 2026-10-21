@@ -4354,3 +4354,17 @@ frames (it fell back to comparing pictures), but it fetched the Worker each time
 logs `kv get <key> failed, retrying: <status>`. Not chosen: a long-lived API token in place of
 OAuth (an owner setup step for a cosmetic fault), or a wrangler upgrade (4.92 is pinned by the
 repo; untested whether newer versions wait for the token).
+
+**Addendum (2026-10-21, the owner found the book repetitive):** the repeats were the fallback's
+work. Whenever a cache read failed (the 401s above), the live job could not tell the moment,
+compared pictures instead, and saved the frame because the scene had changed a little within the
+same moment; that row had no moment key, so the book kept it as a page of its own, and the next
+good run sometimes saved the same moment again under its key. 19 Oct gained 6 such pages, 20 Oct
+14 of 29, 21 Oct 7 by midday; 17-18 Oct, rendered locally, had none. Measured on the saved frames
+(positions only, never the content): a repeat changes only the scene (rows above `SCENE_BOTTOM`,
+352), while every new moment also changes the story text or the log below it. The EPUB builder
+now leaves out a frame whose rows below the scene match the last kept frame's, so the saved
+frames and indexes stay as they were and a future fallback cannot repeat a page either. After
+the fix: 17 Oct 9, 18 Oct 15, 19 Oct 12, 20 Oct 15 pages. Not chosen: re-keying the old rows
+with `annotate`, which recomputes every row's moment from today's cached context, and moment
+boundaries move with that context.

@@ -2,8 +2,9 @@
 """
 Builds the desk story book (DECISIONS #95) as an EPUB from the frames the storybook job saved
 in Dropbox: one chapter per day, one frame per story moment (the first one saved for it, by the
-index's `moment` key), captioned with the moment's start time. A row without a moment key (saved
-while the story engine could not say) stands as its own frame. Prints counts only: the story is
+index's `moment` key), captioned with the moment's start time. A frame whose story text and log (the page below the
+scene) match the last kept frame's is the same moment again and is left out: rows saved while the
+engine could not say the moment carry no key, and repeated what was already showing. Prints counts only: the story is
 a surprise (#93). Runs every night (com.eink.storybook-epub) and by hand; reads only Dropbox.
 
     python3 -I scripts/storybook-epub.py [FOLDER] [OUT.epub]   (-I: also runs on the system Python 3.9)
@@ -12,6 +13,7 @@ a surprise (#93). Runs every night (com.eink.storybook-epub) and by hand; reads 
 import json
 import sys
 import zipfile
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -21,6 +23,7 @@ FOLDER = Path(sys.argv[1] if len(sys.argv) > 1 else
 OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else FOLDER / "storybook.epub"
 TITLE = "The Desk Story"
 CHICAGO = ZoneInfo("America/Chicago")
+SCENE_BOTTOM = 352   # src/hud/castaway-page.ts: the story text and log are drawn below this row
 LOG = Path.home() / "Library" / "Logs" / "eink-series" / "storybook.log"
 
 
@@ -29,14 +32,42 @@ def frames(day_dir: Path) -> list[dict]:
     return sorted(rows, key=lambda r: r["at"])
 
 
-def one_per_moment(rows: list) -> list:
+def text_area(png: bytes):
+    """The raw rows below the scene of a PNG as src/png.ts writes it (unfiltered), or None."""
+    pos, ihdr, idat = 8, None, []
+    while pos + 8 <= len(png):
+        length, kind = int.from_bytes(png[pos:pos + 4], "big"), png[pos + 4:pos + 8]
+        if kind == b"IHDR":
+            ihdr = png[pos + 8:pos + 8 + length]
+        elif kind == b"IDAT":
+            idat.append(png[pos + 8:pos + 8 + length])
+        pos += 12 + length
+    if not ihdr or ihdr[12] != 0:
+        return None
+    width, height = int.from_bytes(ihdr[0:4], "big"), int.from_bytes(ihdr[4:8], "big")
+    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}.get(ihdr[9], 0)
+    stride = 1 + -(-width * ihdr[8] * channels // 8)
+    try:
+        raw = zlib.decompress(b"".join(idat))
+    except zlib.error:
+        return None
+    if not channels or len(raw) < stride * height or any(raw[y * stride] for y in range(SCENE_BOTTOM, height)):
+        return None
+    return raw[SCENE_BOTTOM * stride:stride * height]
+
+
+def one_per_moment(day_dir: Path, rows: list) -> list:
     """The first saved frame of each moment, in time order, with its caption."""
-    kept, seen = [], set()
+    kept, seen, last_text = [], set(), None
     for r in rows:
         key = r.get("moment") or r["file"]
         if key in seen:
             continue
         seen.add(key)
+        text = text_area((day_dir / r["file"]).read_bytes())
+        if text is not None and text == last_text:
+            continue
+        last_text = text
         start = r.get("moment_start")
         caption = (datetime.fromisoformat(start.replace("Z", "+00:00")).astimezone(CHICAGO).strftime("%H:%M")
                    if start else r["time"])
@@ -58,7 +89,7 @@ def main() -> None:
     for d in days:
         rows = frames(d)
         total += len(rows)
-        kept = one_per_moment(rows)
+        kept = one_per_moment(d, rows)
         if not kept:
             continue
         n = len(chapters) + 1
