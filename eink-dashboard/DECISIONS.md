@@ -4546,3 +4546,44 @@ addendum of 2026-10-23).
 **Rejected.**
 - Turning the jobs off until a successor was ready: the serial would stop being written and reviewed.
 - A free-form command template: the two CLIs differ too much in how they take permissions.
+
+## 99. The Mac Jobs Can Move to the MacBook; Volt Is the Independent Reviewer (2026-10-23)
+
+**Context.** The owner wants everything that ran on the Mac mini to run on the MacBook, which is
+now on 24/7 and is where Jarvis lives (`/Users/quark`, Dropbox at `/Users/quark/Dropbox`). The
+scripts and LaunchAgents had the mini's paths written in: the external SSD's Dropbox and Photos
+library, and the `tboliveira` home folder. The owner also named Volt (the Grok bot, Season 2's
+writer) as the independent reviewer of Jarvis's own chapters. That keeps the reviewer from the
+same model family as the author, which a Codex reviewer would not (#98, "Limits").
+
+**Decision.**
+- **One path setting.** `scripts/eink-paths.mjs` reads `~/.config/eink/paths.json` (`dropbox`,
+  `photosLibrary`, `familyTmp`); without it, the mini's SSD. The series watcher and import, the
+  serial jobs, `storybook.mjs` and `storybook-epub.py` all use it, and the old environment
+  overrides still win. The chapter prompt takes `{{MAILBOX}}` instead of a fixed path.
+- **One installer.** `scripts/launchd/install.sh [--load] [names…]` rewrites the repo's plists for
+  the Mac it runs on (home, repo, `node`, Dropbox root) into `~/Library/LaunchAgents`, and checks
+  each one with `plutil`. It skips `series-weekly` (retired, #98) unless that job is named. On the
+  mini it produces the installed plists exactly; the only difference is the case of `Projetos`,
+  which the disk ignores.
+- **The move itself is Jarvis's**, by the order in the handover (Dropbox
+  `00_SHARED_INBOX/eink-handover/EINK-HANDOVER.md` §12): stop the mini's jobs first, copy the
+  state, install on the MacBook, and check each job. Two mailbox watchers must never run at once.
+  The alert's `WATCHED_MACHINES` (`src/alert.ts`) changes from `mini` to `macbook` in the same
+  change, with a deploy.
+- **Volt reviews.** With `"seriesReviewer": "volt"` in `agent.json`, an upload of a showrunner
+  chapter puts a request in Volt's lane at `writer-exchange/s02-volt/to-writer/LD-REVIEW-<s-c-rev>/`:
+  the proof export, the unpacked package, the continuity notes and `review.md` filled in with
+  paths inside the folder.
+  - Jarvis asks Volt to read it. Volt writes `from-writer/LD-REVIEW-…/VERDICT.md`, first line
+    `PASS` or `REVISE`.
+  - Each mailbox run collects it, but only if it names the revision. The record `approve` checks
+    is then written (`reviewer: "volt"`), with `INDEPENDENT-REVIEW.md` in the proof folder
+    (formerly `CLAUDE-REVIEW.md`), and Jarvis gets a note.
+  - Tested end to end in a sandbox. That included a verdict for the wrong revision, which was
+    ignored.
+
+**Limits.** Volt's lane is inside the shared mailbox, so the review material sits where the owner
+could open it. Volt's own season material already does, and the owner simply doesn't open it.
+Desk serial reviews stay with the unattended runner: 4-6 a day, needed minutes after a painting
+lands, too fast for a relayed reviewer.

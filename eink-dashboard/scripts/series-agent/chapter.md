@@ -14,7 +14,7 @@ Continue exactly where the season stands:
   as new files following the existing pattern, then regenerate season.json with ALL chapters;
   earlier chapters must stay byte-identical.
 - Follow {{REPO}}/docs/series/SEASON-FORMAT.md exactly and the writer rules in section 7 of
-  /Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_SHARED_INBOX/series/JARVIS-BRIEF.md: 25 scenes,
+  {{MAILBOX}}/JARVIS-BRIEF.md: 25 scenes,
   scene 1 a splash title card, a hook or resolution at scene 25, a non-spoiling teaser, printable
   ASCII only, at least one new picture each weekday, no words in pictures, calm zones kept plain,
   no canon characters, grown-up tone without gore (SHOWRUNNER.md), original Force-users only as guests.
@@ -24,7 +24,7 @@ Continue exactly where the season stands:
   The painted picture is what goes in the package. Gouache is the Prologue's base look; a scene
   may change look to mark a story layer (a memory, a legend, a dream), at most once per beat and
   with a reason, following the reference guides in
-  /Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_SHARED_INBOX/series/reference/. The engine also
+  {{MAILBOX}}/reference/. The engine also
   has `oil` and `pixel` manners. Keep compositions so anchors and keep-clear
   boxes still match. Keep the art lessons in bible-notes.md that still apply (contrast between
   garments, keep-clear boxes on bodies and key objects, readable faces).

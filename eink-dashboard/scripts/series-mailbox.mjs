@@ -22,19 +22,21 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { runAgent } from "./agent-run.mjs";
+import { agentConfig, runAgent } from "./agent-run.mjs";
+import { einkPaths } from "./eink-paths.mjs";
 
 const require = createRequire(import.meta.url);
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const HOME = os.homedir();
-const MAILBOX = process.env.SERIES_MAILBOX ?? "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_SHARED_INBOX/series";
+const PATHS = einkPaths();
+const MAILBOX = process.env.SERIES_MAILBOX ?? path.join(PATHS.dropbox, "00_SHARED_INBOX", "series");
 const INBOX = path.join(MAILBOX, "to-claude");
 const OUTBOX = path.join(MAILBOX, "from-claude");
 const WORK = path.join(HOME, "series-work");
 const LOGS = path.join(HOME, "Library", "Logs", "eink-series");
 const ATTEMPTS = path.join(WORK, ".mailbox-attempts.json");
 const SITE = "https://eink-dashboard.thiago-oliveira77.workers.dev";
-const PROOFS = process.env.SERIES_PROOFS ?? "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_JARVIS_SPOILERS/series-proofs";
+const PROOFS = process.env.SERIES_PROOFS ?? path.join(PATHS.dropbox, "00_JARVIS_SPOILERS", "series-proofs");
 const MAX_ATTEMPTS = 3;
 
 fs.mkdirSync(LOGS, { recursive: true });
@@ -155,10 +157,12 @@ function handle(file, m) {
 }
 
 /**
- * Claude's independent review of a chapter the showrunner wrote himself (DECISIONS #79). An
- * unattended run reads every exported page and the package, and writes PASS or REVISE. The
- * record that `approve` trusts stays in ~/series-work/reviews, where Jarvis cannot write; a copy
- * of the verdict goes next to the pages in his proof folder. Returns the verdict or null.
+ * The independent review of a chapter the showrunner wrote himself (DECISIONS #79). An unattended
+ * run reads every exported page and the package, and writes PASS or REVISE; or, when agent.json
+ * names `"seriesReviewer": "volt"`, Volt (another company's model, #99) gets the same material in
+ * his writer-exchange lane and his verdict is collected later (`collectVoltReviews`). The record
+ * that `approve` trusts stays in ~/series-work/reviews, where Jarvis cannot write; a copy of the
+ * verdict goes next to the pages in his proof folder. Returns the verdict, "SENT TO VOLT" or null.
  */
 function review(season, chapter, revision, exportDir, zip) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -172,19 +176,76 @@ function review(season, chapter, revision, exportDir, zip) {
   const packageSha = crypto.createHash("sha256").update(fs.readFileSync(zip)).digest("hex");
   const verdictFile = path.join(dir, `${base}.md`);
   fs.rmSync(verdictFile, { force: true });
+  if (agentConfig().seriesReviewer === "volt") return sendToVolt({ season, chapter, revision, base, exportDir, unpacked, packageSha });
   agent("review.md", {
     SEASON: String(season), CHAPTER: String(chapter), REVISION: revision, EXPORT: exportDir,
     PACKAGE: unpacked, PACKAGE_SHA: packageSha, VERDICT: verdictFile, MAILBOX,
   }, { claudeTools: ["Read", "Glob", "Grep", `Edit(/${verdictFile})`], write: [dir] }, `review-${base}`);
+  return recordVerdict({ season, chapter, revision, base, exportDir, packageSha }, verdictFile, "agent");
+}
+
+/** Keeps a verdict file that starts PASS or REVISE as the record `approve` checks; null otherwise. */
+function recordVerdict({ season, chapter, revision, base, exportDir, packageSha }, verdictFile, reviewer) {
+  const dir = path.join(WORK, "reviews");
   const first = fs.existsSync(verdictFile) ? fs.readFileSync(verdictFile, "utf8").split("\n")[0].trim() : "";
   const verdict = /^(PASS|REVISE)$/.test(first) ? first : null;
   if (!verdict) return null;
   const manifestSha = crypto.createHash("sha256").update(fs.readFileSync(path.join(exportDir, "MANIFEST.json"))).digest("hex");
   fs.writeFileSync(path.join(dir, `${base}.json`), JSON.stringify({
-    season, chapter, revision, verdict, packageSha256: packageSha, manifestSha256: manifestSha, reviewedAt: new Date().toISOString(),
+    season, chapter, revision, verdict, reviewer, packageSha256: packageSha, manifestSha256: manifestSha, reviewedAt: new Date().toISOString(),
   }, null, 2) + "\n");
-  fs.copyFileSync(verdictFile, path.join(exportDir, "CLAUDE-REVIEW.md"));
+  fs.copyFileSync(verdictFile, path.join(exportDir, "INDEPENDENT-REVIEW.md"));
   return verdict;
+}
+
+const VOLT_LANE = path.join(MAILBOX, "writer-exchange", "s02-volt");
+
+/**
+ * A review request in Volt's lane: the exported pages, the unpacked package, the continuity notes,
+ * and review.md filled in with paths inside the request. Volt answers with
+ * from-writer/LD-REVIEW-<base>/VERDICT.md. Jarvis relays the request to him; the watcher collects it.
+ */
+function sendToVolt(r) {
+  const id = `LD-REVIEW-${r.base}`;
+  const req = path.join(VOLT_LANE, "to-writer", id);
+  fs.rmSync(req, { recursive: true, force: true });
+  fs.cpSync(r.exportDir, path.join(req, "proof"), { recursive: true });
+  fs.cpSync(r.unpacked, path.join(req, "package"), { recursive: true });
+  for (const f of ["JARVIS-BRIEF.md", "from-claude/bible-notes-prologue.md", "from-claude/SPOILERS-prologue-outline.md"]) {
+    if (!fs.existsSync(path.join(MAILBOX, f))) continue;
+    fs.mkdirSync(path.dirname(path.join(req, "continuity", f)), { recursive: true });
+    fs.cpSync(path.join(MAILBOX, f), path.join(req, "continuity", f));
+  }
+  fs.cpSync(path.join(REPO, "docs", "series", "SEASON-FORMAT.md"), path.join(req, "continuity", "SEASON-FORMAT.md"));
+  let prompt = fs.readFileSync(path.join(REPO, "scripts", "series-agent", "review.md"), "utf8");
+  const vars = { SEASON: String(r.season), CHAPTER: String(r.chapter), REVISION: r.revision, EXPORT: "proof/", PACKAGE: "package/",
+    PACKAGE_SHA: r.packageSha, VERDICT: `from-writer/${id}/VERDICT.md (in your own lane)`, MAILBOX: "continuity" };
+  for (const [k, v] of Object.entries(vars)) prompt = prompt.replaceAll(`{{${k}}}`, v);
+  prompt = prompt.replaceAll("the repo's\n  docs/series/SEASON-FORMAT.md", "continuity/SEASON-FORMAT.md");
+  fs.writeFileSync(path.join(req, "REVIEW-REQUEST.md"), `Volt: an independent review for The Long Drift. Paths below are inside this folder (writer-exchange/s02-volt/to-writer/${id}/).\n\n${prompt}`);
+  fs.writeFileSync(path.join(WORK, "reviews", `${r.base}.volt.json`), JSON.stringify({ ...r, id }, null, 2));
+  log(`review ${r.base}: sent to Volt (${id})`);
+  return "SENT TO VOLT";
+}
+
+/** Each run: record any verdict Volt has returned, and tell Jarvis. */
+function collectVoltReviews() {
+  const dir = path.join(WORK, "reviews");
+  if (!fs.existsSync(dir)) return;
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".volt.json"))) {
+    const r = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+    const answer = path.join(VOLT_LANE, "from-writer", r.id, "VERDICT.md");
+    if (!fs.existsSync(answer)) continue;
+    // A verdict for another revision (an older request) must not clear this one.
+    if (!fs.readFileSync(answer, "utf8").includes(r.revision)) { log(`review ${r.base}: Volt's verdict does not name revision ${r.revision}; ignored`); continue; }
+    const verdictFile = path.join(dir, `${r.base}.md`);
+    fs.copyFileSync(answer, verdictFile);
+    const v = recordVerdict(r, verdictFile, "volt");
+    if (!v) { log(`review ${r.base}: Volt's verdict does not start with PASS or REVISE; waiting for a fixed one`); continue; }
+    fs.rmSync(path.join(dir, f));
+    log(`review ${r.base}: Volt says ${v}`);
+    reply(`volt-review-${r.base}`, `FYI: Volt's independent review of season ${r.season} chapter ${r.chapter} revision ${r.revision} says **${v}**. Details: INDEPENDENT-REVIEW.md in that revision's proof folder.${v === "PASS" ? `\n\nYou can now send APPROVE season=${r.season} chapter=${r.chapter} revision=${r.revision}.` : ""}`);
+  }
 }
 
 /** Review every exported chapter of an upload that needs it; one line per chapter for Jarvis. */
@@ -194,12 +255,14 @@ function reviewUploaded(m, out, zip) {
     const e = l.match(/^proof export: season (\d+) chapter (\d+) revision ([0-9a-f]{16}) in (.+)$/);
     if (!e || !m.mailbox.needsIndependentReview(Number(e[1]))) continue;
     const v = review(Number(e[1]), Number(e[2]), e[3], e[4], zip);
-    lines.push(v
-      ? `- Season ${e[1]} chapter ${e[2]} revision ${e[3]}: Claude's independent review says **${v}**. Details: CLAUDE-REVIEW.md in that revision's proof folder.`
-      : `- Season ${e[1]} chapter ${e[2]} revision ${e[3]}: the independent review did not finish; Thiago has been asked to open a session.`);
-    if (!v) note(`Claude's independent review of season ${e[1]} chapter ${e[2]} did not finish. Please open a session.`);
+    lines.push(v === "SENT TO VOLT"
+      ? `- Season ${e[1]} chapter ${e[2]} revision ${e[3]}: sent to Volt for the independent review (writer-exchange/s02-volt/to-writer/LD-REVIEW-s${e[1].padStart(2, "0")}-c${e[2].padStart(2, "0")}-${e[3]}/). Please ask him to read REVIEW-REQUEST.md there; his VERDICT.md is collected automatically and you will get a note.`
+      : v
+        ? `- Season ${e[1]} chapter ${e[2]} revision ${e[3]}: the independent review says **${v}**. Details: INDEPENDENT-REVIEW.md in that revision's proof folder.`
+        : `- Season ${e[1]} chapter ${e[2]} revision ${e[3]}: the independent review did not finish; Thiago has been asked to open a session.`);
+    if (!v) note(`The independent review of season ${e[1]} chapter ${e[2]} did not finish. Please open a session.`);
   }
-  return lines.length ? `\n\nIndependent review (Season 1 rule, DECISIONS #79):\n${lines.join("\n")}` : "";
+  return lines.length ? `\n\nIndependent review (DECISIONS #79):\n${lines.join("\n")}` : "";
 }
 
 /** The upload's proof-export lines, for Jarvis (DECISIONS #78). */
@@ -217,6 +280,7 @@ function note(line) {
 
 function cmdRun() {
   if (!fs.existsSync(INBOX)) { log("mailbox not mounted; skipped"); return; }
+  collectVoltReviews();
   const files = fs.readdirSync(INBOX).filter((f) => f.endsWith(".md") && fs.statSync(path.join(INBOX, f)).isFile()).sort();
   // Files Dropbox may still be writing: wait until each is a minute old rather than skip it,
   // because launchd starts this run the moment a file lands and will not start it again until
@@ -268,8 +332,8 @@ const ART_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", web
 const ART_MAX_BYTES = 15 * 1024 * 1024;
 // Family Memory (#92): the photo library, the scratch copy of its database (on the external drive:
 // the Mac's own disk is short of space), the PhotoKit downloader and the shown log.
-const PHOTOS_LIB = process.env.PHOTOS_LIBRARY ?? "/Volumes/SamsungSSD/Pictures/Photos Library.photoslibrary";
-const FAMILY_TMP = process.env.FAMILY_TMP ?? "/Volumes/SamsungSSD/Pictures/.eink-family-tmp";
+const PHOTOS_LIB = process.env.PHOTOS_LIBRARY ?? PATHS.photosLibrary;
+const FAMILY_TMP = process.env.FAMILY_TMP ?? PATHS.familyTmp;
 const FAMILY_FETCH = path.join(HOME, "Applications", "EinkFamilyFetch.app");   // scripts/build-family-fetch.sh
 const FAMILY_SHOWN = path.join(HOME, ".config", "eink", "family-shown.json");
 
@@ -443,7 +507,7 @@ function cmdWeekly() {
   const pkg = path.join(WORK, `s${pad(due.season)}`);
   const out = path.join(WORK, `out-s${pad(due.season)}-c${due.chapter}`);
   log(`weekly: writing season ${due.season} chapter ${due.chapter} (airs ${due.airs})`);
-  const ok = agent("chapter.md", { SEASON: String(due.season), CHAPTER: String(due.chapter), AIRS: due.airs, PACKAGE: pkg, OUT: out, REPO }, {
+  const ok = agent("chapter.md", { SEASON: String(due.season), CHAPTER: String(due.chapter), AIRS: due.airs, PACKAGE: pkg, OUT: out, REPO, MAILBOX }, {
     claudeTools: ["Read", "Glob", "Grep", ...writeTo(WORK), `Bash(node:*)`, `Bash(npm --prefix ${REPO} run series -- build:*)`,
       `Bash(python3 -E -P ${REPO}/scripts/series-paint/:*)`],
     write: [WORK],

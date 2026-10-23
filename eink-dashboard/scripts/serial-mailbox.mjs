@@ -17,12 +17,13 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runAgent } from "./agent-run.mjs";
+import { einkPaths } from "./eink-paths.mjs";
 import { buildBeat, compile, put } from "./serial-build.mjs";
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const HOME = os.homedir();
 const WORK = process.env.SERIAL_WORK ?? path.join(HOME, "desk-serial-work");
-const DROPBOX = "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox";
+const DROPBOX = einkPaths().dropbox;
 const MAILBOX = path.join(DROPBOX, "00_SHARED_INBOX", "series");
 const INBOX = path.join(MAILBOX, "to-claude", "serial");
 const OUTBOX = path.join(MAILBOX, "from-claude");

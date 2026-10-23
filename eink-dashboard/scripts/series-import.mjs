@@ -18,13 +18,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { einkPaths } from "./eink-paths.mjs";
 
 const require = createRequire(import.meta.url);
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const BUCKET = "eink-series";
 const SCHEDULE_KEY = "series/schedule.json";
 // Jarvis's spoiler review folder (DECISIONS #78): outside the shared series mailbox.
-const PROOFS = process.env.SERIES_PROOFS ?? "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_JARVIS_SPOILERS/series-proofs";
+const PROOFS = process.env.SERIES_PROOFS ?? path.join(einkPaths().dropbox, "00_JARVIS_SPOILERS", "series-proofs");
 
 function compile() {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "series-build-"));
@@ -311,12 +312,12 @@ async function cmdApprove() {
   // The pages on air must be the ones reviewed: recompute the revision from R2 itself.
   const now = (await readChapter(m, season, chapter)).revision;
   if (now !== revision) { console.error(`the pages changed since revision ${revision}; R2 now holds revision ${now}. Review that export first`); process.exit(1); }
-  // The showrunner's own season also needs Claude's independent PASS for this revision (#79).
+  // The showrunner's own seasons also need the independent PASS for this revision (#79).
   if (m.mailbox.needsIndependentReview(season)) {
     const pad = (n) => String(n).padStart(2, "0");
     const f = path.join(os.homedir(), "series-work", "reviews", `s${pad(season)}-c${pad(chapter)}-${revision}.json`);
     const r = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
-    if (r?.verdict !== "PASS" || r.revision !== revision) { console.error(`season ${season} needs Claude's independent PASS for revision ${revision} first${r ? ` (the review said ${r.verdict})` : " (no review yet)"}`); process.exit(1); }
+    if (r?.verdict !== "PASS" || r.revision !== revision) { console.error(`season ${season} needs the independent PASS for revision ${revision} first${r ? ` (the review said ${r.verdict})` : " (no review yet)"}`); process.exit(1); }
   }
   e.pending = e.pending.filter((c) => c !== chapter);
   if (!e.approved.includes(chapter)) e.approved.push(chapter);

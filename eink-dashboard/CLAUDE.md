@@ -449,6 +449,8 @@ eink-dashboard/
     storybook-set-key.sh       — Owner runs it in a real terminal: choose STORYBOOK_KEY (hidden prompt) → ~/.config/eink/storybook-key + Cloudflare secret, prints the /storybook link (#97)
     storybook-epub.py          — Builds `storybook.epub` (one chapter per day, one frame per story moment) from those Dropbox frames; no Worker requests (DECISIONS #95)
     serial-build.mjs           — The desk serial's offline build: day file + Jarvis's painting → page HTML, upload to R2 (DECISIONS #96)
+    eink-paths.mjs             — Where this Mac keeps Dropbox and the Photos library: `~/.config/eink/paths.json`, else the mini's SSD (DECISIONS #99)
+    launchd/install.sh         — Installs the LaunchAgents for the Mac it runs on, paths rewritten; `--load` starts them (DECISIONS #99)
     agent-run.mjs              — The one place the Mac mini's jobs start an unattended AI run: Claude or Codex per `~/.config/eink/agent.json` (DECISIONS #98)
     serial-mailbox.mjs         — The desk serial's Mac mini jobs: `run` (build, review, publish; LaunchAgent `com.eink.serial-run`, every 2 min), `weekly` (writer, `com.eink.serial-weekly`, daily 09:15), `check` (fit, glyph, no-repeat). Prompts `series-agent/serial-*.md`
     series-timeline.mjs        — What the panels will show at every refresh change, from the live schedule through the real clock code, by page NAME only (safe in front of the owner), and whether R2 holds every page; `--approve 1,2` pretends. Run before each season (DECISIONS #80)

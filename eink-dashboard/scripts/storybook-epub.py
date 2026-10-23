@@ -18,8 +18,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-FOLDER = Path(sys.argv[1] if len(sys.argv) > 1 else
-              "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox/00_STORYBOOK_SURPRISE_do_not_open")
+def dropbox_root() -> Path:
+    """This Mac's Dropbox, from ~/.config/eink/paths.json like scripts/eink-paths.mjs (DECISIONS #99)."""
+    try:
+        return Path(json.loads((Path.home() / ".config" / "eink" / "paths.json").read_text())["dropbox"])
+    except (OSError, ValueError, KeyError):
+        return Path("/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox")
+
+
+FOLDER = Path(sys.argv[1]) if len(sys.argv) > 1 else dropbox_root() / "00_STORYBOOK_SURPRISE_do_not_open"
 OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else FOLDER / "storybook.epub"
 TITLE = "The Desk Story"
 CHICAGO = ZoneInfo("America/Chicago")

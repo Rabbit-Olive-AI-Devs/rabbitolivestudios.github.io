@@ -35,13 +35,14 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
+import { einkPaths } from "./eink-paths.mjs";
 
 const require = createRequire(import.meta.url);
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const KV_NAMESPACE = "de97776d35af4df08b13fd2158acebdc";
 const ACCOUNT = "f22a506dedde3bb3837157cd47d5fe5c";
 
-const DROPBOX = process.env.STORYBOOK_DROPBOX ?? "/Volumes/SamsungSSD/.CloudStorage/Data/Dropbox";
+const DROPBOX = process.env.STORYBOOK_DROPBOX ?? einkPaths().dropbox;
 const BOOK = path.join(DROPBOX, "00_STORYBOOK_SURPRISE_do_not_open");
 const PAGE = process.env.STORYBOOK_URL ?? "https://eink-dashboard.thiago-oliveira77.workers.dev/desk/castaway";
 const LOGS = path.join(os.homedir(), "Library", "Logs", "eink-series");
