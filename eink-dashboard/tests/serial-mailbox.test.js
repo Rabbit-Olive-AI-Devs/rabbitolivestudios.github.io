@@ -22,6 +22,7 @@ test("needsBuild: new picture, changed live text, or a review still owed", async
   const { needsBuild } = await script();
   assert.equal(needsBuild(undefined, "a", "default"), true);
   assert.equal(needsBuild({ sha: "a", verdict: "PASS", variant: "default" }, "a", "default"), false);
+  assert.equal(needsBuild({ sha: "a", verdict: "PASS" }, "a", "default"), false); // a settings-library record
   assert.equal(needsBuild({ sha: "a", verdict: "PASS", variant: "default" }, "b", "default"), true);
   assert.equal(needsBuild({ sha: "a", verdict: "PASS", variant: "default" }, "a", "done:2-1"), true);
   assert.equal(needsBuild({ sha: "a", verdict: "REVISE" }, "a", "default"), false);

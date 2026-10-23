@@ -84,7 +84,9 @@ export function beatText(beat, match) {
  */
 export function needsBuild(prev, sha, variant, now = Date.now()) {
   if (!prev || prev.sha !== sha) return true;
-  if (prev.verdict === "PASS") return prev.variant !== variant;
+  // A record saved without a variant (the settings library's) is the default one: reading it as
+  // changed re-reviewed every passed place on every run (2026-10-22/23, the whole usage budget).
+  if (prev.verdict === "PASS") return (prev.variant ?? "default") !== variant;
   if (prev.verdict !== "UNREVIEWED") return false;
   return (prev.tries ?? 0) < REVIEW_TRIES || now - (prev.at ?? 0) >= REVIEW_RETRY_MS;
 }

@@ -4462,6 +4462,15 @@ up to 4 exact ASCII strings of at most 40 characters, checked by `serial-mailbox
 reviewer passes only that text, spelled exactly; any other text, Aurebesh, invented script or
 garbled lettering is still a REVISE. The writer is told to use it sparingly (signs, labels).
 
+**Addendum (2026-10-23, the settings reviews that never stopped):** a passed settings-library record
+is saved without a `variant`, and `needsBuild` read a missing variant as changed, so `run` rebuilt
+and re-reviewed all 13 passed places every few minutes from 22 Oct 01:50 UTC (each passed 40-48
+times). That spent the owner's whole Claude usage. Once the limit hit, every background `claude -p`
+failed: reviews, the daily writer (22 and 23 Oct) and two Jarvis messages. `needsBuild` now reads a
+missing variant as `default`. The 13 records were set back to PASS by hand, after checking the saved
+sha against each picture. Lesson: a background job that spends Claude usage must be idempotent on
+success, and the log showing the same PASS twice should have been the alarm.
+
 ## 97. The Story Book on the Web, Current All Day (2026-10-21)
 
 **Why.** The owner reads the story book (#95), but Apple Books keeps its own copy of an imported
