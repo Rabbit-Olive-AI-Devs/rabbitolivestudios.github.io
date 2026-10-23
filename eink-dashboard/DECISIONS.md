@@ -4497,3 +4497,52 @@ session, as with the EPUB (#93, #95).
 requests a minute per visitor), because a day's page loads one picture per frame. Requests to
 `/storybook*` that carry the valid key now skip that limit. Each is a cheap R2 passthrough, and
 unkeyed requests are still counted and refused. Deployed bc5eb903; the owner confirmed it works.
+
+## 98. Claude Hands Its Work Over to Jarvis; the Mac Mini's AI Runs Become Switchable (2026-10-23)
+
+**Context.** The owner is reducing their Claude subscription and asked for everything Claude does on
+this project to pass to Jarvis or another agent. Until now every unattended AI run on the Mac mini
+called `claude -p` directly. That covered the desk serial's writer and reviewer (#96), and the
+series mailbox's message runs, Claude's own chapters and the independent review of Jarvis's season
+(#72, #79). Earlier the same day, a bug in those runs used up the whole Claude allowance (#96
+addendum of 2026-10-23).
+
+**Decision.**
+- **One runner.** `scripts/agent-run.mjs` (`runAgent`) starts every unattended run. The agent is
+  chosen in `~/.config/eink/agent.json`, or by `EINK_AGENT` for one run. Claude is the default, so
+  nothing changes until the file says otherwise.
+  - Claude keeps its exact per-tool rules.
+  - Codex runs the ChatGPT app's bundled CLI on the owner's ChatGPT sign-in (the Homebrew CLI
+    lagged and was refused the account's models). The model comes from `agent.json`, else from the
+    `model =` line of `~/.codex/config.toml`. It is always started with `--ignore-user-config`, so
+    Codex's memories never keep a story it read.
+  - Codex has no per-tool rules, so it gets the nearest sandbox. That is `read-only` when the run
+    writes nothing; otherwise `workspace-write`, with the first writable directory as its working
+    root, never the repo. Pictures to judge are attached with `-i`.
+  - A real settings-painting review through Codex returned PASS in 17 s. The prompts no longer call
+    the agent "Claude".
+- **The series.** Claude's finished work stays Claude's: Prologue chapters 1-3, written, painted,
+  approved and in R2, keep their "STORY & ART CLAUDE" credit. An upload never replaces an approved
+  chapter without `--replace-approved`. Everything not yet done passes to Jarvis (owner): Prologue
+  chapters 4-10 and Season 4. `CALENDAR` names him for both, so their chapters need the
+  independent review before `APPROVE`, like Season 1. His first Prologue delivery sets the
+  schedule's writer to his package's writer. `com.eink.series-weekly`, which existed only to write
+  Claude's next chapter, is booted out and disabled. The full current Prologue source (528 files,
+  with its continuity notes and a SHA-256 manifest) is copied to his spoiler folder
+  `series-source/s00-full-2026-10-23/`. The older `s00/` copy lacked the notes.
+- **Desk serial.** Writing (`serial-weekly`) and reviewing (`serial-run`) keep running on the Mac
+  mini through the runner, whichever agent `agent.json` names. Jarvis keeps painting.
+- **The handover.** A full operational handover for Jarvis (every role, job, routine, rule and
+  check, with a cutover checklist and a prompt) is in Dropbox `00_SHARED_INBOX/eink-handover/`. It
+  is not in the repo, which stays the technical reference (HANDOVER.md).
+
+**Limits.**
+- Jarvis now writes the Prologue and Season 4 as well as Season 1. If the runner points at Codex, the
+  independent review of his chapters is a separate run, but it is not by a different company's
+  model. Whether to keep that gate is the owner's call.
+- The desk serial's writer under Codex has not been run end to end. Its first run should be watched,
+  by counts only in `serial.log`.
+
+**Rejected.**
+- Turning the jobs off until a successor was ready: the serial would stop being written and reviewed.
+- A free-form command template: the two CLIs differ too much in how they take permissions.

@@ -9,6 +9,8 @@ Entry point for agents that load this file automatically. It is deliberately sho
 3. **`DECISIONS.md`** — 72 numbered records of why things are the way they are, including every rejected approach. Search it before proposing something; it has probably been tried.
 4. **`README.md`** — endpoints, setup, troubleshooting table.
 
+**Taking over from Claude?** The operational handover (every job, routine, rule and check Claude ran, and a cutover checklist) is in the owner's Dropbox: `00_SHARED_INBOX/eink-handover/EINK-HANDOVER.md` (DECISIONS #98).
+
 ## What this is
 
 "Moment Before" — one Cloudflare Worker (TypeScript, plain `switch` router, no framework, zero runtime dependencies) on the **free tier**, serving three 800x480 e-ink panels: a reTerminal E1001 (mono, home, Naperville IL), a reTerminal E1002 (Spectra 6 colour, office, Chicago IL) and a second E1001 on the owner's desk. Daily AI illustration of a historical event, weather dashboards, a daily city skyline, steel/trade headlines, Worker-drawn desk pages, and *The Long Drift*, a pre-made graphic-novel series.

@@ -22,6 +22,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { runAgent } from "./agent-run.mjs";
 
 const require = createRequire(import.meta.url);
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -77,14 +78,14 @@ function series(args) {
   return { ok: r.status === 0, out: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
 }
 
-/** An unattended Claude run with a fixed instruction file and tight tool rules. */
-function claude(instructionsFile, vars, allowedTools, logName) {
+/**
+ * An unattended agent run (scripts/agent-run.mjs, DECISIONS #98) with a fixed instruction file and
+ * tight rights: `claudeTools` are Claude's exact tool rules, `write` the only places it may write.
+ */
+function agent(instructionsFile, vars, { claudeTools, write }, logName) {
   let prompt = fs.readFileSync(path.join(REPO, "scripts", "series-agent", instructionsFile), "utf8");
   for (const [k, v] of Object.entries(vars)) prompt = prompt.replaceAll(`{{${k}}}`, v);
-  const r = spawnSync("claude", [
-    "-p", prompt, "--model", "opus", "--permission-mode", "dontAsk",
-    "--allowedTools", allowedTools.join(" "), "--add-dir", MAILBOX, "--add-dir", WORK,
-  ], { cwd: REPO, encoding: "utf8", env: process.env, timeout: 90 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
+  const r = runAgent({ prompt, cwd: REPO, read: [MAILBOX, WORK], write, claudeTools, timeout: 90 * 60 * 1000 });
   fs.writeFileSync(path.join(LOGS, `${stamp().file}-${logName}.log`), `${r.stdout ?? ""}\n---\n${r.stderr ?? ""}`);
   return r.status === 0;
 }
@@ -148,7 +149,7 @@ function handle(file, m) {
       return true;
     default: {
       const read = ["Read", "Glob", "Grep"];
-      return claude("message.md", { MESSAGE: path.join(INBOX, file), MAILBOX, OUTBOX, STAMP: stamp().file }, [...read, ...writeTo(OUTBOX)], `message-${file.replace(/\.md$/, "")}`);
+      return agent("message.md", { MESSAGE: path.join(INBOX, file), MAILBOX, OUTBOX, STAMP: stamp().file }, { claudeTools: [...read, ...writeTo(OUTBOX)], write: [OUTBOX] }, `message-${file.replace(/\.md$/, "")}`);
     }
   }
 }
@@ -171,10 +172,10 @@ function review(season, chapter, revision, exportDir, zip) {
   const packageSha = crypto.createHash("sha256").update(fs.readFileSync(zip)).digest("hex");
   const verdictFile = path.join(dir, `${base}.md`);
   fs.rmSync(verdictFile, { force: true });
-  claude("review.md", {
+  agent("review.md", {
     SEASON: String(season), CHAPTER: String(chapter), REVISION: revision, EXPORT: exportDir,
     PACKAGE: unpacked, PACKAGE_SHA: packageSha, VERDICT: verdictFile, MAILBOX,
-  }, ["Read", "Glob", "Grep", `Edit(/${verdictFile})`], `review-${base}`);
+  }, { claudeTools: ["Read", "Glob", "Grep", `Edit(/${verdictFile})`], write: [dir] }, `review-${base}`);
   const first = fs.existsSync(verdictFile) ? fs.readFileSync(verdictFile, "utf8").split("\n")[0].trim() : "";
   const verdict = /^(PASS|REVISE)$/.test(first) ? first : null;
   if (!verdict) return null;
@@ -442,10 +443,11 @@ function cmdWeekly() {
   const pkg = path.join(WORK, `s${pad(due.season)}`);
   const out = path.join(WORK, `out-s${pad(due.season)}-c${due.chapter}`);
   log(`weekly: writing season ${due.season} chapter ${due.chapter} (airs ${due.airs})`);
-  const ok = claude("chapter.md", { SEASON: String(due.season), CHAPTER: String(due.chapter), AIRS: due.airs, PACKAGE: pkg, OUT: out, REPO }, [
-    "Read", "Glob", "Grep", ...writeTo(WORK), `Bash(node:*)`, `Bash(npm --prefix ${REPO} run series -- build:*)`,
-    `Bash(python3 -E -P ${REPO}/scripts/series-paint/:*)`,
-  ], `chapter-s${due.season}-c${due.chapter}`);
+  const ok = agent("chapter.md", { SEASON: String(due.season), CHAPTER: String(due.chapter), AIRS: due.airs, PACKAGE: pkg, OUT: out, REPO }, {
+    claudeTools: ["Read", "Glob", "Grep", ...writeTo(WORK), `Bash(node:*)`, `Bash(npm --prefix ${REPO} run series -- build:*)`,
+      `Bash(python3 -E -P ${REPO}/scripts/series-paint/:*)`],
+    write: [WORK],
+  }, `chapter-s${due.season}-c${due.chapter}`);
   // Story must never reach the public repo: any change there stops the weekly run cold.
   const dirty = execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" }).trim();
   if (dirty) {

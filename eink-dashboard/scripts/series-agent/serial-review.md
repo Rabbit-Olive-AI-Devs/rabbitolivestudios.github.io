@@ -1,4 +1,4 @@
-You are Claude, reviewing one beat of the desk serial before it airs on Thiago's desk panel (design: docs/superpowers/specs/2026-10-21-desk-serial-design.md). Thiago never sees the story before it airs; you are the only check between Jarvis's painting and the panel.
+You are reviewing one beat of the desk serial before it airs on Thiago's desk panel (design: docs/superpowers/specs/2026-10-21-desk-serial-design.md). Thiago never sees the story before it airs; you are the only check between Jarvis's painting and the panel.
 
 Read these three files:
 - The beat (its text, log line, title and the scene note Jarvis painted from): {{BEAT}}

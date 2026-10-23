@@ -85,11 +85,12 @@ export function dueClaudeChapter(schedule: Schedule, today: string): { season: n
 
 /** The decided calendar (DECISIONS #71): who writes each season and the Monday it premieres. */
 export const CALENDAR: readonly { number: number; writer: string; premiere: string }[] = [
-  { number: 0, writer: "Claude", premiere: "2026-10-26" },
+  // Chapters 1-3 are Claude's and stay so; Jarvis writes the rest, and Season 4 (owner, 2026-10-23, DECISIONS #98).
+  { number: 0, writer: "Jarvis", premiere: "2026-10-26" },
   { number: 1, writer: "Jarvis", premiere: "2027-01-04" }, // in place of Zoe (owner, 2026-10-15)
   { number: 2, writer: "Volt", premiere: "2027-04-05" },
   { number: 3, writer: "Pepper", premiere: "2027-07-05" },
-  { number: 4, writer: "Claude", premiere: "2027-10-04" },
+  { number: 4, writer: "Jarvis", premiere: "2027-10-04" },
 ];
 
 /** The showrunner, who approves every chapter (DECISIONS #71). */
@@ -124,7 +125,7 @@ export function heartbeat(schedule: Schedule, today: string): string {
   const onAir: string[] = [], due: string[] = [], late: string[] = [], soon: string[] = [];
   for (const cal of CALENDAR) {
     const s = schedule.seasons.find((x) => x.number === cal.number);
-    const who = `${label(cal.number)} (${cal.writer}${cal.writer === "Claude" ? ", written by the weekly run" : ""})`;
+    const who = `${label(cal.number)} (${cal.writer})`;
     const chapters = s?.chapters ?? plannedChapters(cal.number);
     for (let c = 1; c <= chapters; c++) {
       const airs = shiftDateStr(cal.premiere, (c - 1) * 7);

@@ -10,12 +10,13 @@
  * mailbox's open notes or the logs: everything printed or logged here is counts, ids and reasons.
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { runAgent } from "./agent-run.mjs";
 import { buildBeat, compile, put } from "./serial-build.mjs";
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -177,8 +178,8 @@ function review(beat, pagePng, picture) {
   fs.writeFileSync(path.join(dir, "beat.json"), JSON.stringify(beat, null, 2));
   let prompt = fs.readFileSync(path.join(REPO, "scripts", "series-agent", "serial-review.md"), "utf8");
   for (const [k, v] of Object.entries({ BEAT: path.join(dir, "beat.json"), PAGE: pagePng, PICTURE: picture })) prompt = prompt.replaceAll(`{{${k}}}`, v);
-  const r = spawnSync("claude", ["-p", prompt, "--model", "opus", "--permission-mode", "dontAsk", "--allowedTools", "Read", "--add-dir", dir, "--add-dir", path.dirname(picture), "--add-dir", path.dirname(pagePng)],
-    { cwd: dir, encoding: "utf8", timeout: 10 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 });
+  const r = runAgent({ prompt, cwd: dir, read: [dir, path.dirname(picture), path.dirname(pagePng)], images: [picture, pagePng],
+    claudeTools: ["Read"], timeout: 10 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 });
   fs.rmSync(dir, { recursive: true, force: true });
   const m = /VERDICT:\s*(PASS|REVISE)\s*:?\s*(.*)/.exec(r.stdout ?? "");
   // stdout may hold story, so only the exit status and stderr's tail reach the log.
@@ -348,11 +349,10 @@ function cmdWeekly() {
   log(`weekly: writing ${missing.length} days (${missing[0]}..${missing.at(-1)})`);
   let prompt = fs.readFileSync(path.join(REPO, "scripts", "series-agent", "serial-writer.md"), "utf8");
   for (const [k, v] of Object.entries({ FROM: missing[0], THROUGH: missing.at(-1), TODAY: today, WORK, SPOILERS, OUTBOX, INBOX, MAILBOX, REPO })) prompt = prompt.replaceAll(`{{${k}}}`, v);
-  const r = spawnSync("claude", ["-p", prompt, "--model", "opus", "--permission-mode", "dontAsk",
-    "--allowedTools", ["Read", "Glob", "Grep", "WebSearch", "WebFetch", `Write(/${WORK}/**)`, `Edit(/${WORK}/**)`, `Write(/${SPOILERS}/**)`, `Write(/${OUTBOX}/**)`,
-      `Bash(node ${REPO}/scripts/serial-mailbox.mjs check:*)`, `Bash(mkdir:*)`].join(" "),
-    "--add-dir", WORK, "--add-dir", SPOILERS, "--add-dir", MAILBOX],
-  { cwd: REPO, encoding: "utf8", timeout: 90 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
+  const r = runAgent({ prompt, cwd: REPO, read: [MAILBOX], write: [WORK, SPOILERS, OUTBOX], web: true,
+    claudeTools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch", `Write(/${WORK}/**)`, `Edit(/${WORK}/**)`, `Write(/${SPOILERS}/**)`, `Write(/${OUTBOX}/**)`,
+      `Bash(node ${REPO}/scripts/serial-mailbox.mjs check:*)`, `Bash(mkdir:*)`],
+    timeout: 90 * 60 * 1000 });
   fs.writeFileSync(path.join(LOGS, `${chicago().stamp}-serial-weekly.log`), `${r.stdout ?? ""}\n---\n${r.stderr ?? ""}`);
   const dirty = execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" }).trim();
   if (dirty) {
