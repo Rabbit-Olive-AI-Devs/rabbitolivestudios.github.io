@@ -192,17 +192,130 @@ test("series problems are part of the message and the fingerprint", () => {
   assert.match(alertFingerprint(state), /^series:/);
 });
 
-test("a quiet Mac mini and a night Jarvis missed are alerted (DECISIONS #90)", () => {
-  const { quietMachines, QUIET_AFTER_MS, describeProblems, alertFingerprint } = fromBuild("src/alert.js");
-  const now = 1_800_000_000_000;
-  assert.deepEqual(quietMachines({ mini: now - 30 * 60_000, macbook: now - 10 * QUIET_AFTER_MS }, now), []);
-  assert.deepEqual(quietMachines({ mini: now - QUIET_AFTER_MS - 1 }, now), ["mini"]);
-  assert.deepEqual(quietMachines({}, now), ["mini"]);
-  const state = { dateStr: "2026-10-18", missingImages: [], aiBlocked: false, quietMachines: ["mini"], jarvisMissed: ["moment"] };
+test("the post-migration alert watches only the existing macbook TARS identity", () => {
+  const { WATCHED_MACHINES, quietMachines, QUIET_AFTER_MS } = fromBuild("src/alert.js");
+  assert.deepEqual(WATCHED_MACHINES, ["macbook"]);
+  assert.deepEqual(quietMachines({ macbook: NOW, mini: NOW - 10 * QUIET_AFTER_MS }, NOW), []);
+  assert.deepEqual(quietMachines({ macbook: NOW }, NOW), []);
+});
+
+test("a fresh mini report cannot hide a stale or missing MacBook report", () => {
+  const { quietMachines, QUIET_AFTER_MS } = fromBuild("src/alert.js");
+  assert.deepEqual(quietMachines({ mini: NOW, macbook: NOW - QUIET_AFTER_MS - 1 }, NOW), ["macbook"]);
+  assert.deepEqual(quietMachines({ mini: NOW }, NOW), ["macbook"]);
+  assert.deepEqual(quietMachines({}, NOW), ["macbook"]);
+});
+
+test("MacBook quiet detection keeps the strict over-two-hours boundary", () => {
+  const { quietMachines, QUIET_AFTER_MS } = fromBuild("src/alert.js");
+  assert.equal(QUIET_AFTER_MS, 2 * 60 * 60 * 1000);
+  assert.deepEqual(quietMachines({ macbook: NOW - QUIET_AFTER_MS + 1 }, NOW), []);
+  assert.deepEqual(quietMachines({ macbook: NOW - QUIET_AFTER_MS }, NOW), []);
+  assert.deepEqual(quietMachines({ macbook: NOW - QUIET_AFTER_MS - 1 }, NOW), ["macbook"]);
+});
+
+test("a quiet MacBook and a night Jarvis missed are alerted (DECISIONS #90, #99)", () => {
+  const state = { dateStr: "2026-10-18", missingImages: [], aiBlocked: false, quietMachines: ["macbook"], jarvisMissed: ["moment"] };
   const problems = describeProblems(state);
-  assert.match(problems[0], /Mac mini has not reported/);
+  assert.match(problems[0], /^The MacBook has not reported for over 2 hours/);
+  assert.match(problems[0], /FileVault/);
   assert.match(problems[1], /Jarvis did not deliver 2026-10-18's moment; Workers AI drew it/);
-  assert.equal(alertFingerprint(state), "quiet:mini|jarvis:moment");
-  assert.equal(alertFingerprint({ ...state, dateStr: "2026-10-19" }), "quiet:mini|jarvis:moment");
+  assert.equal(alertFingerprint(state), "quiet:macbook|jarvis:moment");
+  assert.equal(alertFingerprint({ ...state, dateStr: "2026-10-19" }), "quiet:macbook|jarvis:moment");
   assert.equal(alertFingerprint({ dateStr: "2026-10-18", missingImages: [], aiBlocked: false, quietMachines: [], jarvisMissed: [] }), "ok");
+  const email = buildAlertEmail("problem", problems, { dateStr: state.dateStr, baseUrl: "https://example.workers.dev" });
+  assert.match(email.subject, /MacBook/);
+  assert.match(email.text, /MacBook/);
+  assert.doesNotMatch(email.subject + email.text, /Mac mini|The macbook/);
+});
+
+test("machine naming preserves the mini name and unknown-id fallback", () => {
+  const state = { dateStr: "2026-10-18", missingImages: [], aiBlocked: false, quietMachines: ["mini", "other-host"] };
+  const problems = describeProblems(state);
+  assert.match(problems[0], /^The Mac mini has not reported/);
+  assert.match(problems[1], /^The other-host has not reported/);
+});
+
+// In-memory bindings only: exercise real orchestration without a Worker or network.
+function alertFixture() {
+  const { parseReport, mergeReport, emptyState } = fromBuild("src/tars.js");
+  const report = (id, name) => parseReport({ machine: { id, name, diskTotalGb: 100, diskFreeGb: 50 } });
+  const machines = mergeReport(mergeReport(emptyState(), report("mini", "Mac mini"), NOW), report("macbook", "MacBook"), NOW - 1);
+  const values = new Map([["tars:v1:state", JSON.stringify(machines)]]);
+  const sent = [], writes = [], events = [];
+  let failDelivery = false;
+  const env = {
+    CACHE: {
+      async get(key) { return values.get(key) ?? null; },
+      async put(key, value, options) {
+        events.push("record");
+        writes.push({ key, value: JSON.parse(value), options });
+        values.set(key, value);
+      },
+    },
+    SERIES: { async get() { return null; } },
+    SEND_EMAIL: { async send(message) {
+      events.push("send");
+      if (failDelivery) throw new Error("offline test delivery failure");
+      sent.push(message);
+    } },
+    ALERT_FROM: "alert@example.invalid",
+    ALERT_TO: "owner@example.invalid",
+  };
+  const opts = { dateStr: "2026-08-17", chicagoHour: 7, imageKeys: {}, baseUrl: "https://example.invalid", now: NOW };
+  return { env, opts, values, sent, writes, events, failDelivery: () => { failDelivery = true; } };
+}
+
+test("MacBook orchestration preserves daily repeat and one recovery notice", async (t) => {
+  const { runAlertCheck, QUIET_AFTER_MS } = fromBuild("src/alert.js");
+  t.mock.method(console, "log", () => {});
+  const f = alertFixture();
+  // mini stays fresh while macbook crosses the threshold.
+  f.opts.now = NOW + QUIET_AFTER_MS;
+  const first = await runAlertCheck(f.env, f.opts);
+  assert.equal(first.fingerprint, "quiet:macbook");
+  assert.equal(first.sent, true);
+  assert.match(f.sent[0].subject, /MacBook/);
+  assert.deepEqual(f.events, ["send", "record"]);
+  assert.deepEqual(f.writes[0], { key: "alert:v1:last", value: { fingerprint: "quiet:macbook", sentAt: f.opts.now }, options: { expirationTtl: 604800 } });
+  const firstAt = f.opts.now;
+  const refreshMini = () => {
+    const state = JSON.parse(f.values.get("tars:v1:state"));
+    state.machines.mini.receivedAt = f.opts.now;
+    f.values.set("tars:v1:state", JSON.stringify(state));
+  };
+  f.opts.now = firstAt + ALERT_REPEAT_MS - 1;
+  refreshMini();
+  assert.equal((await runAlertCheck(f.env, f.opts)).sent, false);
+  f.opts.now = firstAt + ALERT_REPEAT_MS;
+  refreshMini();
+  assert.equal((await runAlertCheck(f.env, f.opts)).sent, true);
+  assert.equal(f.sent.length, 2);
+  const state = JSON.parse(f.values.get("tars:v1:state"));
+  state.machines.macbook.receivedAt = f.opts.now;
+  delete state.machines.mini;
+  f.values.set("tars:v1:state", JSON.stringify(state));
+  const recovered = await runAlertCheck(f.env, f.opts);
+  assert.equal(recovered.fingerprint, OK_FINGERPRINT);
+  assert.equal(recovered.sent, true);
+  assert.match(f.sent[2].subject, /Recovered/);
+  assert.equal((await runAlertCheck(f.env, f.opts)).sent, false);
+  assert.equal(f.sent.length, 3);
+});
+
+test("a failed MacBook email is not recorded and retries on the next check", async (t) => {
+  const { runAlertCheck, QUIET_AFTER_MS } = fromBuild("src/alert.js");
+  t.mock.method(console, "error", () => {});
+  t.mock.method(console, "log", () => {});
+  const f = alertFixture();
+  f.opts.now = NOW + QUIET_AFTER_MS;
+  f.failDelivery();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await runAlertCheck(f.env, f.opts);
+    assert.equal(result.sent, false);
+    assert.equal(result.reason, "offline test delivery failure");
+  }
+  assert.deepEqual(f.events, ["send", "send"]);
+  assert.deepEqual(f.writes, []);
+  assert.equal(f.values.has("alert:v1:last"), false);
 });

@@ -43,7 +43,8 @@ const FACES = {
   plex13s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 13, chars: TEXT },
   plex15m: { ...PLEX, metrics: "IBMPlexMono-Medium.ttf", weight: 500, size: 15, chars: TEXT },
   plex15s: { ...PLEX, metrics: "IBMPlexMono-SemiBold.ttf", weight: 600, size: 15, chars: TEXT },
-  plex28r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 28, chars: BIG },
+  // Series titles preserve authored ASCII apostrophes; other large HUD faces stay unchanged.
+  plex28r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 28, chars: BIG + "'" },
   plex36r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 36, chars: BIG },
   plex50r: { ...PLEX, metrics: "IBMPlexMono-Regular.ttf", weight: 400, size: 50, chars: BIG },
   af20: { ...AF, metrics: AF.files[0], weight: 400, size: 20, chars: UPPER },

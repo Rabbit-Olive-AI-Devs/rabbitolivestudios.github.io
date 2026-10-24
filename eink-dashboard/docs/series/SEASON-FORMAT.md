@@ -75,6 +75,7 @@ Think of a chapter as one episode: a mission with a setup on Monday, trouble mid
 | `season.premiere` | A Monday, `YYYY-MM-DD` |
 | `season.writer` | The writer **agent's** name, printed in the credit (owner's decision, 2026-10-14): `Claude`, `Jarvis` (Season 1, OpenAI provider, in place of Zoe since 2026-10-15), `Volt` (Grok), `Pepper` (Muse), or two names joined by ` & ` |
 | `chapters` | 13 (10 for the Prologue), numbered from 1 in order. A package may hold only the chapters delivered so far (section 5) |
+| `chapters[].writer` | Optional writer credit for that chapter's live and replay scene pages. Omit to inherit `season.writer`. A supplied value must be a nonblank printable-ASCII string and passes the existing banned-name checks. Teasers have no writer credit and remain unchanged; season cards and schedule metadata keep the season writer. Keep the original season writer when a later chapter has a different author. Existing chapters and their credits are unchanged. |
 | `scenes` | Exactly 25 per chapter, numbered 1–25 in order |
 | `template` | `wide`, `split`, `strip`, `splash` or `panel-text` (section 3) |
 | `caption` | The location or time box, one short line. Optional |

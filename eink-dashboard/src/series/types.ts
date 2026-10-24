@@ -36,6 +36,8 @@ export interface Scene {
 export interface Chapter {
   number: number;
   title: string;
+  /** Optional chapter-only credit; omitted chapters inherit the season writer. */
+  writer?: string;
   teaser: string;
   scenes: Scene[];
 }

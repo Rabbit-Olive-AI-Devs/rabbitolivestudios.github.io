@@ -182,10 +182,19 @@ function review(beat, pagePng, picture) {
   const r = runAgent({ prompt, cwd: dir, read: [dir, path.dirname(picture), path.dirname(pagePng)], images: [picture, pagePng],
     claudeTools: ["Read"], timeout: 10 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 });
   fs.rmSync(dir, { recursive: true, force: true });
-  const m = /VERDICT:\s*(PASS|REVISE)\s*:?\s*(.*)/.exec(r.stdout ?? "");
+  // Exit0 and PASS alone can survive an incomplete review. Require the exact beat
+  // file's digest, which is not supplied in the prompt, plus one final verdict.
+  const digest = crypto.createHash("sha256").update(JSON.stringify(beat, null, 2)).digest("hex");
+  const lines = String(r.stdout ?? "").trim().split(/\r?\n/);
+  const hashes = lines.filter((line) => line.startsWith("BEAT-SHA256:"));
+  const verdicts = lines.filter((line) => line.startsWith("VERDICT:"));
+  const complete = r.status === 0 && !r.signal && !r.error
+    && hashes.length === 1 && hashes[0] === `BEAT-SHA256: ${digest}` && verdicts.length === 1;
+  const candidate = complete ? /^VERDICT: (PASS|REVISE)(?:: (.+))?$/.exec(lines.at(-1)) : null;
+  const m = candidate && (candidate[1] === "PASS" ? !candidate[2] : Boolean(candidate[2]?.trim())) ? candidate : null;
   // stdout may hold story, so only the exit status and stderr's tail reach the log.
   if (!m) log(`review of ${beat.id}: no verdict (exit ${r.status}${r.signal ? `, ${r.signal}` : ""}; ${String(r.stderr ?? "").replace(/\s+/g, " ").slice(-200) || "no stderr"})`);
-  return m ? { verdict: m[1], reason: m[2].trim() } : null;
+  return m ? { verdict: m[1], reason: (m[2] ?? "").trim() } : null;
 }
 
 function reply(slug, body) {
@@ -360,9 +369,45 @@ function cmdWeekly() {
     fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's writer left changes in the repo. Please open a session before anything is committed.\n`);
     log("weekly: repo dirty after the writer ran");
   }
-  const still = missing.filter((d) => !dayFiles()[d]);
+  // Native exit zero (or a surviving final answer) is not proof that the writer delivered.
+  // Reuse the check command's real fit/glyph/no-repeat checks against the finished local set.
+  const written = dayFiles(), settings = settingsLibrary(), engine = engineLines();
+  let lib;
+  const still = missing.filter((d) => {
+    if (!written[d]) return true;
+    try {
+      const day = JSON.parse(fs.readFileSync(written[d], "utf8"));
+      if (day.date !== d || !Array.isArray(day.beats) || day.beats.length < 4 || day.beats.length > 6) return true;
+      lib ??= compile();
+      const problems = checkDay(lib, day, linesOfOtherDays(d), engine, Object.keys(settings).length ? settings : null);
+      if (problems.length) log(`weekly: ${d} failed ${problems.length} local check(s)`);
+      return problems.length > 0;
+    } catch {
+      log(`weekly: ${d} could not be checked`);
+      return true;
+    }
+  });
   log(`weekly: ${missing.length - still.length} of ${missing.length} days written`);
   if (still.length) fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's writer could not write ${still.length} day(s) from ${still[0]}. Please open a session.\n`);
+  const nonemptyFile = (file) => {
+    try {
+      if (!fs.lstatSync(file).isFile()) return "";
+      const body = fs.readFileSync(file, "utf8");
+      return body.trim() ? body : "";
+    } catch { return ""; }
+  };
+  const unbriefed = missing.filter((d) => !nonemptyFile(path.join(SPOILERS, d, "brief.md")));
+  // The filename and exact range header come from serial-writer.md; never invent a receipt.
+  const noteName = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-\\d{4}-serial-brief-${missing[0]}-to-${missing.at(-1)}\\.md$`);
+  const notes = fs.readdirSync(OUTBOX).filter((name) => noteName.test(name)).filter((name) => {
+    const [header, ...body] = nonemptyFile(path.join(OUTBOX, name)).split(/\r?\n/);
+    return header === `SERIAL BRIEF date=${missing[0]}..${missing.at(-1)}` && body.join("\n").trim();
+  });
+  const nativeOK = r.status === 0 && !r.signal && !r.error;
+  if (!nativeOK || still.length || unbriefed.length || notes.length !== 1) {
+    fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's weekly writer did not finish (native ${nativeOK ? "OK" : "failed"}, ${still.length} invalid/missing day(s), ${unbriefed.length} missing brief(s), ${notes.length} valid briefing note(s)). Please open a session.\n`);
+    throw new Error(`weekly incomplete: native exit ${r.status}${r.signal ? `, ${r.signal}` : ""}; ${still.length} invalid/missing day(s), ${unbriefed.length} missing brief(s), ${notes.length} valid briefing note(s)`);
+  }
 }
 
 function cmdCheck() {

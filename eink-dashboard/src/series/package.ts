@@ -60,6 +60,13 @@ export function validatePackage(
     if (!ch.teaser) problems.push(`${C}: missing teaser`);
     text(`${C} title`, ch.title);
     text(`${C} teaser`, ch.teaser);
+    if (ch.writer !== undefined) {
+      if (typeof ch.writer !== "string" || !ch.writer.trim()) {
+        problems.push(`${C} writer: must be a nonblank string`);
+      } else {
+        text(`${C} writer`, ch.writer);
+      }
+    }
     if (!Array.isArray(ch.scenes) || ch.scenes.length !== SCENES_PER_CHAPTER) {
       problems.push(`${C}: ${ch.scenes?.length ?? 0} scenes, needs ${SCENES_PER_CHAPTER}`);
     }

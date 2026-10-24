@@ -35,6 +35,8 @@ export async function buildChapter(
   const problems: string[] = [];
   const ch = pkg.chapters[chapterNo - 1];
   if (!ch) return { files, problems: [`chapter ${chapterNo}: not in the package`] };
+  // Override only the visible scene credit; preserve season metadata and cards.
+  const sceneInfo = ch.writer === undefined ? pkg.season : { ...pkg.season, writer: ch.writer };
   const season = pkg.season.number;
   let prevPanels: PanelArt[] = [];
 
@@ -88,7 +90,7 @@ export async function buildChapter(
       panels.push({ image, anchors, clear });
     });
     if (!ok) continue;
-    const { pages, problems: p } = await renderScene(pkg.season, ch, scene, panels);
+    const { pages, problems: p } = await renderScene(sceneInfo, ch, scene, panels);
     problems.push(...p);
     if (pages.s) files.set(sceneKey(season, chapterNo, scene.number, false), toDocument(pages.s));
     if (pages.r) files.set(sceneKey(season, chapterNo, scene.number, true), toDocument(pages.r));
@@ -96,6 +98,7 @@ export async function buildChapter(
   }
 
   const finale = chapterNo === plannedChapters(season);
+  // The existing teaser has no writer credit. Keep its layout and pixels unchanged.
   const teaser = await renderTeaser(pkg.season, ch, finale);
   files.set(teaserKey(season, chapterNo), toDocument(teaser));
   return { files, problems };

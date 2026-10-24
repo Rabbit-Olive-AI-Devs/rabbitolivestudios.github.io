@@ -49,8 +49,8 @@ export interface AlertState {
   jarvisMissed?: string[];
 }
 
-/** Machines that run the e-ink jobs and must keep reporting (the Mac mini runs the mailbox). */
-export const WATCHED_MACHINES: readonly string[] = ["mini"];
+/** Machines that run the e-ink jobs and must keep reporting (the MacBook after the #99 migration). */
+export const WATCHED_MACHINES: readonly string[] = ["macbook"];
 /** Reports come every 30 minutes; this long without one means the machine is not running its jobs. */
 export const QUIET_AFTER_MS = 2 * 60 * 60 * 1000;
 
@@ -86,7 +86,7 @@ export function describeProblems(state: AlertState): string[] {
   problems.push(...(state.series ?? []));
   for (const id of state.quietMachines ?? []) {
     problems.push(
-      `The ${id === "mini" ? "Mac mini" : id} has not reported for over 2 hours, so its jobs are not running ` +
+      `The ${id === "mini" ? "Mac mini" : id === "macbook" ? "MacBook" : id} has not reported for over 2 hours, so its jobs are not running ` +
       `(mailbox watcher, Jarvis's briefs, TARS). After a restart it waits for its password (FileVault): log in on it.`,
     );
   }

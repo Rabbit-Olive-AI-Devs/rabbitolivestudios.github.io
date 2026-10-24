@@ -24,6 +24,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { agentConfig, runAgent } from "./agent-run.mjs";
 import { einkPaths } from "./eink-paths.mjs";
+import { familyPhoto as selectFamilyPhoto } from "./family-selection.mjs";
 
 const require = createRequire(import.meta.url);
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -151,22 +152,42 @@ function handle(file, m) {
       return true;
     default: {
       const read = ["Read", "Glob", "Grep"];
-      return agent("message.md", { MESSAGE: path.join(INBOX, file), MAILBOX, OUTBOX, STAMP: stamp().file }, { claudeTools: [...read, ...writeTo(OUTBOX)], write: [OUTBOX] }, `message-${file.replace(/\.md$/, "")}`);
+      const before = new Set(fs.readdirSync(OUTBOX));
+      const when = stamp().file;
+      const ok = agent("message.md", { MESSAGE: path.join(INBOX, file), MAILBOX, OUTBOX, STAMP: when }, { claudeTools: [...read, ...writeTo(OUTBOX)], write: [OUTBOX] }, `message-${file.replace(/\.md$/, "")}`);
+      if (!ok) return false;
+      // Exit zero alone is not delivery. Require a new, regular reply file bound to this
+      // exact source name; an old reply (even overwritten by this run) cannot clear it.
+      const prefix = `${when}-reply-`;
+      const replies = fs.readdirSync(OUTBOX).filter((name) => {
+        if (before.has(name) || !name.startsWith(prefix) || !name.endsWith(".md")) return false;
+        const target = path.join(OUTBOX, name);
+        if (!fs.lstatSync(target).isFile()) return false;
+        const [first, ...body] = fs.readFileSync(target, "utf8").split(/\r?\n/);
+        return first === `FYI: reply to ${file}` && body.join("\n").trim().length > 0;
+      });
+      if (replies.length !== 1) log(`${file}: agent completed without exactly one new source-bound reply`);
+      return replies.length === 1;
     }
   }
 }
 
 /**
- * The independent review of a chapter the showrunner wrote himself (DECISIONS #79). An unattended
- * run reads every exported page and the package, and writes PASS or REVISE; or, when agent.json
- * names `"seriesReviewer": "volt"`, Volt (another company's model, #99) gets the same material in
- * his writer-exchange lane and his verdict is collected later (`collectVoltReviews`). The record
+ * The independent review of a chapter the showrunner wrote himself (DECISIONS #79).
+ * Only an explicit `"seriesReviewer": "volt"` dispatches the material to Volt (#99);
+ * missing or unsupported selectors leave the review unfinished, never self-reviewed.
+ * His verdict is collected later (`collectVoltReviews`). The record
  * that `approve` trusts stays in ~/series-work/reviews, where Jarvis cannot write; a copy of the
  * verdict goes next to the pages in his proof folder. Returns the verdict, "SENT TO VOLT" or null.
  */
 function review(season, chapter, revision, exportDir, zip) {
   const pad = (n) => String(n).padStart(2, "0");
   const base = `s${pad(season)}-c${pad(chapter)}-${revision}`;
+  // Reject the selector before touching existing exact-revision evidence or packages.
+  if (agentConfig().seriesReviewer !== "volt") {
+    log(`review ${base}: explicit seriesReviewer=volt required; review not started`);
+    return null;
+  }
   const dir = path.join(WORK, "reviews");
   fs.mkdirSync(dir, { recursive: true });
   const unpacked = path.join(WORK, "review-packages", base);
@@ -176,12 +197,7 @@ function review(season, chapter, revision, exportDir, zip) {
   const packageSha = crypto.createHash("sha256").update(fs.readFileSync(zip)).digest("hex");
   const verdictFile = path.join(dir, `${base}.md`);
   fs.rmSync(verdictFile, { force: true });
-  if (agentConfig().seriesReviewer === "volt") return sendToVolt({ season, chapter, revision, base, exportDir, unpacked, packageSha });
-  agent("review.md", {
-    SEASON: String(season), CHAPTER: String(chapter), REVISION: revision, EXPORT: exportDir,
-    PACKAGE: unpacked, PACKAGE_SHA: packageSha, VERDICT: verdictFile, MAILBOX,
-  }, { claudeTools: ["Read", "Glob", "Grep", `Edit(/${verdictFile})`], write: [dir] }, `review-${base}`);
-  return recordVerdict({ season, chapter, revision, base, exportDir, packageSha }, verdictFile, "agent");
+  return sendToVolt({ season, chapter, revision, base, exportDir, unpacked, packageSha });
 }
 
 /** Keeps a verdict file that starts PASS or REVISE as the record `approve` checks; null otherwise. */
@@ -330,10 +346,8 @@ function wrangler(args) {
 const ART_BUCKET = "eink-birthday-photos";
 const ART_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
 const ART_MAX_BYTES = 15 * 1024 * 1024;
-// Family Memory (#92): the photo library, the scratch copy of its database (on the external drive:
-// the Mac's own disk is short of space), the PhotoKit downloader and the shown log.
-const PHOTOS_LIB = process.env.PHOTOS_LIBRARY ?? PATHS.photosLibrary;
-const FAMILY_TMP = process.env.FAMILY_TMP ?? PATHS.familyTmp;
+// Family Memory (#92): only request-bound selected output; the existing app owns protected reads.
+const FAMILY_TMP = PATHS.familyTmp;
 const FAMILY_FETCH = path.join(HOME, "Applications", "EinkFamilyFetch.app");   // scripts/build-family-fetch.sh
 const FAMILY_SHOWN = path.join(HOME, ".config", "eink", "family-shown.json");
 
@@ -354,56 +368,15 @@ function looksLikeImage(buf, ext) {
 
 /**
  * Family Memory (#92): pick the date's family photo and put it in R2 for the brief and the warm,
- * once per date. Works on a scratch copy of the Photos database, downloads only the chosen photo,
- * keeps nothing on the Mac but the shown log (UUIDs and dates).
+ * once per date. The existing PhotoKit app selects privately and returns only the winner.
+ * Node records the shown log only after both uploads succeed.
  */
 function familyPhoto(date) {
-  const shown = fs.existsSync(FAMILY_SHOWN) ? JSON.parse(fs.readFileSync(FAMILY_SHOWN, "utf8")) : [];
-  if (shown.some((e) => e.date === date)) return;
-  if (!fs.existsSync(path.join(PHOTOS_LIB, "database", "Photos.sqlite")) || !fs.existsSync(FAMILY_FETCH)) {
-    log(`family ${date}: Photos library or family-fetch missing; skipped`);
-    return;
-  }
-  fs.rmSync(FAMILY_TMP, { recursive: true, force: true });
-  fs.mkdirSync(FAMILY_TMP, { recursive: true });
-  try {
-    for (const f of fs.readdirSync(path.join(PHOTOS_LIB, "database")).filter((f) => /^Photos\.sqlite(-wal|-shm)?$/.test(f))) {
-      fs.copyFileSync(path.join(PHOTOS_LIB, "database", f), path.join(FAMILY_TMP, f));
-    }
-    const pick = JSON.parse(execFileSync("python3", ["-I", path.join(REPO, "scripts", "family-pick.py"),
-      "--db", path.join(FAMILY_TMP, "Photos.sqlite"), "--date", date,
-      "--people", path.join(REPO, "photos", "portraits", "people.json"), "--shown", FAMILY_SHOWN], { encoding: "utf8" }));
-    const jpg = path.join(FAMILY_TMP, "photo.jpg");
-    for (const c of pick.candidates) {
-      // Launched as an app (`open -W`) so macOS's Photos permission applies; it reports in <jpg>.txt.
-      fs.rmSync(`${jpg}.txt`, { force: true });
-      spawnSync("open", ["-W", "-n", "-g", FAMILY_FETCH, "--args", c.localIdentifier, jpg], { encoding: "utf8", timeout: 180_000 });
-      const report = fs.existsSync(`${jpg}.txt`) ? fs.readFileSync(`${jpg}.txt`, "utf8").trim() : "no report";
-      const width = /^\d+x\d+$/.test(report) ? Number(report.split("x")[0]) : 0;
-      if (width < 1024) {
-        log(`family ${date}: ${c.uuid} not usable (${report.slice(0, 120)})`);
-        if (report.startsWith("no Photos access")) break;   // every candidate would fail the same way
-        continue;
-      }
-      const meta = path.join(FAMILY_TMP, "photo.json");
-      fs.writeFileSync(meta, JSON.stringify({ taken: c.taken }));
-      const put = (file, key, type) => wrangler(["r2", "object", "put", `${ART_BUCKET}/family/${date}/${key}`, "--file", file, "--content-type", type, "--remote"]);
-      if (put(jpg, "photo.jpg", "image/jpeg").status !== 0 || put(meta, "photo.json", "application/json").status !== 0) {
-        log(`family ${date}: upload failed`);
-        return;
-      }
-      shown.push({ uuid: c.uuid, date, round: pick.round });
-      fs.mkdirSync(path.dirname(FAMILY_SHOWN), { recursive: true });
-      fs.writeFileSync(FAMILY_SHOWN, JSON.stringify(shown, null, 1) + "\n");
-      log(`family ${date}: photo from ${c.taken} (${c.source}) put up`);
-      return;
-    }
-    log(`family ${date}: no usable photo among ${pick.candidates.length} candidates`);
-  } catch (err) {
-    log(`family ${date}: ${String(err?.message ?? err).slice(0, 300)}`);
-  } finally {
-    fs.rmSync(FAMILY_TMP, { recursive: true, force: true });
-  }
+  return selectFamilyPhoto(date, {
+    tmp: FAMILY_TMP, shown: FAMILY_SHOWN, app: FAMILY_FETCH, log,
+    launch: (args) => spawnSync("open", args, { encoding: "utf8", timeout: 180_000, stdio: "ignore" }),
+    put: (file, key, type) => wrangler(["r2", "object", "put", `${ART_BUCKET}/${key}`, "--file", file, "--content-type", type, "--remote"]),
+  });
 }
 
 /**

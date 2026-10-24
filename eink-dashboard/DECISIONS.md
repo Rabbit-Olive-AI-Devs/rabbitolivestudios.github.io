@@ -4549,6 +4549,9 @@ addendum of 2026-10-23).
 
 ## 99. The Mac Jobs Can Move to the MacBook; Volt Is the Independent Reviewer (2026-10-23)
 
+**Implementation checkpoint — 2026-10-24.** The single-host move is applied: the seven mini jobs are stopped and disabled, their seven replacements are installed on the MacBook, and live state was transferred directly over SSH. Empty destination book-history files were restored from an intact private source snapshot; the actual ebook was rebuilt, and the affected web index and frame bytes were read back from R2. The deployed alert watches the MacBook; application version remains3.25.0. Jarvis owns operations, Codex is selected, and the genuine Volt approval gate and historical Claude credits remain unchanged. Fresh native writing and unobserved timer firings are not accepted merely because host migration is complete. See HANDOVER.md; historical rationale follows.
+
+
 **Context.** The owner wants everything that ran on the Mac mini to run on the MacBook, which is
 now on 24/7 and is where Jarvis lives (`/Users/quark`, Dropbox at `/Users/quark/Dropbox`). The
 scripts and LaunchAgents had the mini's paths written in: the external SSD's Dropbox and Photos
@@ -4587,3 +4590,24 @@ same model family as the author, which a Codex reviewer would not (#98, "Limits"
 could open it. Volt's own season material already does, and the owner simply doesn't open it.
 Desk serial reviews stay with the unattended runner: 4-6 a day, needed minutes after a painting
 lands, too fast for a relayed reviewer.
+
+**2026-10-24 operational acceptance addendum.** The MacBook is the sole production host and
+Codex is the only accepted unattended agent; missing/invalid config and Claude selection fail
+closed, with `--ignore-user-config` retained. Original work/credits and Volt's independent
+chapter PASS gate remain unchanged.
+
+Family Memory selection now stays inside the existing signed Photos helper, behind full Photos
+authorization. Node receives only a request-bound winner and small metadata, never the private
+library database or family roster. Producer ownership and cleanup acknowledgement survive a
+waiter timeout; unresolved crashes/cleanup retain ownership rather than permitting overlap.
+The real installed art-brief route passed private selection, PhotoKit download, both R2 uploads,
+remote JPEG/metadata readback, shown-history update and cleanup. No panel setting or version
+changed. These manual results do not claim natural scheduled firing or fresh native writing.
+
+## 100. MacBook-Only Jarvis Operations and the Standing Production Schedule (2026-10-24)
+
+The owner confirmed the Claude-free handover and asked that all changes be reflected in this repository. [OPERATIONS.md](OPERATIONS.md) is the current orchestration reference: seven Mac production jobs and six existing Hermes cron jobs, with the MacBook as sole local production host. Cloudflare and SenseCraft keep their existing hosting/rendering roles. Jarvis owns unfinished Prologue chapters 4–10, Season 1 and Season 4; Volt/Inky keeps Season 2 and Pepper keeps Season 3. Original Volt must independently PASS Jarvis-authored chapters before APPROVE; completed Claude work/credit is preserved.
+
+At the owner's explicit request, the unmodified installed weekly desk writer ran a real native Codex functional test using synthetic private inputs. It produced four new test beats, their art instructions and one exact-range mailbox handoff; the real checker passed, and all 46 compared real production/source files stayed unchanged. No test content was displayed or published. This closes functional handover acceptance, not future scheduled-firing, physical-panel or editorial approval gates. The separate nested-sandbox experiment remains held, and parked optional repair candidates are excluded.
+
+The existing coordinator continues every 15 minutes. Writing checks run daily 09:15; desk artwork runs 17:30/19:30 for the 21:00 deadline; general art follows 17:00/19:00/21:00 briefs ten minutes later. Monday 08:00 is the MacBook engineering heartbeat, followed by the existing 08:30 spoiler-free report. Archive capture remains every 10 minutes and EPUB rebuild 00:15. The former mini production jobs stay disabled/unloaded and no new scheduler is introduced. No application version, SenseCraft panel or website-root change is part of source publication. Local configs, full cron prompts, story, images, family data, credentials and private receipts remain outside Git.
