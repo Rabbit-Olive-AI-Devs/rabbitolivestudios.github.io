@@ -390,14 +390,28 @@ async function cmdArtBrief() {
   familyPhoto(date);   // first, so the brief already carries the family picture (#92)
   const res = await fetch(`${SITE}/art/brief?date=${date}`);
   if (!res.ok) throw new Error(`brief for ${date}: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
-  const brief = await res.json();
+  let brief = await res.json();
   fs.mkdirSync(ART_OUT, { recursive: true });
-  // One brief per date: a complete one is never sent twice. An earlier one that was waiting for
-  // the moment is replaced by a later run that has it.
+  // A photo can arrive after an earlier brief was complete. Add newly available kinds,
+  // preserving every picture already sent (its event, style and local references).
   const json = path.join(ART_OUT, `${date}-brief.json`);
-  if (fs.existsSync(json) && !JSON.parse(fs.readFileSync(json, "utf8")).waiting && !process.env.ART_FORCE) { log(`art brief ${date}: already sent`); return; }
-  if (fs.existsSync(json) && brief.waiting) { log(`art brief ${date}: still waiting for ${brief.waiting.join(", ")}`); return; }
-  const birthday = brief.pictures.find((p) => p.kind === "birthday");
+  let pendingPictures = brief.pictures;
+  if (fs.existsSync(json) && !process.env.ART_FORCE) {
+    const previous = JSON.parse(fs.readFileSync(json, "utf8"));
+    const known = new Set(previous.pictures.map((p) => p.kind));
+    pendingPictures = brief.pictures.filter((p) => !known.has(p.kind));
+    const pictures = [...previous.pictures, ...pendingPictures];
+    const present = new Set(pictures.map((p) => p.kind));
+    const waiting = [...new Set([...(previous.waiting ?? []), ...(brief.waiting ?? [])])].filter((kind) => !present.has(kind));
+    if (!pendingPictures.length && JSON.stringify(waiting) === JSON.stringify(previous.waiting ?? [])) {
+      log(`art brief ${date}: unchanged`);
+      return;
+    }
+    brief = { ...previous, pictures };
+    if (waiting.length) brief.waiting = waiting;
+    else delete brief.waiting;
+  }
+  const birthday = pendingPictures.find((p) => p.kind === "birthday");
   if (birthday) {
     const key = String(birthday.subject.key).replace(/[^a-z]/g, "");
     const refs = [];
@@ -409,13 +423,14 @@ async function cmdArtBrief() {
     birthday.references = refs.length;
     birthday.referenceFiles = refs.map((f) => `from-claude/art/${f}`);
   }
-  const family = brief.pictures.find((p) => p.kind === "family");
+  const family = pendingPictures.find((p) => p.kind === "family");
   if (family) {
     const dest = path.join(ART_OUT, `${date}-family-ref.jpg`);
     const r = wrangler(["r2", "object", "get", `${ART_BUCKET}/family/${date}/photo.jpg`, "--file", dest, "--remote"]);
-    const ok = r.status === 0 && fs.existsSync(dest) && fs.statSync(dest).size > 0;
-    family.references = ok ? 1 : 0;
-    family.referenceFiles = ok ? [`from-claude/art/${path.basename(dest)}`] : [];
+    const ok = r.status === 0 && fs.existsSync(dest) && fs.statSync(dest).size > 0 && looksLikeImage(fs.readFileSync(dest), "jpg");
+    if (!ok) throw new Error(`family reference for ${date} unavailable; previous brief left unchanged`);
+    family.references = 1;
+    family.referenceFiles = [`from-claude/art/${path.basename(dest)}`];
   }
   fs.writeFileSync(json, JSON.stringify(brief, null, 2) + "\n");
   const files = brief.pictures.map((p) => `- ${p.kind}: to-claude/art/${p.file} (${p.style.name})`).join("\n");
@@ -540,6 +555,7 @@ try {
   await ({ run: cmdRun, weekly: cmdWeekly, heartbeat: cmdHeartbeat, review: cmdReview, "art-brief": cmdArtBrief })[cmd]();
 } catch (err) {
   log(`${cmd} failed: ${err.stack ?? err}`);
+  if (cmd === "art-brief") process.exitCode = 1;
   try { note(`The mailbox watcher hit an error (${cmd}). Please open a session.`); } catch { /* mailbox gone */ }
 } finally {
   fs.rmSync(LOCK, { force: true });
