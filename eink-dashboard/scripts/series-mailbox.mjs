@@ -291,7 +291,7 @@ function exportLines(out) {
 
 /** A spoiler-free line for Thiago, relayed by Jarvis. */
 function note(line) {
-  fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${stamp().file}: ${line}\n`);
+  fs.appendFileSync(path.join(OUTBOX, "NEEDS-OWNER.md"), `- ${stamp().file}: ${line}\n`);
 }
 
 function cmdRun() {

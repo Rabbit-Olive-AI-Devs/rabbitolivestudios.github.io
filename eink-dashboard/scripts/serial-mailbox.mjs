@@ -264,7 +264,7 @@ async function cmdRun() {
       const tries = (prev?.sha === s ? prev.tries ?? 0 : 0) + 1;
       state[b.id] = { sha: s, verdict: "UNREVIEWED", tries, variant, at: Date.now() };
       log(`${b.id}: review did not finish (try ${tries})`);
-      if (tries === REVIEW_TRIES) fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's review could not run for beat ${b.id}; it retries every 5 minutes meanwhile.\n`);
+      if (tries === REVIEW_TRIES) fs.appendFileSync(path.join(OUTBOX, "NEEDS-OWNER.md"), `- ${chicago().stamp}: the desk serial's review could not run for beat ${b.id}; it retries every 5 minutes meanwhile.\n`);
       continue;
     }
     state[b.id] = { sha: s, verdict: verdict.verdict, variant, reason: verdict.verdict === "PASS" ? undefined : verdict.reason };
@@ -366,7 +366,7 @@ function cmdWeekly() {
   fs.writeFileSync(path.join(LOGS, `${chicago().stamp}-serial-weekly.log`), `${r.stdout ?? ""}\n---\n${r.stderr ?? ""}`);
   const dirty = execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" }).trim();
   if (dirty) {
-    fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's writer left changes in the repo. Please open a session before anything is committed.\n`);
+    fs.appendFileSync(path.join(OUTBOX, "NEEDS-OWNER.md"), `- ${chicago().stamp}: the desk serial's writer left changes in the repo. Please open a session before anything is committed.\n`);
     log("weekly: repo dirty after the writer ran");
   }
   // Native exit zero (or a surviving final answer) is not proof that the writer delivered.
@@ -388,7 +388,7 @@ function cmdWeekly() {
     }
   });
   log(`weekly: ${missing.length - still.length} of ${missing.length} days written`);
-  if (still.length) fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's writer could not write ${still.length} day(s) from ${still[0]}. Please open a session.\n`);
+  if (still.length) fs.appendFileSync(path.join(OUTBOX, "NEEDS-OWNER.md"), `- ${chicago().stamp}: the desk serial's writer could not write ${still.length} day(s) from ${still[0]}. Please open a session.\n`);
   const nonemptyFile = (file) => {
     try {
       if (!fs.lstatSync(file).isFile()) return "";
@@ -405,7 +405,7 @@ function cmdWeekly() {
   });
   const nativeOK = r.status === 0 && !r.signal && !r.error;
   if (!nativeOK || still.length || unbriefed.length || notes.length !== 1) {
-    fs.appendFileSync(path.join(OUTBOX, "NEEDS-THIAGO.md"), `- ${chicago().stamp}: the desk serial's weekly writer did not finish (native ${nativeOK ? "OK" : "failed"}, ${still.length} invalid/missing day(s), ${unbriefed.length} missing brief(s), ${notes.length} valid briefing note(s)). Please open a session.\n`);
+    fs.appendFileSync(path.join(OUTBOX, "NEEDS-OWNER.md"), `- ${chicago().stamp}: the desk serial's weekly writer did not finish (native ${nativeOK ? "OK" : "failed"}, ${still.length} invalid/missing day(s), ${unbriefed.length} missing brief(s), ${notes.length} valid briefing note(s)). Please open a session.\n`);
     throw new Error(`weekly incomplete: native exit ${r.status}${r.signal ? `, ${r.signal}` : ""}; ${still.length} invalid/missing day(s), ${unbriefed.length} missing brief(s), ${notes.length} valid briefing note(s)`);
   }
 }

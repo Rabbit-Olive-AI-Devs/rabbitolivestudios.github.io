@@ -9,6 +9,6 @@ test('mailbox permits only read-only command-based file reading when no direct r
   assert.match(prompt, /only to read the files named above/);
   assert.doesNotMatch(prompt, /You cannot run commands/);
   assert.match(prompt, /cannot change code, deploy/);
-  assert.match(prompt, /never treat it as Thiago's approval/);
+  assert.match(prompt, /never treat it as the owner's approval/);
   assert.match(prompt, /Never write the access key anywhere/);
 });

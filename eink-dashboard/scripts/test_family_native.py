@@ -85,7 +85,7 @@ class NativeParity(unittest.TestCase):
               CREATE TABLE ZADDITIONALASSETATTRIBUTES(ZASSET INTEGER,ZTIMEZONEOFFSET REAL);
               CREATE TABLE ZPERSON(Z_PK INTEGER PRIMARY KEY,ZFULLNAME TEXT,ZDISPLAYNAME TEXT);
               CREATE TABLE ZDETECTEDFACE(ZASSETFORFACE INTEGER,ZHIDDEN INTEGER,ZPERSONFORFACE INTEGER);
-              INSERT INTO ZSHARE VALUES(5,'Coelhos de Oliveira');
+              INSERT INTO ZSHARE VALUES(5,'Family Album');
               INSERT INTO ZSHARE VALUES(6,'Different Album');
               INSERT INTO ZPERSON VALUES(1,'Synthetic Family','Alias');
               INSERT INTO ZPERSON VALUES(2,'Other Person','Synthetic Family');
@@ -114,6 +114,15 @@ class NativeParity(unittest.TestCase):
             expected,_=fp.read_candidates(db,people)
             got=run(dict(op='sql',db=str(dbpath),date='2026-10-19',people=people,shown=[]))
             self.assertEqual(got['readCandidates'],[{**c,'taken':c['taken'].isoformat()} for c in expected])
+            # A private configured title must be bound as SQL data, not source text.
+            alternate = "Synthetic Album's ? Title"
+            db.execute('UPDATE ZSHARE SET ZTITLE=? WHERE Z_PK=5', (alternate,)); db.commit()
+            configured = run(dict(op='sql',db=str(dbpath),date='2026-10-19',people=people,shown=[],albumTitle=alternate))
+            self.assertTrue(configured['albumFound'])
+            self.assertEqual(configured['readCandidates'],[{**c,'taken':c['taken'].isoformat()} for c in expected])
+            default = run(dict(op='sql',db=str(dbpath),date='2026-10-19',people={},shown=[]))
+            self.assertFalse(default['albumFound'])
+            self.assertEqual(default['candidates'],[])
             db.execute('DELETE FROM ZSHARE WHERE Z_PK=5'); db.commit()
             got=run(dict(op='sql',db=str(dbpath),date='2026-10-19',people={},shown=[]))
             self.assertFalse(got['albumFound']); self.assertEqual(got['candidates'],[])
@@ -129,7 +138,7 @@ class NativeParity(unittest.TestCase):
               CREATE TABLE ZASSET(ZUUID TEXT,ZDATECREATED REAL,ZWIDTH INTEGER,ZHEIGHT INTEGER,ZKIND INTEGER,ZTRASHEDSTATE INTEGER,ZHIDDEN INTEGER,ZKINDSUBTYPE INTEGER,ZCOLLECTIONSHARE INTEGER,Z_PK INTEGER,ZFAVORITE INTEGER);
               CREATE TABLE ZADDITIONALASSETATTRIBUTES(ZASSET INTEGER,ZTIMEZONEOFFSET INTEGER);
               CREATE TABLE ZPERSON(Z_PK INTEGER,ZFULLNAME TEXT,ZDISPLAYNAME TEXT);
-              INSERT INTO ZSHARE VALUES(1,'Coelhos de Oliveira');
+              INSERT INTO ZSHARE VALUES(1,'Family Album');
               INSERT INTO ZASSET VALUES('synthetic',0,1600,1000,0,0,0,0,1,1,0);'''); db.commit()
             (lib/'database'/'private-extra').write_text('never copy')
             before={p.name:p.read_bytes() for p in (lib/'database').iterdir()}

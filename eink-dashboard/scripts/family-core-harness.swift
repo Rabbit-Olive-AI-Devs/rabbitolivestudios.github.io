@@ -52,7 +52,7 @@ import Foundation
       let candidates: [FamilyCandidate]
       var found = true
       if op == "sql" {
-        (candidates, found) = try FamilyCore.readCandidates(o["db"] as! String, people: o["people"] as! [String:String])
+        (candidates, found) = try FamilyCore.readCandidates(o["db"] as! String, people: o["people"] as! [String:String], albumTitle: o["albumTitle"] as? String ?? "Family Album")
       } else {
         candidates = try JSONDecoder().decode([FamilyCandidate].self,
           from: JSONSerialization.data(withJSONObject: o["candidates"]!))

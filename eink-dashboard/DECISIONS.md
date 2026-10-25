@@ -3220,7 +3220,7 @@ Two LaunchAgents on the Mac mini (`scripts/launchd/`), both running `scripts/ser
   chapter early.
 
 Handled messages move to `to-claude/done/` (three failed tries, then the owner is flagged).
-Anything that needs the owner becomes one spoiler-free line in `from-claude/NEEDS-THIAGO.md`,
+Anything that needs the owner becomes one spoiler-free line in `from-claude/NEEDS-OWNER.md`,
 which Jarvis relays in Slack. Logs: `~/Library/Logs/eink-series/`. A lock file stops two runs
 overlapping. The watcher needs the external SSD mounted (Dropbox lives there); without it, it
 logs and skips.

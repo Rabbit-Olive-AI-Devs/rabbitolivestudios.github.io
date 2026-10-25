@@ -244,7 +244,8 @@ enum FamilyCore {
     }
     return (round, Array(ranked.prefix(12)).map { $0.4 })
   }
-  static func readCandidates(_ file: String, people: [String:String]) throws -> ([FamilyCandidate], Bool) {
+  static func readCandidates(_ file: String, people: [String:String], albumTitle: String = "Family Album") throws -> ([FamilyCandidate], Bool) {
+    guard !albumTitle.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { throw FamilyFailure.invalid }
     let db = try FamilyDatabase(file)
     let base = """
       SELECT a.ZUUID, a.ZDATECREATED, x.ZTIMEZONEOFFSET, a.ZWIDTH * a.ZHEIGHT
@@ -252,7 +253,7 @@ enum FamilyCore {
       WHERE a.ZKIND = 0 AND a.ZTRASHEDSTATE = 0 AND a.ZHIDDEN = 0
       AND COALESCE(a.ZKINDSUBTYPE, 0) != ? AND a.ZWIDTH > a.ZHEIGHT
       """
-    let share = try db.query("SELECT Z_PK FROM ZSHARE WHERE ZTITLE = ?", [.text("Coelhos de Oliveira")]).first
+    let share = try db.query("SELECT Z_PK FROM ZSHARE WHERE ZTITLE = ?", [.text(albumTitle)]).first
     var out: [FamilyCandidate] = []
     func append(_ rows: [[FamilySQLValue]], _ source: String) throws {
       for r in rows {

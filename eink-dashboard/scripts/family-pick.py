@@ -28,7 +28,7 @@ import json
 import os
 import sqlite3
 
-ALBUM = "Coelhos de Oliveira"
+ALBUM = "Family Album"
 MIN_AGE_DAYS = 335        # "at least 11 months old"
 APPLE_EPOCH = dt.datetime(2001, 1, 1)
 SCREENSHOT_SUBTYPE = 10

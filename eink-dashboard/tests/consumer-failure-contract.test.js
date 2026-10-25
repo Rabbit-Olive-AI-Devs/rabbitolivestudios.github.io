@@ -202,7 +202,7 @@ test('failed serial native PASS retains three attempts, escalation and five-minu
     f.run('serial-mailbox.mjs', 'run');
     assert.equal(readJSON(path.join(f.work, 'state.json'))[f.id].tries, i);
   }
-  assert.match(fs.readFileSync(path.join(f.outbox, 'NEEDS-THIAGO.md'), 'utf8'), /review could not run/);
+  assert.match(fs.readFileSync(path.join(f.outbox, 'NEEDS-OWNER.md'), 'utf8'), /review could not run/);
   f.run('serial-mailbox.mjs', 'run');
   assert.equal(nativeCalls(f).length, 6, 'retry held before five minutes');
   const state = readJSON(path.join(f.work, 'state.json'));
@@ -239,12 +239,12 @@ for (const mode of ['message-missing', 'message-wrong', 'message-stale', 'messag
       f.run('series-mailbox.mjs', 'run');
       assert.ok(fs.existsSync(path.join(f.inbox, f.source)), 'failed message must stay pending');
       assert.equal(readJSON(path.join(f.seriesWork, '.mailbox-attempts.json'))[f.source], attempt);
-      assert.ok(!fs.existsSync(path.join(f.outbox, 'NEEDS-THIAGO.md')));
+      assert.ok(!fs.existsSync(path.join(f.outbox, 'NEEDS-OWNER.md')));
     }
     f.run('series-mailbox.mjs', 'run');
     assert.ok(fs.existsSync(path.join(f.inbox, 'done', f.source)), 'existing third-failure archive semantics preserved');
     assert.deepEqual(readJSON(path.join(f.seriesWork, '.mailbox-attempts.json')), {});
-    assert.match(fs.readFileSync(path.join(f.outbox, 'NEEDS-THIAGO.md'), 'utf8'), /needs a .*session/);
+    assert.match(fs.readFileSync(path.join(f.outbox, 'NEEDS-OWNER.md'), 'utf8'), /needs a .*session/);
     assert.ok(fs.readdirSync(f.outbox).some(n => n.endsWith('-could-not-handle.md')));
     assert.equal(nativeCalls(f).length, 3);
     const log = fs.readFileSync(path.join(f.home, 'Library/Logs/eink-series/mailbox.log'), 'utf8');
@@ -271,7 +271,7 @@ test('CRLF exact-source reply is accepted', () => {
   const f = messageFixture('message-crlf');
   f.run('series-mailbox.mjs', 'run');
   assert.ok(fs.existsSync(path.join(f.inbox, 'done', f.source)));
-  assert.ok(!fs.existsSync(path.join(f.outbox, 'NEEDS-THIAGO.md')));
+  assert.ok(!fs.existsSync(path.join(f.outbox, 'NEEDS-OWNER.md')));
 });
 test('a missing reply can recover on the next attempt with a genuine new reply', () => {
   const f = messageFixture('message-missing');
@@ -281,7 +281,7 @@ test('a missing reply can recover on the next attempt with a genuine new reply',
   f.run('series-mailbox.mjs', 'run');
   assert.ok(fs.existsSync(path.join(f.inbox, 'done', f.source)));
   assert.deepEqual(readJSON(path.join(f.seriesWork, '.mailbox-attempts.json')), {});
-  assert.ok(!fs.existsSync(path.join(f.outbox, 'NEEDS-THIAGO.md')));
+  assert.ok(!fs.existsSync(path.join(f.outbox, 'NEEDS-OWNER.md')));
 });
 
 function chapterFixture(reviewer, season = 4) {

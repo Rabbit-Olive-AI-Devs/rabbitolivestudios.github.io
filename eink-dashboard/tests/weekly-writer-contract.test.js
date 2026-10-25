@@ -198,7 +198,7 @@ for (const mode of ['refusal-zero', 'partial', 'invalid-json', 'wrong-date', 'em
     assert.equal(nativeCalls(f).length, 1, 'real runner reaches only the fake native transport');
     assert.notEqual(r.status, 0, 'weekly must fail closed instead of returning success');
     assert.match(f.log(), /weekly failed:/);
-    assert.match(fs.readFileSync(path.join(f.outbox, 'NEEDS-THIAGO.md'), 'utf8'), /could not write|incomplete|did not finish/);
+    assert.match(fs.readFileSync(path.join(f.outbox, 'NEEDS-OWNER.md'), 'utf8'), /could not write|incomplete|did not finish/);
     if (mode === 'refusal-zero') assert.match(f.log(), /weekly: 0 of 1 days written/);
   });
 }

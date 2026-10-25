@@ -69,6 +69,13 @@ import Photos
       }
       return URL(fileURLWithPath:fallback, isDirectory:true)
     }
+    let albumTitle: String
+    if let value = settings["familyAlbum"] {
+      guard let title = value as? String, !title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { throw FamilyFailure.blocked }
+      albumTitle = title
+    } else {
+      albumTitle = "Family Album"
+    }
     let library = try configured("photosLibrary", "/Volumes/SamsungSSD/Pictures/Photos Library.photoslibrary")
     let output = try configured("familyTmp", "/Volumes/SamsungSSD/Pictures/.eink-family-tmp")
     try lease.validateOutput(output)
@@ -90,7 +97,7 @@ import Photos
     try lease.check()
     let (round,candidates) = try FamilyFiles.withSnapshot(library:library, cache:cache) { db in
       try lease.check()
-      let (all,_) = try FamilyCore.readCandidates(db.path, people:people)
+      let (all,_) = try FamilyCore.readCandidates(db.path, people:people, albumTitle:albumTitle)
       try lease.check()
       return try FamilyCore.choose(all, shown:shown, target:day)
     }
