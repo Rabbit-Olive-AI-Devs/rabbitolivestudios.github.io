@@ -62,15 +62,26 @@ test("the brief carries the family picture only when the photo is up, never them
   const none = await buildArtBrief(await fakeEnv({}), "2026-11-26");
   assert.ok(!none.pictures.some((p) => p.kind === "family"));
 
-  const env = await fakeEnv({ "family/2026-10-20/photo.jpg": "x", "family/2026-10-31/photo.jpg": "x" });
+  const env = await fakeEnv({
+    "family/2026-10-20/photo.jpg": "x",
+    "family/2026-10-20/photo.json": JSON.stringify({ taken: "2001-02-03", place: "Sample Shore" }),
+    "family/2026-10-31/photo.jpg": "x",
+  });
   const bday = await buildArtBrief(env, "2026-10-20");
   assert.deepEqual(bday.pictures.map((p) => p.kind), ["birthday", "skyline", "family"]);
   const fam = bday.pictures.find((p) => p.kind === "family");
   assert.equal(fam.file, "2026-10-20-family.png");
   assert.equal(fam.references, 1);
+  assert.equal(fam.subject.date, "2001-02-03");
+  assert.equal(fam.subject.yearsAgo, 25);
+  assert.equal(fam.subject.place, "Sample Shore");
+  assert.equal(fam.subject.style, fam.style.id);
 
   const halloween = (await buildArtBrief(env, "2026-10-31")).pictures.find((p) => p.kind === "family");
   assert.doesNotMatch(halloween.prompt, /Halloween|jack-o|pumpkin/i);
+  assert.equal(halloween.subject.place, "Family");
+  assert.equal(halloween.subject.style, halloween.style.id);
+  assert.equal(halloween.subject.date, undefined);
 });
 
 test("storeFamily prefers Jarvis, falls back to the photo, cleans up after itself", async () => {
@@ -101,6 +112,20 @@ function pageKV(entries) {
     list: async ({ prefix }) => ({ keys: [...m.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
   };
 }
+
+test("the page sends date, ago, place and style", async () => {
+  const env = await fakeEnv({
+    "family/2001-06-07/photo.jpg": "p",
+    "family/2001-06-07/photo.json": JSON.stringify({ taken: "2001-02-03", place: "Sample Shore" }),
+  });
+  assert.equal(await storeFamily(env, "2001-06-07"), "photo");
+  const res = await handleFamilyPage(env, "2001-06-07");
+  assert.equal(res.headers.get("x-family-date"), "2001-02-03");
+  assert.equal(res.headers.get("x-family-ago"), "1");
+  assert.equal(res.headers.get("x-family-place"), "Sample Shore");
+  assert.equal(res.headers.get("x-family-style"), familyStyleFor("2001-06-07").id);
+  assert.match(await res.text(), /data:image\/png;base64,/);
+});
 
 test("the page serves today, then the latest earlier day, then the text page", async () => {
   const today = await (await handleFamilyPage({ CACHE: pageKV({ "family:v1:2026-10-18": "VE9EQVk=" }) }, "2026-10-18")).text();

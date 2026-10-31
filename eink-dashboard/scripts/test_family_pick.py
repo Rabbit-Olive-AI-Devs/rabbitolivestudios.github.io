@@ -2,7 +2,9 @@
 
 import datetime as dt
 import importlib.util
+import json
 import os
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location("family_pick", os.path.join(os.path.dirname(__file__), "family-pick.py"))
@@ -52,6 +54,60 @@ class ChooseTest(unittest.TestCase):
     def test_favourite_also_in_the_album_counts_once(self):
         got = pick([photo("x", "2020-10-19"), photo("x", "2020-10-19", "favourite")], "2026-10-19")
         self.assertEqual(got, ["x"])
+
+
+class PlaceTest(unittest.TestCase):
+    def test_no_gps_place_is_family(self):
+        def fetch(*_args):
+            raise AssertionError("no lookup without coordinates")
+        self.assertEqual(fp.resolve_place(None, None, "/absent/places.json", fetch=fetch), "Family")
+        self.assertEqual(fp.resolve_place(None, None, "/absent/places.json", fetch=fetch), "Family")
+        self.assertNotEqual(fp.resolve_place(None, 12.5, "/absent/places.json", fetch=fetch), fp.ALBUM)
+        self.assertEqual(fp.resolve_place(None, 12.5, "/absent/places.json", fetch=fetch), "Family")
+
+    def test_album_name_is_never_the_place(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = os.path.join(tmp, "places.json")
+            got = fp.resolve_place(1.25, 2.5, cache, fetch=lambda *_a: fp.ALBUM, sleep=lambda *_a: None, now=lambda: 0)
+            self.assertEqual(got, "Family")
+            self.assertNotEqual(got, fp.ALBUM)
+
+    def test_cache_is_used_before_the_network_and_requests_wait(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = os.path.join(tmp, "places.json")
+            calls = []
+            sleeps = []
+            clock = {"t": 1000.0}
+
+            def fetch(lat, lon):
+                calls.append((lat, lon))
+                return "Sample Shore"
+
+            def sleep(seconds):
+                sleeps.append(seconds)
+                clock["t"] += seconds
+
+            self.assertEqual(fp.resolve_place(1.234, 5.678, cache, fetch=fetch, sleep=sleep, now=lambda: clock["t"]), "Sample Shore")
+            self.assertEqual(calls, [(1.23, 5.68)])
+            self.assertEqual(sleeps, [])
+            with open(cache, encoding="utf-8") as f:
+                stored = json.load(f)
+            self.assertEqual(stored["1.23,5.68"], "Sample Shore")
+            self.assertEqual(fp.resolve_place(9, 9, cache, fetch=fetch, sleep=sleep, now=lambda: clock["t"]), "Sample Shore")
+            self.assertGreaterEqual(sleeps[0], 1)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(fp.resolve_place(1.231, 5.679, cache, fetch=fetch, sleep=sleep, now=lambda: clock["t"]), "Sample Shore")
+            self.assertEqual(len(calls), 2, "a rounded coordinate already cached is not looked up again")
+
+    def test_photo_json_is_taken_and_place(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "photo.json")
+            fp.write_photo_json(path, "2001-02-03", "Sample Shore")
+            with open(path, encoding="utf-8") as f:
+                self.assertEqual(json.load(f), {"taken": "2001-02-03", "place": "Sample Shore"})
+            fp.write_photo_json(path, "2001-02-03", None)
+            with open(path, encoding="utf-8") as f:
+                self.assertEqual(json.load(f), {"taken": "2001-02-03", "place": "Family"})
 
 
 if __name__ == "__main__":

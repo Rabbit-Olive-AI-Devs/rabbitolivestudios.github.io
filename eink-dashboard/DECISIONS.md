@@ -4227,6 +4227,26 @@ the photo was one day short of its anniversary. The owner: that is 2 years ago. 
 from a nearby day (Favourites, closest day), so the caption now subtracts the years (at least 1).
 That day's KV entry was rebuilt by hand from Jarvis's painting with the new caption.
 
+**#92 addendum (2026-10-31): the place name may leave the Mac.** Until now nothing but the
+photo's date left the machine. Thiago approved sending the place to Cloudflare, as an exception
+to that rule. Raw coordinates still stay on the Mac, and so does the album name.
+- The picked photo's GPS latitude and longitude come back from PhotoKit (`family-fetch.swift`)
+  and, when the library has them, from `ZLATITUDE` / `ZLONGITUDE` (`family-core.swift`,
+  `family-pick.py`).
+- The place is resolved on the Mac: the cache
+  `~/Library/Application Support/coelho-dashboard/places.json`, keyed by coordinates rounded to
+  two decimals, then OpenStreetMap Nominatim (a named User-Agent, at most one request a second).
+  New results are cached. No GPS, an unusable pair, or a failed lookup is the word "Family".
+  The album title is never used as the place.
+- `photo.json` is `{"taken","place"}`. The brief's family picture carries `date` (the photo's
+  `YYYY-MM-DD`), `yearsAgo`, `place` and `style` (from `familyStyleFor`) on `subject`.
+- `/color/family` sends `x-family-date`, `x-family-ago`, `x-family-place` and `x-family-style`
+  for the picture it actually serves. The burned-in caption is unchanged (date, title, years ago).
+  The KV value is now JSON `{image, date, yearsAgo, place, style}` under the same `family:v1:` key.
+  Older raw-base64 entries still render; they simply have no caption headers. No cache-key bump,
+  so a picture already on the panel is not thrown away.
+- Names still do not leave the Mac. Workers AI is still not used.
+
 **#89 addendum (2026-10-18): the watcher retries its R2 calls once.** Jarvis's 19 Oct pictures
 (moment and skyline) failed to upload at 17:15 CT with a transient request error and were only put
 up by hand in a session. Every `wrangler r2` call in `scripts/series-mailbox.mjs` (puts and gets,

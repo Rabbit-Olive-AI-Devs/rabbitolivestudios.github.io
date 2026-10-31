@@ -16,7 +16,7 @@ import Foundation
           let i = attempts.count; attempts.append(c.uuid)
           if widths[i] == -2 { throw FamilyFailure.blocked }
           if widths[i] == -1 { return nil }
-          return (Data(), widths[i], 1000)
+          return (Data(), widths[i], 1000, nil, nil)
         }
         result = ["attempts":attempts,"winner":winner?.0.uuid ?? "none"]
       } catch { result = ["attempts":attempts,"blocked":true] }
@@ -58,11 +58,19 @@ import Foundation
           from: JSONSerialization.data(withJSONObject: o["candidates"]!))
       }
       let selection = try FamilyCore.choose(candidates, shown: shown, target: target)
+      func wire(_ c: FamilyCandidate, identifier: Bool) -> [String: Any] {
+        var row: [String: Any] = ["uuid": c.uuid, "taken": c.taken, "source": c.source, "pixels": c.pixels]
+        if identifier { row["localIdentifier"] = "\(c.uuid)/L0/001" }
+        if let gps = FamilyCore.coordinate(c.latitude, c.longitude) {
+          row["latitude"] = gps.0
+          row["longitude"] = gps.1
+        }
+        return row
+      }
       result = ["round": selection.0, "albumFound": found,
-        "candidates": selection.1.map { ["uuid": $0.uuid, "taken": $0.taken,
-          "source": $0.source, "pixels": $0.pixels, "localIdentifier": "\($0.uuid)/L0/001"] as [String:Any] }]
+        "candidates": selection.1.map { wire($0, identifier: true) }]
       if op == "sql" {
-        result["readCandidates"] = candidates.map { ["uuid":$0.uuid,"taken":$0.taken,"source":$0.source,"pixels":$0.pixels] as [String:Any] }
+        result["readCandidates"] = candidates.map { wire($0, identifier: false) }
       }
     }
     FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]))

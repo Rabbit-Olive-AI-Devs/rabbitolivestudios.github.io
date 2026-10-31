@@ -10,6 +10,7 @@
 // (a launchd job cannot show that question): scripts/build-family-fetch.sh. The job launches it with
 // `open -W`, and the result (the picture's size, or the error) goes to <out.jpg>.txt.
 import AppKit
+import CoreLocation
 import Photos
 
 @main enum FamilyFetch {
@@ -103,7 +104,7 @@ import Photos
     }
     try lease.check()
     // Raw snapshot and SQLite handles are gone before any winner bytes are published.
-    guard let (candidate,jpeg,width,height) = try FamilyCore.fetchWinner(candidates, download: { candidate in
+    guard let (candidate,jpeg,width,height,lat,lon) = try FamilyCore.fetchWinner(candidates, download: { candidate in
       guard PHPhotoLibrary.authorizationStatus(for:.readWrite) == .authorized else { throw FamilyFailure.blocked }
       guard UUID(uuidString:candidate.uuid) != nil else { throw FamilyFailure.blocked }
       try lease.check()
@@ -112,7 +113,7 @@ import Photos
       return image
     }) else { throw FamilyFailure.noImage }
     let receipt = FamilyReceipt(request:request, date:day, uuid:candidate.uuid, taken:candidate.taken,
-      source:candidate.source, round:round, width:width, height:height)
+      source:candidate.source, round:round, width:width, height:height, latitude:lat, longitude:lon)
     try lease.check()
     try FamilyFiles.publish(jpeg, receipt:receipt, root:output)
     do { try lease.check() } catch {
@@ -122,7 +123,7 @@ import Photos
       throw FamilyFailure.blocked
     }
   }
-  static func download(_ identifier: String) throws -> (Data,Int,Int)? {
+  static func download(_ identifier: String) throws -> (Data,Int,Int,Double?,Double?)? {
     guard let asset = PHAsset.fetchAssets(withLocalIdentifiers:[identifier], options:nil).firstObject else {
       guard PHPhotoLibrary.authorizationStatus(for:.readWrite) == .authorized else { throw FamilyFailure.blocked }
       return nil
@@ -132,13 +133,14 @@ import Photos
     opts.isSynchronous = true
     opts.deliveryMode = .highQualityFormat
     opts.resizeMode = .exact
-    var result: (Data,Int,Int)?
+    var result: (Data,Int,Int,Double?,Double?)?
     var denied = false
+    let gps = asset.location.map { ($0.coordinate.latitude, $0.coordinate.longitude) }
     PHImageManager.default().requestImage(for:asset, targetSize:CGSize(width:1600,height:1600), contentMode:.aspectFit, options:opts) { image, info in
       if let error = info?[PHImageErrorKey] as? NSError, FamilyCore.protectedDenial(error) { denied = true; return }
       guard let image = image, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data:tiff),
         let jpeg = rep.representation(using:.jpeg, properties:[.compressionFactor:0.88]) else { return }
-      result = (jpeg,rep.pixelsWide,rep.pixelsHigh)
+      result = (jpeg,rep.pixelsWide,rep.pixelsHigh,gps?.0,gps?.1)
     }
     guard !denied, PHPhotoLibrary.authorizationStatus(for:.readWrite) == .authorized else { throw FamilyFailure.blocked }
     return result

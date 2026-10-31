@@ -37,7 +37,9 @@ test('request-bound receipt accepts only matching date/request and real JPEG dim
   const {readSelection}=await module(); const f=fixture();
   try {
     f.write(); assert.equal(readSelection(f.root,date,request).uuid,uuid);
-    for(const bad of [{...selection,request:'stale'}, {...selection,date:'2026-10-18'}, {...selection,width:1023}, {...selection,height:999}, {...selection,taken:'2020-02-30'}, {...selection,source:'other'}, {...selection,uuid:'../escape'}, {...selection,round:0}]) {
+    f.write({...selection, place:'Sample Shore'});
+    assert.equal(readSelection(f.root,date,request).place, 'Sample Shore');
+    for(const bad of [{...selection,request:'stale'}, {...selection,date:'2026-10-18'}, {...selection,width:1023}, {...selection,height:999}, {...selection,taken:'2020-02-30'}, {...selection,source:'other'}, {...selection,uuid:'../escape'}, {...selection,round:0}, {...selection,place:'Family Album'}, {...selection,place:'bad\nname'}, {...selection,place:''}, {...selection,latitude:91,longitude:0}, {...selection,latitude:1.25}]) {
       f.write(bad); assert.throws(()=>readSelection(f.root,date,request));
     }
     f.write(selection,{request:'stale',date}); assert.throws(()=>readSelection(f.root,date,request));
@@ -53,11 +55,12 @@ test('one existing-app invocation; upload shape; shown written only after both u
   const shown=path.join(f.root,'shown.json'), calls=[], uploads=[];
   const deps={home:path.join(f.root,'home'),tmp:f.root,shown,app:'/synthetic/EinkFamilyFetch.app',request:()=>request,log:()=>{},
     launch:(args)=>{calls.push(args);fs.mkdirSync(f.dir);f.write();return {status:0};},
-    put:(file,key,type)=>{uploads.push({key,type}); assert.equal(fs.existsSync(shown),false); return {status:0};}};
+    put:(file,key,type)=>{uploads.push({key,type,body:key.endsWith('.json')?fs.readFileSync(file,'utf8'):null}); assert.equal(fs.existsSync(shown),false); return {status:0};}};
   try {
     familyPhoto(date,deps);
     assert.deepEqual(calls,[['-W','-n','-g',deps.app,'--args','--select-and-fetch',date,request]]);
     assert.deepEqual(uploads.map(u=>u.key),[`family/${date}/photo.jpg`,`family/${date}/photo.json`]);
+    assert.deepEqual(JSON.parse(uploads[1].body), {taken:'2020-10-19', place:'Family'});
     assert.deepEqual(JSON.parse(fs.readFileSync(shown)),[{uuid,date,round:2}]);
     assert.equal(fs.existsSync(f.dir),false);
     familyPhoto(date,deps); assert.equal(calls.length,1);
@@ -75,6 +78,21 @@ test('failed upload or helper never writes shown and stale existing request cann
     try { familyPhoto(date,deps); assert.equal(fs.existsSync(shown),false); if(kind==='existing')assert.equal(launches,0); }
     finally {f.clean();}
   }
+});
+
+test('coordinates are resolved to a place and never uploaded raw',async()=>{
+  const {familyPhoto}=await module(); const f=fixture(); fs.rmSync(f.dir,{recursive:true});
+  const shown=path.join(f.root,'shown.json'); const uploads=[]; let lookups=0;
+  const deps={home:path.join(f.root,'home'),tmp:f.root,shown,app:'/synthetic/EinkFamilyFetch.app',request:()=>request,log:()=>{},
+    placeOf:(lat,lon)=>{lookups++; assert.deepEqual([lat,lon],[1.25,2.5]); return 'Sample Shore';},
+    launch:()=>{fs.mkdirSync(f.dir); f.write({...selection, latitude:1.25, longitude:2.5}); return {status:0};},
+    put:(file,key)=>{uploads.push({key,body:key.endsWith('.json')?JSON.parse(fs.readFileSync(file,'utf8')):null}); return {status:0};}};
+  try {
+    familyPhoto(date,deps);
+    assert.equal(lookups,1);
+    assert.deepEqual(uploads[1].body, {taken:'2020-10-19', place:'Sample Shore'});
+    assert.equal(Object.hasOwn(uploads[1].body,'latitude'), false);
+  } finally {f.clean();}
 });
 
 test('invalid calendar date rejected before launch or file access',async()=>{

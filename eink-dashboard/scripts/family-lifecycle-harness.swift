@@ -1,6 +1,10 @@
 // Offline protocol exerciser, never compiled into the application. No PhotoKit or private paths.
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#else
+import Glibc
+#endif
 @main enum LifecycleHarness {
  static func main() {
   let a=CommandLine.arguments

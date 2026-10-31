@@ -37,6 +37,26 @@ class Boundary(unittest.TestCase):
             self.assertEqual(result.returncode,2,result.stdout+result.stderr)
             self.assertEqual(list(actual.iterdir()),[])
 
+    def test_place_may_leave_the_mac(self):
+        """#92 sent only the date. Thiago approved the place name; coordinates and the album title stay here."""
+        selection = (S/'family-selection.mjs').read_text()
+        pick = (S/'family-pick.py').read_text()
+        core = (S/'family-core.swift').read_text()
+        fetch = (S/'family-fetch.swift').read_text()
+        page = (S.parent/'src'/'pages'/'family.ts').read_text()
+        route = (S.parent/'src'/'index.ts').read_text()
+        self.assertIn('JSON.stringify({taken:c.taken,place})', selection)
+        self.assertNotIn('latitude', selection[selection.index('JSON.stringify({taken:c.taken,place})'):selection.index('JSON.stringify({taken:c.taken,place})')+40])
+        self.assertIn('places.json', pick)
+        self.assertIn('return "Family"', pick)
+        self.assertNotIn('Coelhos', pick)
+        self.assertIn('latitude', core)
+        self.assertIn('longitude', core)
+        self.assertIn('asset.location', fetch)
+        for name in ('x-family-date', 'x-family-ago', 'x-family-place', 'x-family-style'):
+            self.assertIn(name, page)
+            self.assertIn(name, route)
+
     def test_build_is_explicit_staging_only_no_ls_and_no_live_replacement(self):
         s=(S/'build-family-fetch.sh').read_text()
         self.assertIn('--output',s)

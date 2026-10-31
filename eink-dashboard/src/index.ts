@@ -1249,8 +1249,15 @@ export default {
         if (authBlockSTP) return authBlockSTP;
         return handleSkylineTestPage(url);
       }
-      case "/color/family":
-        return handleFamilyPage(env);
+      case "/color/family": {
+        const page = await handleFamilyPage(env);
+        const headers = new Headers(page.headers);
+        for (const name of ["x-family-date", "x-family-ago", "x-family-place", "x-family-style"]) {
+          const value = headers.get(name);
+          if (value) headers.set(name, value);
+        }
+        return new Response(await page.text(), { status: page.status, headers });
+      }
       case "/art/brief": {
         // What Jarvis draws for a date (#89). Today or tomorrow (Chicago) only: each new date
         // costs at most one LLM call for its event, which the warm would make anyway.

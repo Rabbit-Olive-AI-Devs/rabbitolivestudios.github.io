@@ -1,8 +1,10 @@
 // Node receives only a winner JPEG and request-bound small receipt from the existing Photos app.
 import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {fileURLToPath} from 'node:url';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = () => { throw new Error('family helper unavailable'); };
@@ -30,6 +32,30 @@ function smallJSON(file) {
 }
 function exactKeys(o, keys) {
   return o && !Array.isArray(o) && Object.keys(o).sort().join(',') === keys.sort().join(',');
+}
+const SELECTION_REQUIRED = ['request','date','uuid','taken','source','round','width','height'];
+// place is the approved exception (#92). latitude/longitude stay on this Mac and are optional.
+const SELECTION_OPTIONAL = ['place','latitude','longitude'];
+function selectionShape(o) {
+  if (!o || Array.isArray(o)) return false;
+  const keys = Object.keys(o);
+  return SELECTION_REQUIRED.every(k => keys.includes(k)) && keys.every(k => SELECTION_REQUIRED.includes(k) || SELECTION_OPTIONAL.includes(k));
+}
+function validPlace(s) {
+  return typeof s === 'string' && s.length >= 1 && s.length <= 80 && s === s.trim() && !/[\u0000-\u001f\u007f]/.test(s) && s !== 'Family Album';
+}
+function coord(v, min, max) {
+  if (v == null) return null;
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) fail();
+  return v;
+}
+function lookupPlace(lat, lon, home) {
+  if (lat == null || lon == null) return 'Family';
+  const script = fileURLToPath(new URL('./family-pick.py', import.meta.url));
+  const cache = path.join(home, 'Library', 'Application Support', 'coelho-dashboard', 'places.json');
+  const run = spawnSync('python3', ['-I', script, '--resolve-place', String(lat), String(lon), '--places-cache', cache], {encoding:'utf8', timeout:20000});
+  const place = run.status === 0 ? String(run.stdout || '').trim() : '';
+  return validPlace(place) ? place : 'Family';
 }
 // Read the dimensions encoded in the JPEG rather than trusting a stale text sidecar.
 function dimensions(buf) {
@@ -60,10 +86,13 @@ export function readSelection(root,date,request) {
   const done = smallJSON(path.join(dir,'completed.json'));
   if (!exactKeys(done,['request','date']) || done.request !== request || done.date !== date) fail();
   const c = smallJSON(path.join(dir,'selection.json'));
-  if (!exactKeys(c,['request','date','uuid','taken','source','round','width','height']) ||
+  if (!selectionShape(c) ||
       c.request !== request || c.date !== date || !UUID.test(c.uuid) || !validDate(c.taken) ||
       !['album','favourite'].includes(c.source) || !Number.isSafeInteger(c.round) || c.round < 1 ||
       !Number.isSafeInteger(c.width) || c.width < 1024 || !Number.isSafeInteger(c.height) || c.height < 1) fail();
+  if (Object.prototype.hasOwnProperty.call(c,'place') && !validPlace(c.place)) fail();
+  const lat = coord(c.latitude, -90, 90), lon = coord(c.longitude, -180, 180);
+  if ((lat == null) !== (lon == null)) fail();
   const jpg = path.join(dir,'photo.jpg'); safe(jpg);
   const st = fs.lstatSync(jpg);
   if (!st.isFile() || st.size > 15*1024*1024) fail();
@@ -130,7 +159,7 @@ function cancel(control) {
 // Dependencies are supplied by the mailbox (or explicit offline tests), never CLI/environment overrides.
 export function familyPhoto(date,deps) {
   if (!validDate(date)) fail();
-  const {tmp,shown,app,launch,put,log=()=>{},request:makeRequest=()=>crypto.randomUUID(),home=os.homedir()} = deps;
+  const {tmp,shown,app,launch,put,log=()=>{},request:makeRequest=()=>crypto.randomUUID(),home=os.homedir(),placeOf} = deps;
   let dir, lease;
   try {
     safe(shown);
@@ -145,8 +174,11 @@ export function familyPhoto(date,deps) {
     if (result.status !== 0 || result.error) fail();
     if (!stopped(lease.control,lease.owner) || smallJSON(path.join(lease.control,'stopped.json')).status!=='complete') fail();
     const c = readSelection(tmp,date,request);
+    const resolve = placeOf || ((lat,lon) => lookupPlace(lat,lon,home));
+    let place = validPlace(c.place) ? c.place : resolve(c.latitude ?? null, c.longitude ?? null);
+    if (!validPlace(place)) place = 'Family';
     const meta=path.join(dir,'photo.json');
-    fs.writeFileSync(meta,JSON.stringify({taken:c.taken}),{flag:'wx',mode:0o600});
+    fs.writeFileSync(meta,JSON.stringify({taken:c.taken,place}),{flag:'wx',mode:0o600});
     if (put(path.join(dir,'photo.jpg'),`family/${date}/photo.jpg`,'image/jpeg').status !== 0 ||
         put(meta,`family/${date}/photo.json`,'application/json').status !== 0) { log(`family ${date}: upload failed`); return; }
     history.push({uuid:c.uuid,date,round:c.round});

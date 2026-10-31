@@ -8,7 +8,7 @@ import { htmlResponse } from "../response";
 import { getChicagoDateParts, shiftDateStr } from "../date-utils";
 import { findMostRecentCached } from "../stale-cache";
 import { familyCacheKey } from "../cache-keys";
-import { FAMILY_TITLE } from "../family";
+import { FAMILY_TITLE, headerPlace, parseStoredFamily } from "../family";
 import { unavailableHTML } from "./unavailable";
 
 const UNAVAILABLE_NOTE = "No family memory yet. The Mac mini picks tomorrow's photo each evening.";
@@ -37,7 +37,15 @@ export function renderFamilyHTML(base64: string): string {
 
 export async function handleFamilyPage(env: Env, dateStr: string = getChicagoDateParts().dateStr): Promise<Response> {
   const today = await env.CACHE.get(familyCacheKey(dateStr));
-  const base64 = today ?? (await findMostRecentCached(env, "family:", shiftDateStr(dateStr, -1)))?.value;
-  if (!base64) return htmlResponse(unavailableHTML(FAMILY_TITLE, UNAVAILABLE_NOTE), "no-store");
-  return htmlResponse(renderFamilyHTML(base64), "no-store");
+  const raw = today ?? (await findMostRecentCached(env, "family:", shiftDateStr(dateStr, -1)))?.value;
+  if (!raw) return htmlResponse(unavailableHTML(FAMILY_TITLE, UNAVAILABLE_NOTE), "no-store");
+  const stored = parseStoredFamily(raw);
+  const caption = stored.caption;
+  const headers = caption ? {
+    "x-family-date": caption.date,
+    "x-family-ago": String(caption.yearsAgo),
+    "x-family-place": headerPlace(caption.place),
+    "x-family-style": caption.style,
+  } : undefined;
+  return htmlResponse(renderFamilyHTML(stored.image), "no-store", headers);
 }
