@@ -12,6 +12,7 @@ import { skylinePageResponse, skylineTestPageResponse, skylineBwPageResponse } f
 import { handleDeskTest, handleDeskAurebesh, handleDeskPlanet, handleDeskTars, handleDeskTarsReport, handleDeskFlamengo, handleDeskCastaway } from "./pages/desk";
 import { handleSeries, handleSeriesAired, handleSeriesAiredPage, handleSeriesProof, handleSeriesProofPage, handleSeriesTest } from "./pages/series";
 import { seriesHealth } from "./series/watch";
+import { handleSeriesBook, handleSeriesBookImage } from "./series/book";
 import { serialHealth } from "./serial";
 import { bookKeyOk, handleStorybook, handleStorybookFrame } from "./storybook";
 import { getPlanetOfDay } from "./planet";
@@ -1278,6 +1279,10 @@ export default {
         return handleSeries(env, url); // every panel gets the same full-colour page (DECISIONS #73)
       case "/color/series":
         return handleSeries(env, url);
+      case "/series/book":
+        return handleSeriesBook(env, url);
+      case "/series/book/image":
+        return handleSeriesBookImage(env, url);
       case "/series/aired":
         return handleSeriesAired(env); // public: only pages already aired (DECISIONS #94)
       case "/series/aired/page":

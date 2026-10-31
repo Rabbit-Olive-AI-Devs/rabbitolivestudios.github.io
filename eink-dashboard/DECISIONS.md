@@ -4604,6 +4604,10 @@ The real installed art-brief route passed private selection, PhotoKit download, 
 remote JPEG/metadata readback, shown-history update and cleanup. No panel setting or version
 changed. These manual results do not claim natural scheduled firing or fresh native writing.
 
+## 101. The Long Drift Aired-Chapter Web Reader (2026-10-26)
+
+The owner requested a website like the desk web book, for Long Drift pages that have already aired. `/series/book` lists available chapters and reads one scene at a time with previous/next navigation and full-size artwork. It uses the existing public, keyless aired archive's approval-and-Chicago-airtime gate (#94), not proof or preview routes. Each `/series/book/image?p=PATH` request checks that gate again and extracts the exact embedded PNG from the stored panel HTML. Future scenes, pending chapters, replays and arbitrary R2 paths are refused; preview time and key parameters do not unlock content. The reader is no-store/noindex, light/dark and phone-friendly, with no client JavaScript, drawing, AI calls, KV writes or new scheduler. Existing panel, proof, FrameBot and keyed desk-storybook contracts remain unchanged. No application-version, SenseCraft or website-root change.
+
 ## 100. MacBook-Only Jarvis Operations and the Standing Production Schedule (2026-10-24)
 
 The owner confirmed the Claude-free handover and asked that all changes be reflected in this repository. [OPERATIONS.md](OPERATIONS.md) is the current orchestration reference: seven Mac production jobs and six existing Hermes cron jobs, with the MacBook as sole local production host. Cloudflare and SenseCraft keep their existing hosting/rendering roles. Jarvis owns unfinished Prologue chapters 4–10, Season 1 and Season 4; Volt/Inky keeps Season 2 and Pepper keeps Season 3. Original Volt must independently PASS Jarvis-authored chapters before APPROVE; completed Claude work/credit is preserved.

@@ -50,6 +50,10 @@ The public mailbox scripts, their tests and prompt use the generic owner-notice 
 
 Historical host notes below describe the previous installation unless this checkpoint says otherwise. Generic owner-notice names in the public documentation are privacy substitutions, not claims that historical or installed files were renamed.
 
+## Long Drift web archive — October 26, 2026
+
+`/series/book` is the owner's phone-friendly reader, modelled on the desk web book. Contents include only chapters with aired scenes; scene pages have previous/next links and a full-size PNG. `/series/book/image?p=PATH` extracts the exact embedded PNG from its stored panel HTML. Both routes use the existing `airedPages(schedule, now)` gate independently. Public access matches the already-public `/series/aired` contract; preview times and keys do not unlock anything. No AI, KV writes, cron jobs, panel settings, version change or website-root change. The keyed desk storybook and all existing series routes stay unchanged. Source is `src/series/book.ts`; focused tests are `tests/series-book.test.js`.
+
 ## 1. What this project is
 
 A single Cloudflare Worker (TypeScript, no framework, zero runtime dependencies) that renders content for three e-ink panels owned by one person. It is a personal project on Cloudflare's **free tier**, and staying on the free tier is a deliberate choice that shapes most of the engineering.
