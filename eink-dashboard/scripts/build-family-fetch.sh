@@ -52,7 +52,7 @@ if [[ -z "$IDENTITY" || "$idents" != *"$IDENTITY"* ]]; then
   printf '%s\n' "signing identity missing: ${IDENTITY}" >&2
   exit 1
 fi
-codesign --force --deep --options runtime --sign "${FAMILY_FETCH_SIGN_IDENTITY:-Apple Development: Thiago Borges de Oliveira (RM6USMH56M)}" -r='designated => identifier "com.eink.family-fetch" and anchor apple generic and certificate leaf[subject.OU] = "6XK6BNVURL"' "$BUILD"
+codesign --force --deep --sign "${FAMILY_FETCH_SIGN_IDENTITY:-Apple Development: Thiago Borges de Oliveira (RM6USMH56M)}" -r='designated => identifier "com.eink.family-fetch" and anchor apple generic and certificate leaf[subject.OU] = "6XK6BNVURL"' "$BUILD"
 mv "$BUILD" "$APP"
 printf 'Built staged %s\n' "$APP"
 if [[ "$WITHOUT_PEOPLE" = 1 ]]; then printf '%s\n' 'Compile-only: no people resource; selection cannot run until an owner build includes it.'; fi
