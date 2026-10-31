@@ -4,7 +4,9 @@
  *
  *   1. The Mac mini picks the photo the evening before (`scripts/family-pick.py`, run by the
  *      mailbox's art-brief job) and puts it in R2: `family/<date>/photo.jpg` and `photo.json`
- *      (`{"taken":"YYYY-MM-DD"}`, nothing else about the photo leaves the Mac).
+ *      (`{"taken":"YYYY-MM-DD","place":"..."}`). The place name is the one exception to "nothing
+ *      else leaves the Mac" (Thiago, 2026-10-31). Raw coordinates stay on the Mac. No GPS, or a
+ *      failed lookup, sends "Family", never the album name.
  *   2. The brief asks Jarvis to repaint it in the day's family style.
  *   3. The nightly warm stores Jarvis's picture, or the photo itself when he did not deliver, cropped
  *      to the panel with the caption burned in, under `family:v1:<date>`. No Workers AI.
@@ -49,6 +51,62 @@ export function yearsAgo(taken: string, date: string): number {
   return Math.max(1, Number(date.slice(0, 4)) - Number(taken.slice(0, 4)));
 }
 
+const PLACE_MAX = 80;
+
+/** A place label safe to store. Empty, or the album title, becomes "Family". */
+export function cleanPlace(value: unknown): string {
+  if (typeof value !== "string") return "Family";
+  const place = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, PLACE_MAX);
+  if (!place || place === "Family Album") return "Family";
+  return place;
+}
+
+/** Header values are ASCII. A place with no ASCII letters still reads "Family". */
+export function headerPlace(place: string): string {
+  const ascii = place.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "").trim().slice(0, PLACE_MAX);
+  return ascii || "Family";
+}
+
+export interface FamilyCaptionMeta {
+  date: string;
+  yearsAgo: number;
+  place: string;
+  style: string;
+}
+
+interface StoredFamily {
+  image?: unknown;
+  date?: unknown;
+  yearsAgo?: unknown;
+  place?: unknown;
+  style?: unknown;
+}
+
+/** KV holds either the old raw base64 or `{image, date, yearsAgo, place, style}`. */
+export function parseStoredFamily(raw: string): { image: string; caption: FamilyCaptionMeta | null } {
+  if (raw.startsWith("{")) {
+    try {
+      const o = JSON.parse(raw) as StoredFamily;
+      if (typeof o.image === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.date ?? "")) &&
+          typeof o.yearsAgo === "number" && Number.isFinite(o.yearsAgo) && typeof o.style === "string" && o.style) {
+        return {
+          image: o.image,
+          caption: { date: String(o.date), yearsAgo: o.yearsAgo, place: cleanPlace(o.place), style: o.style },
+        };
+      }
+      if (typeof o.image === "string") return { image: o.image, caption: null };
+    } catch { /* not the wrapper; fall through */ }
+  }
+  return { image: raw, caption: null };
+}
+
+function parsePhotoMeta(raw: unknown): { taken: string; place: string } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const taken = String((raw as { taken?: unknown }).taken ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(taken)) return null;
+  return { taken, place: cleanPlace((raw as { place?: unknown }).place) };
+}
+
 /** The burned-in caption: the photo's real date, the title, how long ago. No names. */
 export function familyCaption(taken: string, date: string): { left: string; center: string; right: string } {
   const [ty, tm, td] = taken.split("-").map(Number);
@@ -70,12 +128,30 @@ export async function familyPicture(env: Env, date: string): Promise<{
 } | null> {
   if (!(await env.PHOTOS.head(PHOTO_KEY(date)))) return null;
   const style = familyStyleFor(date);
+  let taken = "";
+  let place = "Family";
+  const metaObj = await env.PHOTOS.get(META_KEY(date));
+  if (metaObj) {
+    try {
+      const parsed = parsePhotoMeta(await metaObj.json());
+      if (parsed) { taken = parsed.taken; place = parsed.place; }
+    } catch { /* the picture still goes in the brief; the place stays Family */ }
+  }
+  const subject: Record<string, string | number> = {
+    occasion: "family memory: repaint the reference photograph (no names, no captions)",
+    place,
+    style: style.id,
+  };
+  if (taken) {
+    subject.date = taken;
+    subject.yearsAgo = yearsAgo(taken, date);
+  }
   return {
     kind: "family",
     file: `${date}-family.png`,
     style: { id: style.id, name: style.name },
     prompt: familyPrompt(style),
-    subject: { occasion: "family memory: repaint the reference photograph (no names, no captions)" },
+    subject,
     references: 1,
   };
 }
@@ -87,9 +163,10 @@ export async function familyPicture(env: Env, date: string): Promise<{
 export async function storeFamily(env: Env, date: string): Promise<"jarvis" | "photo" | null> {
   const meta = await env.PHOTOS.get(META_KEY(date));
   if (!meta) return null;
-  let taken = "";
-  try { taken = String((await meta.json<{ taken?: unknown }>()).taken ?? ""); } catch { /* checked below */ }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(taken)) { console.error(`Family ${date}: bad photo.json`); return null; }
+  let parsed: { taken: string; place: string } | null = null;
+  try { parsed = parsePhotoMeta(await meta.json()); } catch { /* checked below */ }
+  if (!parsed) { console.error(`Family ${date}: bad photo.json`); return null; }
+  const { taken, place } = parsed;
 
   let source: "jarvis" | "photo" | null = null;
   let rgb: Uint8Array | null = null;
@@ -107,7 +184,14 @@ export async function storeFamily(env: Env, date: string): Promise<"jarvis" | "p
   if (!rgb || !source) return null;
 
   const png = await finishSkylinePNG(rgb, familyCaption(taken, date));
-  await env.CACHE.put(familyCacheKey(date), pngToBase64(png), { expirationTtl: 604800 });
+  const style = familyStyleFor(date);
+  await env.CACHE.put(familyCacheKey(date), JSON.stringify({
+    image: pngToBase64(png),
+    date: taken,
+    yearsAgo: yearsAgo(taken, date),
+    place,
+    style: style.id,
+  }), { expirationTtl: 604800 });
   if (source === "jarvis") await env.PHOTOS.put(`art/used/${date}/family`, new Date().toISOString());
   await Promise.all([PHOTO_KEY(date), META_KEY(date), ART_KEY(date)].map((k) => env.PHOTOS.delete(k)));
   return source;

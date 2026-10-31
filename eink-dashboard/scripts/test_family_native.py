@@ -42,7 +42,7 @@ class NativeParity(unittest.TestCase):
         return got
 
     def test_existing_seven_against_native(self):
-        # Run the exact unchanged seven existing test bodies with a native choose bridge.
+        # Run the pick tests against a native choose bridge. Place tests do not use choose.
         spec = importlib.util.spec_from_file_location('existing', S / 'test_family_pick.py')
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
@@ -54,7 +54,7 @@ class NativeParity(unittest.TestCase):
         try:
             result = unittest.TestResult()
             unittest.defaultTestLoader.loadTestsFromModule(mod).run(result)
-            self.assertEqual(result.testsRun, 7)
+            self.assertEqual(result.testsRun, 11)
             self.assertEqual(result.errors + result.failures, [])
         finally:
             mod.fp.choose = original
@@ -81,7 +81,7 @@ class NativeParity(unittest.TestCase):
             db = sqlite3.connect(dbpath)
             db.executescript('''
               CREATE TABLE ZSHARE(Z_PK INTEGER PRIMARY KEY,ZTITLE TEXT);
-              CREATE TABLE ZASSET(Z_PK INTEGER PRIMARY KEY,ZUUID TEXT,ZDATECREATED REAL,ZWIDTH INTEGER,ZHEIGHT INTEGER,ZKIND INTEGER DEFAULT 0,ZTRASHEDSTATE INTEGER DEFAULT 0,ZHIDDEN INTEGER DEFAULT 0,ZKINDSUBTYPE INTEGER,ZCOLLECTIONSHARE INTEGER,ZFAVORITE INTEGER DEFAULT 0);
+              CREATE TABLE ZASSET(Z_PK INTEGER PRIMARY KEY,ZUUID TEXT,ZDATECREATED REAL,ZWIDTH INTEGER,ZHEIGHT INTEGER,ZKIND INTEGER DEFAULT 0,ZTRASHEDSTATE INTEGER DEFAULT 0,ZHIDDEN INTEGER DEFAULT 0,ZKINDSUBTYPE INTEGER,ZCOLLECTIONSHARE INTEGER,ZFAVORITE INTEGER DEFAULT 0,ZLATITUDE REAL,ZLONGITUDE REAL);
               CREATE TABLE ZADDITIONALASSETATTRIBUTES(ZASSET INTEGER,ZTIMEZONEOFFSET REAL);
               CREATE TABLE ZPERSON(Z_PK INTEGER PRIMARY KEY,ZFULLNAME TEXT,ZDISPLAYNAME TEXT);
               CREATE TABLE ZDETECTEDFACE(ZASSETFORFACE INTEGER,ZHIDDEN INTEGER,ZPERSONFORFACE INTEGER);
@@ -99,6 +99,7 @@ class NativeParity(unittest.TestCase):
                 db.execute('INSERT INTO ZDETECTEDFACE VALUES(?,?,?)',(i,1 if i==15 else 0,3 if i==16 else (2 if i==17 else 1)))
             for i,col,val in [(3,'ZKIND',1),(4,'ZTRASHEDSTATE',1),(5,'ZHIDDEN',1),(6,'ZKINDSUBTYPE',10),(7,'ZWIDTH',1000),(8,'ZWIDTH',900),(9,'ZKINDSUBTYPE',0)]:
                 db.execute(f'UPDATE ZASSET SET {col}=? WHERE Z_PK=?',(val,i))
+            db.execute('UPDATE ZASSET SET ZLATITUDE=?, ZLONGITUDE=? WHERE Z_PK=1', (1.25, 2.5))
             db.commit()
             people={'synthetic':' Synthetic Family '}
             for target in ['2026-10-19','2026-10-18','2026-10-20']:

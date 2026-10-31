@@ -1,7 +1,11 @@
-// Selection parity with the immutable family-pick.py. No PhotoKit, subprocess or CLI overrides.
+// Selection parity with family-pick.py. No PhotoKit, subprocess or CLI overrides.
 import Foundation
 import SQLite3
+#if canImport(Darwin)
 import Darwin
+#else
+import Glibc
+#endif
 
 // Fixed request-control metadata only. No Photos/config/roster reads in this protocol.
 // A stalled/crashed process is NEVER inferred stopped from the open(1) waiter.
@@ -103,7 +107,9 @@ enum FamilyFiles {
   static func publish(_ jpeg: Data, receipt: FamilyReceipt, root: URL) throws {
     guard FamilyCore.validRequest(receipt.date, receipt.request), UUID(uuidString:receipt.uuid) != nil,
       FamilyCore.date(receipt.taken) != nil, ["album","favourite"].contains(receipt.source),
-      receipt.round >= 1, receipt.width >= 1024, receipt.height > 0 else { throw FamilyFailure.invalid }
+      receipt.round >= 1, receipt.width >= 1024, receipt.height > 0,
+      FamilyCore.coordinate(receipt.latitude, receipt.longitude) != nil || (receipt.latitude == nil && receipt.longitude == nil)
+      else { throw FamilyFailure.invalid }
     try privateDirectory(root)
     let folder = root.appendingPathComponent(receipt.request, isDirectory:true)
     guard try !exists(folder) else { throw FamilyFailure.blocked }
@@ -154,19 +160,72 @@ struct FamilyCandidate: Codable {
   let taken: String
   let source: String
   let pixels: Int64
+  var latitude: Double? = nil
+  var longitude: Double? = nil
 }
 struct FamilyShown: Codable { let uuid: String; let date: String; let round: Int }
 struct FamilyReceipt: Codable {
   let request: String; let date: String; let uuid: String; let taken: String; let source: String
   let round: Int; let width: Int; let height: Int
+  var latitude: Double? = nil
+  var longitude: Double? = nil
+  init(request: String, date: String, uuid: String, taken: String, source: String, round: Int, width: Int, height: Int, latitude: Double? = nil, longitude: Double? = nil) {
+    self.request = request
+    self.date = date
+    self.uuid = uuid
+    self.taken = taken
+    self.source = source
+    self.round = round
+    self.width = width
+    self.height = height
+    self.latitude = latitude
+    self.longitude = longitude
+  }
+  enum CodingKeys: String, CodingKey {
+    case request, date, uuid, taken, source, round, width, height, latitude, longitude
+  }
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    request = try c.decode(String.self, forKey: .request)
+    date = try c.decode(String.self, forKey: .date)
+    uuid = try c.decode(String.self, forKey: .uuid)
+    taken = try c.decode(String.self, forKey: .taken)
+    source = try c.decode(String.self, forKey: .source)
+    round = try c.decode(Int.self, forKey: .round)
+    width = try c.decode(Int.self, forKey: .width)
+    height = try c.decode(Int.self, forKey: .height)
+    latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
+    longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
+  }
+  func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(request, forKey: .request)
+    try c.encode(date, forKey: .date)
+    try c.encode(uuid, forKey: .uuid)
+    try c.encode(taken, forKey: .taken)
+    try c.encode(source, forKey: .source)
+    try c.encode(round, forKey: .round)
+    try c.encode(width, forKey: .width)
+    try c.encode(height, forKey: .height)
+    // Absent GPS stays off the receipt. A null coordinate would look like a location.
+    try c.encodeIfPresent(latitude, forKey: .latitude)
+    try c.encodeIfPresent(longitude, forKey: .longitude)
+  }
 }
 enum FamilyFailure: Error { case blocked, invalid, noImage, cleanupIncomplete }
 
 enum FamilyCore {
-  static func fetchWinner(_ candidates: [FamilyCandidate], download: (FamilyCandidate) throws -> (Data,Int,Int)?) throws -> (FamilyCandidate,Data,Int,Int)? {
+  /// Both coordinates, or neither. One without the other is not a place.
+  static func coordinate(_ lat: Double?, _ lon: Double?) -> (Double, Double)? {
+    guard let lat, let lon, lat >= -90, lat <= 90, lon >= -180, lon <= 180,
+      lat.isFinite, lon.isFinite else { return nil }
+    return (lat, lon)
+  }
+  static func fetchWinner(_ candidates: [FamilyCandidate], download: (FamilyCandidate) throws -> (Data,Int,Int,Double?,Double?)?) throws -> (FamilyCandidate,Data,Int,Int,Double?,Double?)? {
     for candidate in candidates {
-      guard let (jpeg,width,height) = try download(candidate), width >= 1024 else { continue }
-      return (candidate,jpeg,width,height)
+      guard let (jpeg,width,height,lat,lon) = try download(candidate), width >= 1024 else { continue }
+      let gps = coordinate(lat, lon) ?? coordinate(candidate.latitude, candidate.longitude)
+      return (candidate,jpeg,width,height,gps?.0,gps?.1)
     }
     return nil
   }
@@ -247,8 +306,14 @@ enum FamilyCore {
   static func readCandidates(_ file: String, people: [String:String], albumTitle: String = "Family Album") throws -> ([FamilyCandidate], Bool) {
     guard !albumTitle.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { throw FamilyFailure.invalid }
     let db = try FamilyDatabase(file)
+    var columns: Set<String> = []
+    for row in try db.query("PRAGMA table_info(ZASSET)", []) {
+      if let name = row[1].text { columns.insert(name) }
+    }
+    let latSQL = columns.contains("ZLATITUDE") ? "a.ZLATITUDE" : "NULL"
+    let lonSQL = columns.contains("ZLONGITUDE") ? "a.ZLONGITUDE" : "NULL"
     let base = """
-      SELECT a.ZUUID, a.ZDATECREATED, x.ZTIMEZONEOFFSET, a.ZWIDTH * a.ZHEIGHT
+      SELECT a.ZUUID, a.ZDATECREATED, x.ZTIMEZONEOFFSET, a.ZWIDTH * a.ZHEIGHT, \(latSQL), \(lonSQL)
       FROM ZASSET a LEFT JOIN ZADDITIONALASSETATTRIBUTES x ON x.ZASSET = a.Z_PK
       WHERE a.ZKIND = 0 AND a.ZTRASHEDSTATE = 0 AND a.ZHIDDEN = 0
       AND COALESCE(a.ZKINDSUBTYPE, 0) != ? AND a.ZWIDTH > a.ZHEIGHT
@@ -259,7 +324,8 @@ enum FamilyCore {
       for r in rows {
         guard let uuid = r[0].text, let seconds = r[1].number else { throw FamilyFailure.blocked }
         let taken = Date(timeIntervalSince1970: 978307200 + seconds + (r[2].number ?? 0))
-        out.append(FamilyCandidate(uuid:uuid, taken:iso(taken), source:source, pixels:r[3].integer ?? 0))
+        let gps = coordinate(r.count > 5 ? r[4].number : nil, r.count > 5 ? r[5].number : nil)
+        out.append(FamilyCandidate(uuid:uuid, taken:iso(taken), source:source, pixels:r[3].integer ?? 0, latitude:gps?.0, longitude:gps?.1))
       }
     }
     if let pk = share?[0].integer {
