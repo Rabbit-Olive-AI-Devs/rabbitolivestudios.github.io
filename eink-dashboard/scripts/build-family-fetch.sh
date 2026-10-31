@@ -46,7 +46,13 @@ cat > "$BUILD/Contents/Info.plist" <<PLIST
   <key>NSPhotoLibraryUsageDescription</key><string>The e-ink Family Memory page downloads one family photo a day to repaint for the panels.</string>
 </dict></plist>
 PLIST
-codesign --force --sign - "$BUILD"
+IDENTITY="${FAMILY_FETCH_SIGN_IDENTITY:-Apple Development: Thiago Borges de Oliveira (RM6USMH56M)}"
+idents="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+if [[ -z "$IDENTITY" || "$idents" != *"$IDENTITY"* ]]; then
+  printf '%s\n' "signing identity missing: ${IDENTITY}" >&2
+  exit 1
+fi
+codesign --force --deep --sign "${FAMILY_FETCH_SIGN_IDENTITY:-Apple Development: Thiago Borges de Oliveira (RM6USMH56M)}" -r='designated => identifier "com.eink.family-fetch" and anchor apple generic and certificate leaf[subject.OU] = "6XK6BNVURL"' "$BUILD"
 mv "$BUILD" "$APP"
 printf 'Built staged %s\n' "$APP"
 if [[ "$WITHOUT_PEOPLE" = 1 ]]; then printf '%s\n' 'Compile-only: no people resource; selection cannot run until an owner build includes it.'; fi
