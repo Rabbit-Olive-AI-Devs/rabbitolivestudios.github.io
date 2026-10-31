@@ -158,8 +158,8 @@ throw new Error('Unsupported external transport refused');\n`);
   const f = { root, stage, work, home, outbox, spoilers, env, today, through, missing, plan,
     events: () => fs.existsSync(events) ? fs.readFileSync(events, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [],
     log: () => fs.readFileSync(path.join(home, 'Library/Logs/eink-series/serial.log'), 'utf8'),
-    run(command = 'weekly', file) {
-      const args = [...sandbox, process.execPath, path.join(stage, 'scripts/serial-mailbox.mjs'), command, ...(file ? [file] : [])];
+    run(command = 'weekly', file, entry = path.join(stage, 'scripts/serial-mailbox.mjs')) {
+      const args = [...sandbox, process.execPath, entry, command, ...(file ? [file] : [])];
       const r = spawnSync(args[0], args.slice(1), { cwd: stage, env, encoding: 'utf8', timeout: 60000 });
       const label = String(++invocation);
       write(path.join(root, label + '.stdout'), r.stdout ?? ''); write(path.join(root, label + '.stderr'), r.stderr ?? '');
@@ -257,4 +257,39 @@ test('weekly preseeded no-missing run stays successful without native calls or c
   assert.deepEqual(f.events(), []);
   assert.match(f.log(), new RegExp(`weekly: written through ${f.through}`));
   assert.deepEqual(fs.readdirSync(f.outbox), []);
+});
+
+for (const linkKind of ['directory', 'file']) {
+  test(`real CLI checker dispatches through a ${linkKind} symlink`, () => {
+    const f = fixture('checker-symlink');
+    const alias = path.join(f.root, linkKind === 'directory' ? 'linked-stage' : 'linked-cli.mjs');
+    fs.symlinkSync(linkKind === 'directory' ? f.stage : path.join(f.stage, 'scripts/serial-mailbox.mjs'), alias, linkKind === 'directory' ? 'dir' : 'file');
+    const entry = linkKind === 'directory' ? path.join(alias, 'scripts/serial-mailbox.mjs') : alias;
+    write(f.plan[0].file, f.plan[0].body);
+    const good = f.run('check', f.plan[0].file, entry);
+    assert.equal(good.status, 0, good.stdout + good.stderr);
+    assert.match(good.stdout, /4 beats OK/);
+    const bad = JSON.parse(f.plan[0].body);
+    bad.beats[0].text = ['word '.repeat(200)];
+    json(f.plan[0].file, bad);
+    const rejected = f.run('check', f.plan[0].file, entry);
+    assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
+    assert.match(rejected.stdout, /story text longer/);
+    const usage = f.run('not-a-command', undefined, entry);
+    assert.equal(usage.status, 2);
+    assert.match(usage.stderr, /usage: serial-mailbox/);
+    assert.equal(nativeCalls(f).length, 0);
+    assert.equal(f.events().filter(e => e.type === 'real-compiler').length, 2);
+  });
+}
+
+test('dirty postflight reports observation without attributing changes to writer', () => {
+  const f = fixture('success');
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  const notice = fs.readFileSync(path.join(f.outbox, 'NEEDS-OWNER.md'), 'utf8');
+  assert.match(notice, /repository was dirty after the writer ran/i);
+  assert.match(notice, /cause is unknown/i);
+  assert.doesNotMatch(notice, /writer left changes/i);
+  assert.match(f.log(), /weekly: repo dirty after the writer ran/);
 });

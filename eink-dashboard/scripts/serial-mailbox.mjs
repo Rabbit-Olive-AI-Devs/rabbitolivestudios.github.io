@@ -366,7 +366,7 @@ function cmdWeekly() {
   fs.writeFileSync(path.join(LOGS, `${chicago().stamp}-serial-weekly.log`), `${r.stdout ?? ""}\n---\n${r.stderr ?? ""}`);
   const dirty = execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" }).trim();
   if (dirty) {
-    fs.appendFileSync(path.join(OUTBOX, "NEEDS-OWNER.md"), `- ${chicago().stamp}: the desk serial's writer left changes in the repo. Please open a session before anything is committed.\n`);
+    fs.appendFileSync(path.join(OUTBOX, "NEEDS-OWNER.md"), `- ${chicago().stamp}: the repository was dirty after the writer ran; the cause is unknown. Please open a session before anything is committed.\n`);
     log("weekly: repo dirty after the writer ran");
   }
   // Native exit zero (or a surviving final answer) is not proof that the writer delivered.
@@ -419,7 +419,9 @@ function cmdCheck() {
   process.exit(problems.length ? 1 : 0);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Node resolves the main module's symlinks, but argv keeps the invoked path
+// (including macOS /var -> /private/var). Compare canonical paths or the CLI silently skips.
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   const cmd = process.argv[2];
   const run = { run: cmdRun, weekly: cmdWeekly, check: cmdCheck }[cmd];
   if (!run) { console.error("usage: serial-mailbox.mjs run | weekly | check <day.json>"); process.exit(2); }
