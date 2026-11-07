@@ -6,6 +6,8 @@ This document records the key decisions made during development of the "Moment B
 
 ## 1. Image Generation Models
 
+> **Transport/fallback choice superseded by #102 (2026-11-07).** SDXL and the BW-only shortcut are removed. Historical evaluations and style decisions below are preserved; every current image route uses FLUX multipart and last-good cache recovery.
+
 ### Decision: FLUX.2 klein-9b (Pipeline A) + SDXL (Pipeline B + fallback)
 
 **Tried:**
@@ -4635,3 +4637,15 @@ The owner confirmed the Claude-free handover and asked that all changes be refle
 At the owner's explicit request, the unmodified installed weekly desk writer ran a real native Codex functional test using synthetic private inputs. It produced four new test beats, their art instructions and one exact-range mailbox handoff; the real checker passed, and all 46 compared real production/source files stayed unchanged. No test content was displayed or published. This closes functional handover acceptance, not future scheduled-firing, physical-panel or editorial approval gates. The separate nested-sandbox experiment remains held, and parked optional repair candidates are excluded.
 
 The existing coordinator continues every 15 minutes. Writing checks run daily 09:15; desk artwork runs 17:30/19:30 for the 21:00 deadline; general art follows 17:00/19:00/21:00 briefs ten minutes later. Monday 08:00 is the MacBook engineering heartbeat, followed by the existing 08:30 spoiler-free report. Archive capture remains every 10 minutes and EPUB rebuild 00:15. The former mini production jobs stay disabled/unloaded and no new scheduler is introduced. No application version, SenseCraft panel or website-root change is part of source publication. Local configs, full cron prompts, story, images, family data, credentials and private receipts remain outside Git.
+
+## 102. Remove Retiring SDXL and Recover with Last-Good Pictures (2026-11-07)
+
+**Problem and owner.** Cloudflare retires `@cf/stabilityai/stable-diffusion-xl-base-1.0` on **20 November 2026**, moved from 15 November ([official notice](https://developers.cloudflare.com/changelog/post/2026-11-05-planned-model-deprecations/)). Calls then return HTTP410/error5028. Jarvis owns this dashboard repair; Cloudflare owns the shutdown. This does not retire Workers AI itself. Daily uploaded art is independent, but the deployed legacy/raw/1-bit routes and several failure paths still called SDXL. A saved picture could hide that weakness.
+
+**Decision.** Reuse the existing `@cf/black-forest-labs/flux-2-klein-9b` multipart transport. A model-name-only substitution would send the wrong format. Each pipeline retains its style, reference photos, caption, conversion and 800×480 output. One image attempt, then last-good cache; never retry FLUX under the name of a fallback. Skyline uses its reference photo when present and text-only when absent; a failed reference request does not turn into a second text-only call. Birthday failures do not invent a text-only likeness or trigger a second event-generation attempt.
+
+**Recovery.** Prefix-based fallback now includes today's older cache versions, not just yesterday. Colour birthday recovery considers only today's saved portrait, then a saved event; never another day's birthday portrait. With nothing saved, `/color/moment` renders the existing text-only 800×480 unavailable page rather than an HTTP error or broken image. The daily warm still uses delivered art, then cache, then AI for missing pictures; an existing/new budget block pauses image generation without skipping an already-delivered skyline. Focused tests reproduced and repaired both that warm bypass and the second birthday attempt.
+
+**Cache and budget.** `fact4:v6`, `fact1:v8`, `color-moment:v5`, `color-birthday:v4`, `skyline:v6`; `birthday:v3` and `moment:v1` unchanged. No cache deletion. The old zero-neuron SDXL route is not a free test route anymore. No added cron, automatic retry, per-request write or `list` family, credentials, billing, application-version bump, panel setting or art-production change. Earlier model/fallback claims in #1, #32, #34, #36–#38 and the old incident report remain historical, superseded for current transport by this record. Protected legacy `CLAUDE.md` is deliberately not edited; README and HANDOVER carry the current contract.
+
+**Evidence and limits.** See [the repair and release record](docs/operations/2026-11-07-image-model-retirement.md) and `tests/model-retirement.test.js`. All failure cases use synthetic offline bindings; browser rendering at 800×480 is separate from live Cloudflare model/Images acceptance and physical panel observation. This does not clear the two unreadable Worker programs, three deployed Pages function bundles or remote bot scripts left outside the account-wide audit.

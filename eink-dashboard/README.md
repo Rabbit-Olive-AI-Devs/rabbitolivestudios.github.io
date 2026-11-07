@@ -9,13 +9,17 @@ Every day it generates an AI illustration depicting a famous historical event at
 
 Also serves weather data for Naperville, IL, steel/trade headlines, a World Skyline Series, and a daily "On This Day" historical fact. (The FIFA World Cup 2026 dashboard was retired on 2026-08-21 and its code preserved for 2030 — DECISIONS.md #61.) Since v3.21.0 all three panels also show **The Long Drift**, a graphic-novel series written and drawn ahead of time by AI writers (see [The Series](#the-series)). A third panel, a second E1001 on a desk, shows Worker-drawn pages in a targeting-HUD style, starting with an Aurebesh word of the day (DECISIONS.md #66, #67). Since v3.22.0 the daily pictures are drawn by the owner's agent Jarvis from an evening brief, with Workers AI as the backup, in styles from one shared library of 71, and both home panels show them in full colour (DECISIONS.md #84-#90). In the week before each holiday (Carnaval, Easter, Festa Junina, the Fourth of July, Halloween, Thanksgiving, Christmas, New Year) the skyline city is dressed for it and the moment leans its way; on the day itself the moment shows the holiday's own history (DECISIONS.md #91). Since v3.23.0 a new page, `/color/family`, shows a family photo from this day in an earlier year, repainted by Jarvis (DECISIONS.md #92). Since v3.24.0 `/series/aired` lists the series pages that have already aired, for outside readers such as Jarvis's FrameBot (DECISIONS.md #94). Since v3.25.0 the desk panel's story page is a serial written ahead each week, with every beat painted by Jarvis (DECISIONS.md #96).
 
+## November 2026 image-model retirement repair
+
+Cloudflare retires Stable Diffusion XL on **20 November 2026**, not Workers AI itself. The dashboard now uses its existing FLUX.2 multipart transport for every image route. Each pipeline makes one image attempt; failures use the last good saved picture, including today's earlier cache version. With no saved colour picture, the panel gets a readable 800×480 text page. Birthday recovery never borrows another day's portrait. Uploaded artwork still wins, even if AI is paused. See [the repair, tests and release evidence](docs/operations/2026-11-07-image-model-retirement.md) and DECISIONS #102. No application-version or schedule change. Older SDXL decisions are retained as history, not current instructions.
+
 ## The Concept
 
 **"Moment Before"** — each day, the system:
 1. Fetches all historical events for today's date from Wikipedia
 2. An LLM (Llama 3.3 70B) picks the most visually dramatic event
 3. An image model generates an illustration of the event at its defining moment of action, with a daily rotating art style
-4. The picture is sent to the panels **as-is**: the AI image cropped to 800x480 in full colour, untouched, with a solid black-and-white caption bar; each panel converts it to what it can show (DECISIONS #81). A separate 1-bit version (SDXL, 6 styles, style-aware conversion) still exists at `/fact1.png`, unused by the panels.
+4. The picture is sent to the panels **as-is**: the AI image cropped to 800x480 in full colour, untouched, with a solid black-and-white caption bar; each panel converts it to what it can show (DECISIONS #81). A separate 1-bit version (FLUX.2, 6 styles, style-aware conversion) still exists at `/fact1.png`, unused by the panels.
 
 Example: For the sinking of the Titanic, the image would show the ocean liner tilting steeply into dark water, lifeboats scattered on the sea below. The text reads: **"Sinking of the Titanic"** / **"North Atlantic Ocean"** / **"Apr 14, 1912"**
 
@@ -167,7 +171,7 @@ The pipelines share the same LLM event selection (scene-only prompt), then each 
 
 ### Pipeline A: full colour, as-is (`/fact.png`; 4-level grayscale until #81)
 
-Uses **FLUX.2 klein-9b** with daily rotating art styles: Woodcut → Pencil Sketch → Charcoal (cycles by `dayOfYear % 3`). Falls back to SDXL with woodcut style if FLUX.2 fails.
+Uses **FLUX.2 klein-9b** with daily rotating art styles: Woodcut → Pencil Sketch → Charcoal (cycles by `dayOfYear % 3`). On failure, serves the last-good saved picture; no second image-model attempt (#102).
 
 ```
 Wikipedia "On This Day" API
@@ -179,7 +183,7 @@ Llama 3.3 70B (picks event, writes scene-only image prompt)
 Prepend daily style (Woodcut / Pencil Sketch / Charcoal) + anti-text suffix
         │
         ▼
-FLUX.2 klein-9b (4 steps, guidance 7.0) → JPEG  [fallback: SDXL 20 steps]
+FLUX.2 klein-9b (multipart) → JPEG  [failure: last-good saved picture]
         │
         ▼
 Cloudflare Images (.transform → center-crop + resize to 800x480, PNG) → decode RGB
@@ -188,14 +192,14 @@ Cloudflare Images (.transform → center-crop + resize to 800x480, PNG) → deco
 Caption bar burned in as solid black and white (location left, title center, date right)
         │
         ▼
-Full-colour RGB PNG, picture untouched → KV cache (fact4:v5)   [until #81: grayscale → tone curve → 4 levels]
+Full-colour RGB PNG, picture untouched → KV cache (fact4:v6)   [until #81: grayscale → tone curve → 4 levels]
 ```
 
 ### Pipeline B: Style-aware 1-bit (`/fact1.png`)
 
 > **Not on any panel; not warmed since 2026-10-16 (DECISIONS.md #83).** The route still generates and caches the picture on request; the nightly cron and the failure alert no longer include it.
 
-Uses **SDXL** with 6 rotating styles, each with style-appropriate 1-bit conversion (Bayer dithering or histogram threshold).
+Uses **FLUX.2 klein-9b** with 6 rotating styles, each with style-appropriate 1-bit conversion (Bayer dithering or histogram threshold).
 
 **Styles**: woodcut (bayer8), silhouette_poster, linocut, bold_ink_noir, pen_and_ink, charcoal_block (all threshold). Style is picked deterministically by `djb2(date|title|location) % 6`. Test override: `/test1.png?style=NAME`.
 
@@ -212,7 +216,7 @@ Pick style (djb2 hash of date+title+location % 6)
 Prepend style prompt + anti-text suffix
         │
         ▼
-SDXL (20 steps, guidance 6.5) → JPEG
+FLUX.2 klein-9b (multipart) → JPEG
         │
         ▼
 Cloudflare Images (JPEG → PNG conversion)
@@ -274,7 +278,7 @@ Photos go in `photos/portraits/` with naming: `{key}_0.jpg`, `{key}_1.jpg`, etc.
 
 ### Pipeline D: Color, as-is (`/color/moment`)
 
-Uses **FLUX.2 klein-9b** (fallback SDXL) with 18 daily-rotating art styles (5 until #84, tuned for our old 6-colour dithering). Since #81 the picture goes untouched in full colour to the E1002 and, since #84, to the home E1001; each panel converts it. On family birthdays it shows the colour birthday portrait, which the cron now warms first (#84).
+Uses **FLUX.2 klein-9b**, one attempt with last-good cache recovery (#102), and the shared daily-rotating scene styles (5 before #84, 18 before #86). Since #81 the picture goes untouched in full colour to the E1002 and, since #84, to the home E1001; each panel converts it. On family birthdays it shows the colour birthday portrait, which the cron now warms first (#84).
 
 **Styles** (DECISIONS #86): the 70 scene styles of the shared library `src/art-styles.ts`, from gouache, fresco and Brazilian modernism to cordel woodcut, azulejo tiles, cyanotype, ligne claire, claymation and tintype. Each block of 70 days walks them in a fresh random order, so none repeats until all have had a day. Test override: `/color/test-moment?m=7&d=20&style=cordel`.
 
@@ -290,7 +294,7 @@ Pick daily style (shared library, random order, DECISIONS #86)
 Prepend style prompt + anti-text suffix (the old palette suffix for our dithering was dropped, DECISIONS #81)
         │
         ▼
-FLUX.2 klein-9b → JPEG  [fallback: SDXL]
+FLUX.2 klein-9b → JPEG  [failure: last-good saved picture]
         │
         ▼
 Cloudflare Images (.transform → center-crop + resize to 800×480, PNG) → decode RGB
@@ -310,7 +314,7 @@ KV cache (24h)
 
 ### Key Technical Details
 
-- **Image models**: FLUX.2 klein-9b (Pipeline A, Skyline with ref photos), SDXL (Pipeline B, Skyline fallback)
+- **Image model**: FLUX.2 klein-9b for every image pipeline, including legacy 1-bit/raw and both skyline modes. Reference photos are retained; absent photos use one text-only request. Failures do not trigger another image attempt (#102).
 - **LLM**: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (scene-only prompts, no style baked in)
 - **Art styles**: Daily rotation for Pipeline A (Woodcut / Pencil Sketch / Charcoal); 6-style rotation for Pipeline B (Woodcut / Silhouette / Linocut / Noir / Pen & Ink / Charcoal Block); one shared library of 71 styles (`src/art-styles.ts`, #86) for the colour moment (70), skyline (66) and birthday portraits (51)
 - **Panel pictures**: full-colour RGB PNG, the AI image untouched apart from crop/resize and a solid black-and-white caption; the panels convert (#81). (Until #81: 4-level grayscale for the mono panel, Spectra 6 Floyd-Steinberg for the colour panel.)
@@ -380,7 +384,7 @@ DECISIONS #92, design `docs/superpowers/specs/2026-10-17-family-memory-design.md
 │  (mono ePaper│◀────│  ┌────────────────┐  │     └──────────────┘
 └─────────────┘     │  │ Workers AI     │  │     ┌──────────────┐
 ┌─────────────┐     │  │ • Llama 3.3   │  │────▶│  Open-Meteo   │
-│  reTerminal  │────▶│  │ • FLUX.2/SDXL │  │     │  (weather)    │
+│  reTerminal  │────▶│  │ • FLUX.2     │  │     │  (weather)    │
 │  E1002       │     │  ├────────────────┤  │     └──────────────┘
 │  (Spectra 6) │◀────│  │ Images API     │  │     ┌──────────────┐
 └─────────────┘     │  │ (resize+convert│  │────▶│  NWS API      │
@@ -398,7 +402,7 @@ DECISIONS #92, design `docs/superpowers/specs/2026-10-17-family-memory-design.md
 
 | Binding | Service | Purpose |
 |---------|---------|---------|
-| `env.AI` | Workers AI | LLM + image generation (SDXL + FLUX.2) |
+| `env.AI` | Workers AI | LLM + image generation (FLUX.2 only, #102) |
 | `env.IMAGES` | Cloudflare Images | Format conversion + center-crop/resize to 800×480 via `.transform()` |
 | `env.CACHE` | KV Namespace | Response caching (24h/6h) |
 | `env.PHOTOS` | R2 Bucket | Birthday portraits (`portraits/`) + skyline reference photos (`skylines/`) |

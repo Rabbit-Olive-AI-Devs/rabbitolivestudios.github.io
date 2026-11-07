@@ -19,25 +19,14 @@ import { measureText } from "./font";
 import { FONT_8X8 as FONT_DATA } from "./font";
 import { convert1Bit } from "./convert-1bit";
 import { pick1BitStyle, findStyleByName, ANTI_TEXT_SUFFIX } from "./styles-1bit";
-import { isNeuronBudgetError } from "./cache-guard";
 import type { Env, MomentBeforeData } from "./types";
 import { bytesToImageStream } from "./images-input";
-import { generateAndDecodeColor, generateAndDecodeColorFlux } from "./image-color";
+import { generateAndDecodeColorFlux } from "./image-color";
 
 export const WIDTH = 800;
 export const HEIGHT = 480;
 
-// SDXL generation params (Pipeline B + Pipeline A fallback)
-const SDXL_STEPS = 20;
-const SDXL_GUIDANCE = 7.0;
-const SDXL_WIDTH = 1024;
-const SDXL_HEIGHT = 768;
-
-// Pipeline B (1-bit) params
-const FACT1_STEPS = 20;       // Workers AI max
-const FACT1_GUIDANCE = 6.5;
-
-// FLUX.2 params (Pipeline A primary)
+// Shared text-to-image transport; each pipeline keeps its own style and processing.
 const FLUX_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
 const FLUX_WIDTH = 1024;
 const FLUX_HEIGHT = 768;
@@ -67,37 +56,9 @@ export function getSceneStyle(dateStr: string): typeof SCENE_STYLES[number] {
   return SCENE_STYLES[dayOfYear % SCENE_STYLES.length];
 }
 
-// --- AI image generation (SDXL) ---
-
-const SDXL_MODEL = "@cf/stabilityai/stable-diffusion-xl-base-1.0";
-
-export async function generateAIImage(
-  env: Env,
-  prompt: string,
-  steps: number = SDXL_STEPS,
-  guidance: number = SDXL_GUIDANCE,
-): Promise<Uint8Array> {
-  const result: any = await env.AI.run(SDXL_MODEL as any, {
-    prompt,
-    num_steps: steps,
-    guidance,
-    width: SDXL_WIDTH,
-    height: SDXL_HEIGHT,
-  });
-
-  if (result instanceof Uint8Array) return result;
-  if (result instanceof ArrayBuffer) return new Uint8Array(result);
-  if (result instanceof ReadableStream) {
-    return new Uint8Array(await new Response(result).arrayBuffer());
-  }
-  if (typeof result === "object" && result !== null) {
-    const img = result.image ?? result.images?.[0];
-    if (img && typeof img === "string") {
-      return Uint8Array.from(atob(img), (c) => c.charCodeAt(0));
-    }
-  }
-
-  throw new Error(`Unexpected AI image response type: ${typeof result}`);
+/** Legacy/raw callers use the existing FLUX multipart transport too (DECISIONS #102). */
+export async function generateAIImage(env: Env, prompt: string): Promise<Uint8Array> {
+  return generateFluxImage(env, prompt);
 }
 
 // --- AI image generation (FLUX.2 klein-9b) ---
@@ -403,11 +364,9 @@ export function burnCaption(rgb: Uint8Array, draw: (mask: Uint8Array) => void): 
 async function generateAndDecodeGray(
   env: Env,
   prompt: string,
-  steps: number = SDXL_STEPS,
-  guidance: number = SDXL_GUIDANCE,
 ): Promise<Uint8Array> {
   // 1. Generate image (returns JPEG)
-  const jpegBytes = await generateAIImage(env, prompt, steps, guidance);
+  const jpegBytes = await generateFluxImage(env, prompt);
 
   // 2. Convert JPEG → PNG via Cloudflare Images, then decode to grayscale
   const pngResponse = (await env.IMAGES.input(bytesToImageStream(jpegBytes)).output({ format: "image/png" })).response();
@@ -422,7 +381,7 @@ async function generateAndDecodeGray(
 }
 
 // --- Pipeline A: full colour, as-is (/fact.png) ---
-// Uses FLUX.2 klein-9b with daily style rotation, SDXL fallback.
+// One FLUX.2 attempt with daily style rotation; callers serve last-good cache on failure.
 
 export async function generateMomentImage(
   env: Env,
@@ -434,23 +393,7 @@ export async function generateMomentImage(
   const styledPrompt = `${style.prompt}, ${moment.imagePrompt}, no text, no words, no letters, no writing`;
   console.log(`Pipeline A: using ${style.name} style with FLUX.2`);
 
-  let rgb: Uint8Array | null = null;
-
-  // Single FLUX.2 attempt — no retry to conserve neuron budget (free tier)
-  try {
-    rgb = await generateAndDecodeColorFlux(env, styledPrompt);
-  } catch (err) {
-    console.error("Pipeline A FLUX.2 failed:", err);
-    if (isNeuronBudgetError(err)) throw err;
-  }
-
-  // Fallback to SDXL with woodcut style
-  if (!rgb) {
-    console.log("Pipeline A: FLUX.2 failed, falling back to SDXL");
-    const woodcutStyle = findStyleByName("woodcut");
-    const fallbackPrompt = `${woodcutStyle.prompt}, ${moment.imagePrompt}, ${ANTI_TEXT_SUFFIX}`;
-    rgb = await generateAndDecodeColor(env, fallbackPrompt, SDXL_STEPS, SDXL_GUIDANCE);
-  }
+  const rgb = await generateAndDecodeColorFlux(env, styledPrompt);
 
   // The picture untouched; the caption bar as solid black and white (DECISIONS #81).
   burnCaption(rgb, (mask) => drawOverlayText(mask, moment, displayDate));
@@ -458,7 +401,7 @@ export async function generateMomentImage(
 }
 
 // --- Pipeline B: style-aware 1-bit (/fact1.png) ---
-// SDXL → grayscale → style-aware 1-bit conversion (Bayer or threshold) → caption.
+// FLUX → grayscale → style-aware 1-bit conversion (Bayer or threshold) → caption.
 
 export async function generateMomentImage1Bit(
   env: Env,
@@ -473,8 +416,8 @@ export async function generateMomentImage1Bit(
   // 2. Build prompt: style + scene + anti-text
   const prompt = `${spec.prompt}, ${moment.imagePrompt}, ${ANTI_TEXT_SUFFIX}`;
 
-  // 3. Generate → grayscale → crop → resize (SDXL)
-  const gray = await generateAndDecodeGray(env, prompt, FACT1_STEPS, FACT1_GUIDANCE);
+  // 3. Generate → grayscale → crop → resize (one FLUX request)
+  const gray = await generateAndDecodeGray(env, prompt);
 
   // 4. Style-aware 1-bit conversion (with stabilization + guardrail)
   const { bits, blackRatio, styleName } = convert1Bit(gray, WIDTH, HEIGHT, spec);

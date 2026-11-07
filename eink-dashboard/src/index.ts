@@ -179,7 +179,7 @@ async function findRecentDailyPNG(
   prefix: string,
   label: string,
 ): Promise<Response | null> {
-  const hit = await findMostRecentCached(env, prefix, shiftDateStr(dateStr, -1));
+  const hit = await findMostRecentCached(env, prefix, dateStr);
   if (!hit) return null;
   try {
     const binary = Uint8Array.from(atob(hit.value), (c) => c.charCodeAt(0));
@@ -231,9 +231,8 @@ async function handleFactImage(env: Env, ctx?: ExecutionContext): Promise<Respon
   const cached = birthday ? await readBirthdayCache() : await readFactCache();
   if (cached) return cached;
 
-  // Same work whether it runs on the request path or in the background:
-  // birthday portrait first (falling through to the regular pipeline on
-  // failure), then the regular Moment Before image, then the stale fallback.
+  // One image attempt: portrait on a birthday, event otherwise. Failure uses saved
+  // event artwork instead of paying for another generation under a different name.
   const generateFresh = async (background: boolean): Promise<Response> => {
     const lockOpts = background ? { waitMs: BACKGROUND_LOCK_WAIT_MS } : {};
 
@@ -248,8 +247,10 @@ async function handleFactImage(env: Env, ctx?: ExecutionContext): Promise<Respon
         }, lockOpts);
       } catch (err) {
         await markAiBudgetExhausted(env, "fact.png birthday", err);
-        console.error("Birthday image failed, falling back to Moment Before:", err);
-        // Fall through to regular pipeline
+        console.error("Birthday image failed, serving last-good event:", err);
+        return await readFactCache()
+          ?? await findRecentDailyPNG(env, dateStr, "fact4:", "fact.png birthday")
+          ?? new Response("Birthday picture temporarily unavailable", { status: 503 });
       }
     }
 
@@ -280,8 +281,7 @@ async function handleFactImage(env: Env, ctx?: ExecutionContext): Promise<Respon
     const swr = await serveStaleWhileGenerating(
       ctx,
       "fact.png",
-      // On a birthday today's regular image may already exist (an earlier
-      // portrait failure fell through to it) — that beats yesterday's.
+      // An already-saved regular event is safe to show while a portrait is pending.
       async () => (birthday ? await readFactCache() : null)
         ?? findRecentDailyPNG(env, dateStr, "fact4:", "fact.png"),
       () => generateFresh(true),
@@ -408,7 +408,7 @@ async function findStaleSkylineCache(
   // Only daily entries are worth checking: rotate entries expire after rotateMin
   // minutes, so a previous day's bucket can never still be present. The accept
   // filter keeps a colour request from serving a :bw entry (DECISIONS #57).
-  const prev = await findMostRecentCached(env, "skyline:", shiftDateStr(dateStr, -1), {
+  const prev = await findMostRecentCached(env, "skyline:", dateStr, {
     accept: (n) => n.includes(":daily") && n.endsWith(":bw") === bwOnly,
   });
   if (prev) {
@@ -447,7 +447,7 @@ async function handleSkylinePng(env: Env, url: URL, ctx?: ExecutionContext): Pro
   const debug = skylineDebugHeaders(dateStr, mode, rotateMin, bucket, city, style.key, style.colorMode);
 
   const refPrompt = buildSkylineRefPrompt(city, style, parts.dateStr);
-  const sdxlPrompt = buildSkylinePrompt(city, style, parts.dateStr);
+  const textPrompt = buildSkylinePrompt(city, style, parts.dateStr);
   const caption = formatSkylineCaption(city, parts.displayDate, parts.dateStr);
   const photoSeed = djb2(`${dateStr}|photo|${bucket}`);
 
@@ -456,7 +456,7 @@ async function handleSkylinePng(env: Env, url: URL, ctx?: ExecutionContext): Pro
     try {
       await assertAiBudgetAvailable(env);
       console.log(`Skyline random: ${city.name} | ${style.label} (${style.colorMode})`);
-      const result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, style.colorMode, city.key, photoSeed, bwOnly);
+      const result = await generateSkylineImage(env, refPrompt, textPrompt, caption, style.colorMode, city.key, photoSeed);
       return new Response(result.png, {
         headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*", ...debug, "X-Skyline-UsedRef": String(result.usedRef) },
       });
@@ -552,9 +552,9 @@ async function handleSkylinePng(env: Env, url: URL, ctx?: ExecutionContext): Pro
     try {
       await assertAiBudgetAvailable(env);
       return await withGenerationLock(env, cacheKey, readSkylineCache, async () => {
-        console.log(`Skyline ${mode}: ${city.name} | ${style.label} (${style.colorMode}) | bucket=${bucket}${bwOnly ? " sdxlOnly" : ""}`);
+        console.log(`Skyline ${mode}: ${city.name} | ${style.label} (${style.colorMode}) | bucket=${bucket}`);
 
-        const result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, style.colorMode, city.key, photoSeed, bwOnly);
+        const result = await generateSkylineImage(env, refPrompt, textPrompt, caption, style.colorMode, city.key, photoSeed);
         await env.CACHE.put(cacheKey, result.base64, { expirationTtl: Math.max(ttl, 900) });
 
         return new Response(result.png, {
@@ -616,7 +616,7 @@ async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
   const colorMode: SkylineColorMode = colorOverride === "1" ? "color" : colorOverride === "0" ? "bw" : style.colorMode;
 
   const refPrompt = buildSkylineRefPrompt(city, { ...style, colorMode }, parts.dateStr);
-  const sdxlPrompt = buildSkylinePrompt(city, { ...style, colorMode }, parts.dateStr);
+  const textPrompt = buildSkylinePrompt(city, { ...style, colorMode }, parts.dateStr);
   const caption = formatSkylineCaption(city, parts.displayDate, parts.dateStr);
   const photoSeed = djb2(`${parts.dateStr}|photo|${bucket}`);
   console.log(`Skyline test: ${city.name} | ${style.label} (${colorMode}) | ${parts.dateStr} | mode=${mode}`);
@@ -624,7 +624,7 @@ async function handleSkylineTestPng(env: Env, url: URL): Promise<Response> {
   const debug = skylineDebugHeaders(parts.dateStr, mode, rotateMin, bucket, city, style.key, colorMode);
   let result: Awaited<ReturnType<typeof generateSkylineImage>>;
   try {
-    result = await generateSkylineImage(env, refPrompt, sdxlPrompt, caption, colorMode, city.key, photoSeed);
+    result = await generateSkylineImage(env, refPrompt, textPrompt, caption, colorMode, city.key, photoSeed);
   } catch (err) {
     await markAiBudgetExhausted(env, "skyline-test.png", err);
     console.error("Skyline test image error:", err);
@@ -920,10 +920,9 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
   }
 
   // --- Sequential image generation with neuron budget awareness ---
-  // Workers AI free tier = 10,000 neurons/day. Running in parallel would
-  // exhaust the budget before any single pipeline finishes its SDXL fallback.
-  // Sequential execution + early abort ensures core images are prioritized.
-  let budgetExhausted = false;
+  // Sequential single image attempts; an existing/new budget block stops AI,
+  // never the import of pictures Jarvis already delivered.
+  let budgetExhausted = !!(await getAiBudgetBlock(env));
   function isNeuronError(err: unknown): boolean {
     return isNeuronBudgetError(err);
   }
@@ -933,7 +932,7 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
   // each converts itself (DECISIONS #83, #84). Their routes still generate on request.
 
   // 1. Colour moment, or the colour birthday portrait — HIGHEST PRIORITY
-  if (!budgetExhausted) {
+  {
     try {
       const colorStyle = getColorMomentStyle(dateStr);
       const colorCacheKey = birthday ? colorBirthdayCacheKey(dateStr) : colorMomentCacheKey(dateStr, colorStyle.id);
@@ -946,7 +945,8 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
         console.log(`Cron: stored Jarvis's ${birthday ? "birthday portrait" : "moment"} for ${dateStr}`);
       } else if (await env.CACHE.get(colorCacheKey)) {
         console.log(`Cron: colour picture already cached for ${dateStr}`);
-      } else {
+      } else if (!budgetExhausted) {
+        await assertAiBudgetAvailable(env);
         await buildColorMomentEntry(env, dateStr, birthday, yearNum, colorDisplayDate);
         console.log(`Cron: cached ${birthday ? `colour birthday (${birthday.name})` : `colour moment (${colorStyle.name})`} for ${dateStr}`);
       }
@@ -962,25 +962,26 @@ async function warmDailyImages(env: Env, dateStr: string): Promise<void> {
   }
 
   // 2. Skyline — daily mode (one generation per day) — LOWEST PRIORITY
-  if (!budgetExhausted) {
+  {
     try {
       const skylineDailyKey = skylineCacheKey(dateStr, "daily", DEFAULT_ROTATE_MIN, 0);
       if (await storeJarvisSkyline(env, dateStr)) {
         console.log(`Cron: stored Jarvis's skyline for ${dateStr}`);
-      } else if (!(await env.CACHE.get(skylineDailyKey))) {
+      } else if (!(await env.CACHE.get(skylineDailyKey)) && !budgetExhausted) {
+        await assertAiBudgetAvailable(env);
         const skylineParts = parseDateParts(dateStr);
         const skylineOpts: SkylinePickerOpts = { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 };
         const skylineCity = pickSkylineCity(skylineParts, skylineOpts);
         const skylineStyle = pickSkylineStyle(skylineParts, skylineOpts);
         const skylineRefPrompt = buildSkylineRefPrompt(skylineCity, skylineStyle, dateStr);
-        const skylineSdxlPrompt = buildSkylinePrompt(skylineCity, skylineStyle, dateStr);
+        const skylineTextPrompt = buildSkylinePrompt(skylineCity, skylineStyle, dateStr);
         const skylineCaption = formatSkylineCaption(skylineCity, skylineParts.displayDate, dateStr);
         const skylinePhotoSeed = djb2(`${dateStr}|photo|daily`);
-        const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineSdxlPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
+        const skylineResult = await generateSkylineImage(env, skylineRefPrompt, skylineTextPrompt, skylineCaption, skylineStyle.colorMode, skylineCity.key, skylinePhotoSeed);
         await env.CACHE.put(skylineDailyKey, skylineResult.base64, { expirationTtl: 604800 });
         console.log(`Cron: cached skyline daily (${skylineCity.name}, ${skylineStyle.label}, ref=${skylineResult.usedRef})`);
       } else {
-        console.log(`Cron: skyline already cached for today`);
+        console.log("Cron: skyline already cached or AI paused");
       }
     } catch (err) {
       if (isNeuronError(err)) {

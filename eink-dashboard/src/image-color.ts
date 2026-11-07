@@ -4,7 +4,7 @@
  */
 
 import { decodePNG } from "./png-decode";
-import { generateAIImage, generateFluxImage, WIDTH, HEIGHT } from "./image";
+import { generateFluxImage, WIDTH, HEIGHT } from "./image";
 import type { Env } from "./types";
 import { bytesToImageStream } from "./images-input";
 
@@ -21,19 +21,6 @@ export async function jpegToRGB(env: Env, jpegBytes: Uint8Array): Promise<Uint8A
   const decoded = await decodePNG(new Uint8Array(await pngResponse.arrayBuffer()));
   if (!decoded.rgb) throw new Error("Expected color PNG but got grayscale");
   return decoded.rgb;
-}
-
-// --- AI model → RGB 800×480 (SDXL) ---
-
-export async function generateAndDecodeColor(
-  env: Env,
-  prompt: string,
-  steps: number = 20,
-  guidance: number = 7.0,
-): Promise<Uint8Array> {
-  const jpegBytes = await generateAIImage(env, prompt, steps, guidance);
-
-  return jpegToRGB(env, jpegBytes);
 }
 
 // --- AI model → RGB 800×480 (FLUX.2) ---

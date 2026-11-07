@@ -50,6 +50,10 @@ The public mailbox scripts, their tests and prompt use the generic owner-notice 
 
 Historical host notes below describe the previous installation unless this checkpoint says otherwise. Generic owner-notice names in the public documentation are privacy substitutions, not claims that historical or installed files were renamed.
 
+## Image-model retirement repair — November 7, 2026
+
+DECISIONS #102 supersedes the SDXL transport/fallback parts of earlier records. All image routes now use the existing FLUX multipart requests; styles, photo references, captions, conversion and 800×480 output stay separate and unchanged. One image attempt, then last-good cache, including same-date older versions. A birthday may reuse today's saved portrait or a saved event, never another day's portrait. With an empty colour cache the page renders a text-only 800×480 fallback. The daily warm imports delivered art even when an existing/new budget block pauses AI. No cron, panel setting, credential, billing or application-version change. See [implementation and release evidence](docs/operations/2026-11-07-image-model-retirement.md). The protected legacy `CLAUDE.md` is not edited; its SDXL guidance is historical and superseded by this checkpoint.
+
 ## Long Drift web archive — October 26, 2026
 
 `/series/book` is the owner's phone-friendly reader, modelled on the desk web book. Contents include only chapters with aired scenes; scene pages have previous/next links and a full-size PNG. `/series/book/image?p=PATH` extracts the exact embedded PNG from its stored panel HTML. Both routes use the existing `airedPages(schedule, now)` gate independently. Public access matches the already-public `/series/aired` contract; preview times and keys do not unlock anything. No AI, KV writes, cron jobs, panel settings, version change or website-root change. The keyed desk storybook and all existing series routes stay unchanged. Source is `src/series/book.ts`; focused tests are `tests/series-book.test.js`.
@@ -125,7 +129,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 
 | Binding / secret | Service | Use |
 |---|---|---|
-| `env.AI` | Workers AI | Llama 3.3 70B (event selection), FLUX.2 klein-9b and SDXL (images) |
+| `env.AI` | Workers AI | Llama 3.3 70B (event selection), FLUX.2 klein-9b (all image routes, #102) |
 | `env.IMAGES` | Cloudflare Images | JPEG to PNG, centre-crop and resize to 800x480 |
 | `env.CACHE` | KV namespace `de97776d35af4df08b13fd2158acebdc` | Every cache in the project |
 | `env.PHOTOS` | R2 bucket `eink-birthday-photos` | `portraits/` (birthday references), `skylines/` (city references) |
@@ -153,17 +157,17 @@ All pipelines share one LLM-selected event per day through `getOrGenerateMoment(
 
 | | A: `/fact.png` | B: `/fact1.png` | C: birthday | D: `/color/moment` | E: skyline |
 |---|---|---|---|---|---|
-| Model | FLUX.2 klein-9b, SDXL fallback | SDXL | FLUX.2 at 1280x768 + up to 4 face-cropped R2 photos, picked from the Photos library (#85, #87) | FLUX.2, SDXL fallback | FLUX.2 + R2 reference photo, SDXL fallback; BW variant is SDXL only |
+| Model | FLUX.2 klein-9b | FLUX.2 klein-9b | FLUX.2 at 1280x768 + up to 4 face-cropped R2 photos (#85, #87) | FLUX.2 klein-9b | FLUX.2 with R2 reference photo when available; otherwise text-only. Both modes (#102) |
 | Style rotation | 3, by day of year | 6, by hash of date/title/location | 51 from the shared library (#86), random per person and year, never shared in a year or repeated within a block | 70 from the shared library, random daily order, no repeat until all used (#86) | 66 from the shared library over 30 cities, never the moment's style that day (#86) |
 | Output | Full colour as-is (#81) | 1-bit PNG (Bayer or threshold per style) | Full colour as-is (#81) | Full colour as-is (#81) | Full colour as-is, both modes (#81) |
-| Cache key | `fact4:v5:DATE` | `fact1:v7:DATE` | `birthday:v3:DATE`, `color-birthday:v3:DATE` | `color-moment:v4:DATE:STYLE` | `skyline:v5:DATE:daily[:bw]` |
+| Cache key | `fact4:v6:DATE` | `fact1:v8:DATE` | `birthday:v3:DATE`, `color-birthday:v4:DATE` | `color-moment:v5:DATE:STYLE` | `skyline:v6:DATE:daily[:bw]` |
 
 Facts that have each cost real debugging time:
 
 - The brand is "Moment Before" but the prompt depicts **the event itself** at its defining moment; calm pre-event scenes were unreadable on e-ink (#7).
-- FLUX.2 takes multipart FormData, SDXL takes JSON. SDXL has no `negative_prompt`, so negatives go in the positive prompt, and it caps at 20 steps.
+- Every image request uses FLUX.2 multipart FormData, not SDXL JSON. Swapping only the model ID would break the request contract (#102).
 - **`env.IMAGES.input()` must be given a ReadableStream.** Raw bytes throw `undefined (reading 'font')` *after* the AI call has been billed. Always wrap with `bytesToImageStream()` from `src/images-input.ts` (#59).
-- **One FLUX attempt, then fall back. No retry loops.** When changing a retry or budget pattern, grep every call site; a past fix missed four of five (#38).
+- **One FLUX attempt, then last-good cache, never another image call. No retry loops.** When changing a retry or budget pattern, grep every call site; a past fix missed four of five (#38).
 - **Since 2026-10-15 the panels get every picture as-is** (#81): full colour, untouched, caption burned in as solid black and white by `burnCaption()`; each panel converts it, which the owner judged far better than our own 4-grey and Spectra 6 conversions (first seen with the series, #73). Do not add a conversion step back without the owner comparing on the panels. History: Floyd–Steinberg was used for the colour panel and Bayer/threshold for mono (#4, #14); captions were drawn after dithering so diffused error could not corrupt them (#64). Only `/fact1.png` (1-bit, unused by the panels) still converts. The prompts lost the hints written for our conversion (palette, flat colour, no gradients, no micro-detail); Pipeline B and the shared scene prompt in `moment.ts` keep theirs. Text pages (`/weather`, `/color/weather`, `/color/headlines`) were never converted by us; their pure-black rule is for legibility and stands. On the desk pages the crest and planet are full colour (`flamengo:v3:state`), so the desk pages also suit the E1002.
 - **The series is a separate, offline pipeline** (#71): pictures from the writers are cropped and lettered by `scripts/series-import.mjs` on the Mac mini and stored in R2 as finished one-request HTML pages, the picture untouched in full colour. Every panel gets the same page and converts it itself; the series does no dithering of its own (#73). The Worker only passes one stored page through per request. Never move that work onto the request path. Claude paints its own pictures with `scripts/series-paint/painter.py` (gouache over a code-drawn underpainting, #74); the owner approves every writer's look from story-free style tests.
 - Workers cannot run native image libraries; the PNG encoder and decoder are hand-written (`png.ts`, `png-decode.ts`) and the caption font is an 8x8 bitmap.
@@ -195,7 +199,7 @@ Everything here runs inside hard free-tier limits. Cost any change against them 
 
 | Budget | Limit | Normal use | Notes |
 |---|---|---|---|
-| Workers AI neurons | 10,000/day, nominally resets 00:00 UTC, **but the reset lags by hours** (#88) | ~2,000-2,800 since #84 (two FLUX pictures a night) | FLUX.2 klein-9b costs ~1,000-1,400 per image and is essentially the whole bill; SDXL bills 0. Both panels share one account-wide pool: either can blank the other. Before spending AI on tests, count the previous UTC day's usage too until about 06:00 UTC (#88). |
+| Workers AI neurons | 10,000/day, nominally resets 00:00 UTC, **but the reset lags by hours** (#88) | ~2,000-2,800 since #84 (two FLUX pictures a night) | FLUX.2 klein-9b costs ~1,000-1,400 per image and is essentially the whole bill. Older zero-neuron SDXL observations are historical; all image calls now consume FLUX allowance (#102). Both panels share one account-wide pool: either can blank the other. Before spending AI on tests, count the previous UTC day's usage too until about 06:00 UTC (#88). |
 | KV writes | 1,000/day | ~590, plus ~96 once both Macs report to TARS, plus 4 to 12 for the Flamengo board | The tightest budget. Mostly weather/alerts/device caches refreshed by two panels polling every 15 minutes. About 400 spare (#62). |
 | KV lists | 1,000/day | 0 on a healthy day | Only the stale fallback lists, and its listings are memoised for 6h. |
 | R2 (series) | 10 GB stored, 10 M reads and 1 M writes a month | ~2 reads per panel poll; ~160 writes per chapter upload | Far inside the free tier (#71). |
@@ -328,7 +332,7 @@ Things that are not obvious:
 - "Failed to retrieve account IDs" means the account ID was not passed inline. It is not an auth failure.
 - `Authentication error [code: 10000]` on deploy means the OAuth login was revoked. The owner runs `npx wrangler logout && npx wrangler login` themselves.
 - Plain `wrangler dev` runs `env.IMAGES` in local mode and does **not** reproduce edge Images faults. `wrangler dev --remote` under the real Worker name inherits production secrets, so the test routes return 404. To test against real bindings, run under a different name with a copy of `wrangler.toml` and a throwaway KV namespace, and put any needed values in `.dev.vars` (gitignored).
-- `/test1.png` uses SDXL, which has billed 0 neurons, so it is the cheap way to exercise a pipeline end to end.
+- `/test1.png` now uses FLUX and consumes allowance (#102). Use offline synthetic regressions first; do not assume a legacy route is free.
 - After any deploy that touches `[triggers]`, confirm the live schedule through the Cloudflare API (`/accounts/{id}/workers/scripts/eink-dashboard/schedules`).
 - Real neuron and KV usage come from the GraphQL analytics API (`aiInferenceAdaptiveGroups`, `kvOperationsAdaptiveGroups`); the exact queries are in the incident report and DECISIONS #62. Do not trust a `4006` error at face value: Cloudflare has returned false ones, and the midnight reset can lag by an hour.
 - Browser screenshots must be taken over http(s), with a cache-busting query parameter, at an 800x480 viewport.
@@ -426,7 +430,7 @@ This is separate from the Muse firmware experiment above, which concerns the fir
 
 - The E1002 pagelist may effectively show the skyline twice if it still includes the legacy `/color/apod` entry.
 - Headline freshness: the news shown can be stale; unsolved, and moot while the page is retired (#82).
-- SDXL has billed 0 neurons for weeks. Unverified whether it is free or unreported, so no model switch has been made on that basis.
+- Historical zero-neuron SDXL observations were inconclusive. The November retirement repair removes SDXL for availability, not an assumed price advantage (#102).
 - No persistent logging of weather cold-path or budget events (#43).
 - The alert check does not watch KV operation counts (#62).
 

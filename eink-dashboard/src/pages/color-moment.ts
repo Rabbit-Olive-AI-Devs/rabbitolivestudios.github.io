@@ -10,7 +10,7 @@
 
 import { fetchWithTimeout } from "../fetch-timeout";
 import type { Env, MomentBeforeData } from "../types";
-import { getChicagoDateParts, shiftDateStr } from "../date-utils";
+import { getChicagoDateParts } from "../date-utils";
 import { findMostRecentCached } from "../stale-cache";
 import { getTodayEvents } from "../fact";
 import { getOrGenerateMoment, generateMomentBefore } from "../moment";
@@ -18,8 +18,9 @@ import { stylesFor, momentStyleFor } from "../art-styles";
 import type { ArtStyle } from "../art-styles";
 import { getBirthdayToday, getBirthdayByKey, getBirthdayStyle, resolveBirthdayStyle, BIRTHDAY_STYLES } from "../birthday";
 import type { BirthdayPerson } from "../birthday";
-import { callFluxPortrait, fetchReferencePhotos, ageDescription } from "../birthday-image";
-import { generateAndDecodeColorFlux, generateAndDecodeColor, jpegToRGB } from "../image-color";
+import { callFluxPortrait, fetchReferencePhotos } from "../birthday-image";
+import { generateAndDecodeColorFlux, jpegToRGB } from "../image-color";
+import { unavailableHTML } from "./unavailable";
 import { encodePNGRGB, pngToBase64 } from "../png";
 import { spectra6CSS } from "../spectra6";
 import { WIDTH, HEIGHT } from "../image";
@@ -30,7 +31,6 @@ import { colorBirthdayCacheKey, colorMomentCacheKey } from "../cache-keys";
 import {
   assertAiBudgetAvailable,
   getAiBudgetBlock,
-  isNeuronBudgetError,
   markAiBudgetExhausted,
   serveStaleWhileGenerating,
   withGenerationLock,
@@ -59,21 +59,7 @@ export async function generateColorMoment(
   console.log(`Color moment style: ${style.name} (${style.id})`);
   const prompt = `${style.prompt}, ${moment.imagePrompt}, ${ANTI_TEXT_SUFFIX}`;
 
-  let rgb: Uint8Array | null = null;
-
-  // Single FLUX.2 attempt — no retry to conserve neuron budget (free tier)
-  try {
-    rgb = await generateAndDecodeColorFlux(env, prompt);
-  } catch (err) {
-    console.error("Color moment FLUX.2 failed:", err);
-    if (isNeuronBudgetError(err)) throw err;
-  }
-
-  // Fallback to SDXL
-  if (!rgb) {
-    console.log("Color moment: FLUX.2 failed, falling back to SDXL");
-    rgb = await generateAndDecodeColor(env, prompt);
-  }
+  const rgb = await generateAndDecodeColorFlux(env, prompt);
 
   // The picture untouched in full colour; the panel converts it itself (DECISIONS #81).
   const png = await encodePNGRGB(rgb, WIDTH, HEIGHT);
@@ -92,23 +78,9 @@ async function generateColorBirthday(
   const photos = await fetchReferencePhotos(env, person.key);
   console.log(`Color birthday: found ${photos.length} reference photo(s) for ${person.key}`);
 
-  // Single FLUX.2 attempt — no retry to conserve neuron budget (free tier)
-  let rgb: Uint8Array | null = null;
-  try {
-    const jpegBytes = await callFluxPortrait(env, person, style.prompt, photos, currentYear);
-    rgb = await jpegToRGB(env, jpegBytes);
-  } catch (err) {
-    console.error("Color birthday FLUX.2 failed:", err);
-    if (isNeuronBudgetError(err)) throw err;
-  }
-
-  // Fallback: SDXL with text-only prompt (no reference photos — API limitation)
-  if (!rgb) {
-    console.log("Color birthday: FLUX.2 failed, falling back to SDXL");
-    const ageLine = ageDescription(person, currentYear);
-    const prompt = `artistic portrait of ${ageLine}, ${style.prompt}, head and shoulders, centered composition, looking at viewer, smiling, ${ANTI_TEXT_SUFFIX}`;
-    rgb = await generateAndDecodeColor(env, prompt);
-  }
+  // One reference-aware attempt. Never spend again to invent a text-only likeness.
+  const jpegBytes = await callFluxPortrait(env, person, style.prompt, photos, currentYear);
+  const rgb = await jpegToRGB(env, jpegBytes);
 
   // The picture untouched in full colour; the panel converts it itself (DECISIONS #81).
   const png = await encodePNGRGB(rgb, WIDTH, HEIGHT);
@@ -197,8 +169,8 @@ function renderHTML(
 const BACKGROUND_LOCK_WAIT_MS = 60_000;
 
 /**
- * Generate the day's colour picture — the birthday portrait on a family birthday (falling
- * back to the moment if it fails), the moment otherwise — and cache it under its key.
+ * Generate the day's colour picture — the birthday portrait on a family birthday,
+ * the moment otherwise — and cache it under its key. Callers handle failure via last-good cache.
  * Shared by the page and the daily cron, which warms it first (DECISIONS #84).
  */
 export async function buildColorMomentEntry(
@@ -216,17 +188,8 @@ export async function buildColorMomentEntry(
     const age = currentYear - birthday.birthYear;
     const style = getBirthdayStyle(birthday, currentYear);
     moment = { year: currentYear, location: "", title: birthday.name, scene: "", imagePrompt: "" };
-    try {
-      imageB64 = await generateColorBirthday(env, birthday, currentYear);
-      birthdayInfo = { name: birthday.name, age, styleName: style.name };
-    } catch (err) {
-      if (isNeuronBudgetError(err)) throw err;
-      console.error("Color birthday failed, falling back to moment:", err);
-      const { events } = await getTodayEvents(env, dateStr);
-      moment = await getOrGenerateMoment(env, events, dateStr);
-      const result = await generateColorMoment(env, moment, dateStr);
-      imageB64 = result.base64;
-    }
+    imageB64 = await generateColorBirthday(env, birthday, currentYear);
+    birthdayInfo = { name: birthday.name, age, styleName: style.name };
   } else {
     const { events } = await getTodayEvents(env, dateStr);
     moment = await getOrGenerateMoment(env, events, dateStr);
@@ -307,13 +270,10 @@ export async function handleColorMomentPage(env: Env, url: URL, ctx?: ExecutionC
       // failed fetch as an error page, so a day-old illustration is strictly better
       // than a broken panel — and entries live 7 days, so one is usually there
       // (DECISIONS #57).
-      const stale = await findRecentColorMoment(env, dateStr);
+      const stale = await findRecentColorMoment(env, dateStr, !!birthday);
       if (stale) return stale;
 
-      return new Response("Color moment temporarily unavailable", {
-        status: 503,
-        headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "300" },
-      });
+      return htmlResponse(unavailableHTML("Moment Before", "Today's picture is temporarily unavailable. Please try again later."), "no-store");
     }
   };
 
@@ -321,7 +281,7 @@ export async function handleColorMomentPage(env: Env, url: URL, ctx?: ExecutionC
     const swr = await serveStaleWhileGenerating(
       ctx,
       "color/moment",
-      () => findRecentColorMoment(env, dateStr),
+      () => findRecentColorMoment(env, dateStr, !!birthday),
       () => generateFresh(true),
     );
     if (swr) return swr;
@@ -338,9 +298,13 @@ export async function handleColorMomentPage(env: Env, url: URL, ctx?: ExecutionC
  * (DECISIONS #57).
  */
 async function findRecentColorMoment(
-  env: Env, dateStr: string,
+  env: Env, dateStr: string, birthday: boolean,
 ): Promise<Response | null> {
-  const hit = await findMostRecentCached(env, "color-moment:", shiftDateStr(dateStr, -1));
+  // Include today's pre-migration version. Never substitute another day's portrait.
+  const portrait = birthday
+    ? await findMostRecentCached(env, "color-birthday:", dateStr, { maxDaysBack: 1 })
+    : null;
+  const hit = portrait ?? await findMostRecentCached(env, "color-moment:", dateStr);
   if (!hit) return null;
   try {
     const data = JSON.parse(hit.value);

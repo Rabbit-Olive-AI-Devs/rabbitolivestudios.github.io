@@ -2,7 +2,7 @@
  * World Skyline Series — image generation + post-processing.
  *
  * Primary:    FLUX.2 + reference photo from R2 → artistic reinterpretation (when photo available)
- * Fallback:   SDXL text-only (when no reference photo, or FLUX.2 fails)
+ * No reference: FLUX.2 text-only. Failure: callers serve their last-good cache.
  *
  * Both modes: → RGB crop/resize → caption bar in solid black and white → full-colour PNG, the
  * picture untouched. The panels convert it themselves (DECISIONS #81); the BW/colour modes now
@@ -20,11 +20,6 @@ import { encodePNGRGB, pngToBase64 } from "./png";
 import { FONT_8X8 as FONT_DATA, measureText } from "./font";
 import { jpegToRGB } from "./image-color";
 import { getPhotoFromR2 } from "./birthday-image";
-import { isNeuronBudgetError } from "./cache-guard";
-
-// SDXL params (same as Pipeline B — stable for architectural subjects)
-const SDXL_STEPS = 20;
-const SDXL_GUIDANCE = 7.0;
 
 // FLUX.2 params
 const FLUX_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
@@ -240,44 +235,22 @@ function drawSkylineCaptionRGB(
   }
 }
 
-// --- Core generation: FLUX.2 with ref photo → SDXL fallback ---
+// --- Core generation: one FLUX.2 request, with a reference when available ---
 
-/**
- * Generate the raw JPEG bytes for a skyline, trying FLUX.2 with reference photo first.
- * Returns { jpeg, usedRef } so callers know which path was taken.
- */
+/** A failed reference request is not retried as text-only; the caller serves last-good cache. */
 async function generateSkylineJpeg(
   env: Env,
   refPrompt: string,
-  sdxlPrompt: string,
+  textPrompt: string,
   cityKey: string,
   photoSeed: number,
-  sdxlOnly: boolean = false,
 ): Promise<{ jpeg: Uint8Array; usedRef: boolean }> {
-  if (!sdxlOnly) {
-    // Try to fetch reference photos from R2
-    const photos = await fetchSkylinePhotos(env, cityKey);
-
-    if (photos.length > 0) {
-      const photo = pickPhoto(photos, photoSeed);
-      console.log(`Skyline: found ${photos.length} ref photo(s) for ${cityKey}, using FLUX.2`);
-
-      // Single FLUX.2 attempt — no retry to conserve neuron budget (free tier)
-      try {
-        const jpeg = await callFluxSkyline(env, refPrompt, photo);
-        return { jpeg, usedRef: true };
-      } catch (err) {
-        console.error("Skyline FLUX.2 failed:", err);
-        if (isNeuronBudgetError(err)) throw err;
-        console.log("Skyline: falling back to SDXL");
-      }
-    }
-  } else {
-    console.log("Skyline: SDXL-only mode (skipping FLUX.2 to conserve neurons)");
+  const photos = await fetchSkylinePhotos(env, cityKey);
+  if (photos.length > 0) {
+    const jpeg = await callFluxSkyline(env, refPrompt, pickPhoto(photos, photoSeed));
+    return { jpeg, usedRef: true };
   }
-
-  // SDXL fallback (no reference photo, FLUX.2 failed, or sdxlOnly)
-  const jpeg = await generateAIImage(env, sdxlPrompt, SDXL_STEPS, SDXL_GUIDANCE);
+  const jpeg = await generateAIImage(env, textPrompt);
   return { jpeg, usedRef: false };
 }
 
@@ -295,20 +268,19 @@ export interface SkylineImageResult {
 /**
  * Generate a skyline image with caption baked into the PNG.
  *
- * Tries FLUX.2 + reference photo first; falls back to SDXL text-only. Both modes send the
+ * Uses FLUX.2 + reference photo, or text-only when no photo exists. Both modes send the
  * picture untouched in full colour with a solid black-and-white caption bar (DECISIONS #81).
  */
 export async function generateSkylineImage(
   env: Env,
   refPrompt: string,
-  sdxlPrompt: string,
+  textPrompt: string,
   caption: { left: string; center: string; right: string },
   colorMode: SkylineColorMode,
   cityKey: string,
   photoSeed: number,
-  sdxlOnly: boolean = false,
 ): Promise<SkylineImageResult> {
-  const { jpeg, usedRef } = await generateSkylineJpeg(env, refPrompt, sdxlPrompt, cityKey, photoSeed, sdxlOnly);
+  const { jpeg, usedRef } = await generateSkylineJpeg(env, refPrompt, textPrompt, cityKey, photoSeed);
   const png = await finishSkylinePNG(await jpegToRGB(env, jpeg), caption);
   return { png, base64: pngToBase64(png), colorMode, usedRef };
 }
