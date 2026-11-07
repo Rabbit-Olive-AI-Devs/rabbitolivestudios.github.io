@@ -38,7 +38,14 @@ Browser states: cold blocked budget; saved event; today's older-version birthday
 
 Before deployment, authenticated Cloudflare source readback found **one** retiring-model reference. The active version was `be422228-ad28-452f-b873-07a5008df27b` at 100%; its source and deployment projection were retained privately for recovery.
 
-**Production release: pending at this source commit.** The release result and exact deployed-source readback will be appended after deployment, not inferred from local tests.
+**Production release: deployed and read back on 2026-11-07 at 17:28 UTC.**
+
+- Implementation commit: [`667660c032d646a335fbdbf31d8e2982563c7346`](https://github.com/Rabbit-Olive-AI-Devs/rabbitolivestudios.github.io/commit/667660c032d646a335fbdbf31d8e2982563c7346), pushed and exact remote branch read back.
+- Active Worker version: `0b949b79-6f3a-4017-b8a5-51eed609bcfa`, **100%** of traffic; deployment `b3904f5d-031a-46e9-8add-01db8a3452a5`.
+- Authenticated source download: **zero retiring-model references**, with the three existing FLUX transport definitions retained.
+- The downloaded `index.js` matches a fresh local Wrangler bundle **byte-for-byte**: 755,518 bytes; SHA256 `3dfcbaeaa7a67617315c492cf42bff72a669befc451ab4ba9450fc6368e440c2`.
+- Live schedule API readback retains exactly `35 4,5 * * *` and `5 0,6,12,18 * * *`. Application version remains **3.25.0**.
+- No live model test, physical panel observation or unobserved future scheduled run is claimed. This verifies the released code and schedule independently of the local failure simulations.
 
 ## Limits and operating notes
 
