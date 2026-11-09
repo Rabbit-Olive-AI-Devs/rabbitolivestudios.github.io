@@ -312,15 +312,20 @@ function cmdRun() {
   for (const f of ready) {
     let ok = false;
     try { ok = handle(f, m); } catch (err) { log(`${f}: ${err.stack ?? err}`); }
-    attempts[f] = (attempts[f] ?? 0) + 1;
+    const blocked = ok === "blocked";
+    ok = ok === true;
+    attempts[f] = blocked ? MAX_ATTEMPTS : (attempts[f] ?? 0) + 1;
     if (!ok && attempts[f] < MAX_ATTEMPTS) { log(`${f}: not handled (attempt ${attempts[f]}), will retry`); continue; }
     if (!ok) {
-      reply("could-not-handle", `FYI: I could not handle ${f} after ${MAX_ATTEMPTS} tries. It waits for Thiago's next session with Claude.`);
-      note(`A message from Jarvis (${f}) needs a Claude session.`);
+      reply("could-not-handle", blocked
+        ? `FYI: ${f} was stopped by an access or verification failure. No automatic retry. The original files are retained; Jarvis must review the failed receipt.`
+        : `FYI: I could not handle ${f} after ${MAX_ATTEMPTS} tries. The original files are retained; Jarvis must recover the remaining delivery.`);
+      note(`A message from Jarvis (${f}) needs a Jarvis session. See the failed receipt.`);
     }
     fs.renameSync(path.join(INBOX, f), path.join(INBOX, "done", f));
     delete attempts[f];
     log(`${f}: ${ok ? "handled" : "gave up"}`);
+    if (blocked) break; // Do not continue cloud operations after an access/verification refusal.
   }
   fs.writeFileSync(ATTEMPTS, JSON.stringify(attempts));
 }
@@ -329,16 +334,20 @@ function cmdRun() {
 
 const ART_OUT = path.join(OUTBOX, "art");
 const ART_IN = path.join(INBOX, "art");
-/**
- * Runs a wrangler R2 command, once more after 10 s if it fails: Cloudflare's API fails
- * transiently now and then (a request error, an auth 10000), and every call here is safe to
- * repeat. Jarvis's 19 Oct 2026 pictures missed their upload that way.
- */
+/** Classify both streams without putting raw credential-bearing diagnostics in a receipt. */
+function wranglerFailure(result) {
+  const text = `${result.stdout ?? ""} ${result.stderr ?? ""}`;
+  if (/\b(?:401|403|429)\b|code:\s*(?:10000|9109)\b|authenticat|unauthori[sz]ed|forbidden|access denied|quota|rate limit|budget|consent|challenge/i.test(text)) return "access";
+  if (/fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|UND_ERR|socket hang up|HTTP\s*5\d\d\b/i.test(text) || result.error?.code === "ETIMEDOUT") return "transient";
+  return "unknown";
+}
+
+/** Only recognised transport faults get one bounded retry; denials are never retried. */
 function wrangler(args) {
-  const run = () => spawnSync("npx", ["wrangler", ...args], { cwd: REPO, encoding: "utf8", env: process.env });
+  const run = () => spawnSync("npx", ["wrangler", ...args], { cwd: REPO, encoding: "utf8", env: process.env, timeout: 90_000, maxBuffer: 1024 * 1024 });
   const first = run();
-  if (first.status === 0) return first;
-  log(`wrangler ${args.slice(0, 3).join(" ")} failed, retrying: ${(first.stderr ?? "").replace(/\x1b\[[0-9;]*m/g, "").slice(-200).replace(/\s+/g, " ")}`);
+  if (first.status === 0 || wranglerFailure(first) !== "transient") return first;
+  log(`wrangler ${args.slice(0, 3).join(" ")}: transient transport failure; retrying once`);
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * 1000);
   return run();
 }
@@ -447,6 +456,7 @@ function artDelivery(file, date) {
   }
   const found = fs.existsSync(ART_IN) ? fs.readdirSync(ART_IN).filter((f) => f.startsWith(`${date}-`)) : [];
   const lines = [];
+  let deliveryState = true;
   fs.mkdirSync(path.join(ART_IN, "done"), { recursive: true });
   // When the brief left the event to Jarvis, his note carries what he drew: title / year / place.
   const text = fs.readFileSync(path.join(INBOX, file), "utf8");
@@ -458,9 +468,30 @@ function artDelivery(file, date) {
     const ext = f.split(".").pop().toLowerCase();
     const full = path.join(ART_IN, f);
     const buf = fs.readFileSync(full);
-    if (buf.length > ART_MAX_BYTES || !looksLikeImage(buf, ext)) { lines.push(`- ${f}: not uploaded (not a ${ext} image, or over 15 MB)`); continue; }
-    const r = wrangler(["r2", "object", "put", `${ART_BUCKET}/art/${date}/${kind}`, "--file", full, "--content-type", ART_TYPES[ext], "--remote"]);
-    if (r.status !== 0) { lines.push(`- ${f}: upload failed, I will look at it`); log(`art upload ${f}: ${(r.stderr ?? "").slice(-300)}`); continue; }
+    if (buf.length > ART_MAX_BYTES || !looksLikeImage(buf, ext)) { lines.push(`- ${f}: not uploaded (not a ${ext} image, or over 15 MB); original retained`); deliveryState = "blocked"; break; }
+    const key = `${ART_BUCKET}/art/${date}/${kind}`;
+    const r = wrangler(["r2", "object", "put", key, "--file", full, "--content-type", ART_TYPES[ext], "--remote"]);
+    if (r.status !== 0) {
+      const reason = wranglerFailure(r);
+      lines.push(`- ${f}: upload failed (${reason}); original retained${reason === "transient" ? "; delivery remains pending" : "; no automatic retry"}`);
+      log(`art upload ${f}: ${reason} failure`);
+      deliveryState = reason === "transient" ? false : "blocked";
+      if (deliveryState === "blocked") break;
+      continue;
+    }
+    // Exit zero is not acceptance: compare the actual stored copy before archiving the source.
+    const verifyDir = fs.mkdtempSync(path.join(WORK, "art-verify-"));
+    const stored = path.join(verifyDir, f);
+    const readback = wrangler(["r2", "object", "get", key, "--file", stored, "--remote"]);
+    if (readback.status !== 0 || !fs.existsSync(stored) || !fs.readFileSync(stored).equals(buf)) {
+      const reason = readback.status !== 0 ? wranglerFailure(readback) : "mismatch";
+      lines.push(`- ${f}: stored-copy verification failed (${reason}); original retained${reason === "transient" ? "; delivery remains pending" : "; no automatic retry"}`);
+      log(`art verification ${f}: ${reason}; evidence retained at ${verifyDir}`);
+      deliveryState = reason === "transient" ? false : "blocked";
+      if (deliveryState === "blocked") break;
+      continue;
+    }
+    fs.rmSync(verifyDir, { recursive: true, force: true });
     fs.renameSync(full, path.join(ART_IN, "done", f));
     lines.push(`- ${f}: received`);
     if (kind === "moment" && chosen.title && Number.isInteger(chosen.year) && chosen.year > -5000 && chosen.year <= 2100) {
@@ -474,7 +505,7 @@ function artDelivery(file, date) {
   const when = date === tomorrow ? "Tonight's 23:35 run puts them on the panels for tomorrow." : "The 00:35 run tonight puts them on the panels; until then today's pictures stay.";
   reply(`art-received-${date}`, `FYI: reply to ${file}\n\n${lines.join("\n")}\n\n${when}`);
   log(`art delivery ${date}: ${lines.join(" | ")}`);
-  return true;
+  return deliveryState;
 }
 
 // ---------------------------------------------------------------- weekly chapter

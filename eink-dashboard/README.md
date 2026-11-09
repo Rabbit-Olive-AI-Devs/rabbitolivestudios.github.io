@@ -1,5 +1,7 @@
 # E-Ink "Moment Before" Dashboard
 
+> **Daily-art uploader repair — 2026-11-08 (#103).** Failed uploads remain pending rather than falsely handled; denials stop without blind retries. Received now requires an exact stored-copy comparison. No scheduler, panel, model or Worker change. See [the operational repair record](docs/operations/2026-11-08-art-upload-recovery.md).
+
 > **Current production handover — 2026-10-24.** Jarvis/Hermes owns unfinished engineering, writing and operations; the configured agent is Codex and independent chapter review remains with Volt. The MacBook is the sole scheduled production host. All seven former mini jobs are stopped and disabled. Historical Claude work, credits and documentation are preserved; Claude is not the selected runtime. The owner-requested functional writing test passed through the unmodified installed weekly producer and live native Codex, producing a synthetic day, art brief and mailbox handoff with the real checker. Real production content stayed unchanged. Operational handover is complete; the next genuinely new scheduled batch and physical display observation are separate claims. See [current operations and scheduling](OPERATIONS.md) for responsibilities, the seven Mac jobs and six Hermes cron jobs. Earlier mini/Claude operator descriptions below are historical unless explicitly retained there.
 
 
