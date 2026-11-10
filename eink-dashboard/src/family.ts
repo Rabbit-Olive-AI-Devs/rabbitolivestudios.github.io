@@ -162,15 +162,31 @@ export async function familyPicture(env: Env, date: string): Promise<{
  */
 export async function storeFamily(env: Env, date: string): Promise<"jarvis" | "photo" | null> {
   const meta = await env.PHOTOS.get(META_KEY(date));
-  if (!meta) return null;
   let parsed: { taken: string; place: string } | null = null;
-  try { parsed = parsePhotoMeta(await meta.json()); } catch { /* checked below */ }
-  if (!parsed) { console.error(`Family ${date}: bad photo.json`); return null; }
+  if (meta) {
+    try { parsed = parsePhotoMeta(await meta.json()); } catch { /* checked below */ }
+    if (!parsed) { console.error(`Family ${date}: bad photo.json`); return null; }
+  } else {
+    // The first warm may have stored the reference photo and removed its temporary
+    // metadata before a late painting arrived. Reuse only this day's validated,
+    // already-stored caption; do not retain the private source photo any longer.
+    const raw = await env.CACHE.get(familyCacheKey(date));
+    const stored = raw ? parseStoredFamily(raw) : null;
+    const caption = stored?.caption;
+    if (!caption || !stored?.image || caption.style !== familyStyleFor(date).id ||
+        !Number.isInteger(caption.yearsAgo) || caption.yearsAgo !== yearsAgo(caption.date, date) ||
+        caption.date > date) return null;
+    const takenDate = new Date(`${caption.date}T00:00:00Z`);
+    if (!Number.isFinite(takenDate.getTime()) || takenDate.toISOString().slice(0, 10) !== caption.date) return null;
+    parsed = { taken: caption.date, place: caption.place };
+  }
   const { taken, place } = parsed;
 
   let source: "jarvis" | "photo" | null = null;
   let rgb: Uint8Array | null = null;
   for (const [key, who] of [[ART_KEY(date), "jarvis"], [PHOTO_KEY(date), "photo"]] as const) {
+    // Without fresh photo metadata, only the late painting can be promoted.
+    if (!meta && who === "photo") continue;
     const obj = await env.PHOTOS.get(key);
     if (!obj) continue;
     try {
