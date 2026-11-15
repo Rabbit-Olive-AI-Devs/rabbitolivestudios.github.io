@@ -65,7 +65,7 @@ import { buildArtBrief, storeJarvisColor, storeJarvisSkyline, jarvisDrew } from 
 import { storeFamily, FAMILY_WATCH_FROM } from "./family";
 import { handleFamilyPage } from "./pages/family";
 
-const VERSION = "3.25.0";
+const VERSION = "3.25.1";
 
 /** Public origin, used for links in alert emails (a cron has no request URL). */
 const WORKER_BASE_URL = "https://eink-dashboard.thiago-oliveira77.workers.dev";

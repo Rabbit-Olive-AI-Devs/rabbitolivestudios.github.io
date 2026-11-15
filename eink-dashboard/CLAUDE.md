@@ -1,5 +1,7 @@
 # Claude Code — E-Ink Dashboard Project Guidelines
 
+> **Image-model contract revalidated 2026-11-14 (#102, #105).** The SDXL migration is already in source and in the downloaded active program; do not redo it from an older brief. Every image path uses FLUX.2 klein-9b multipart FormData, including Pipeline B, the BW skyline and `/test1.png`. One image attempt, then saved-picture/text recovery; never retry as another model or as a reference-free second request. Pipeline-specific styles, references, conversion and captions remain separate. On November 14 the owner explicitly approved **3.25.1** and this protected document's remaining checkpoint edit. The local release candidate is **3.25.1**, not deployed; last verified production is **3.25.0**. Both live health endpoints passed the pre-release browser baseline at 00:15 UTC November 15 (November 14 Chicago). Account-wide daily neuron usage is still unmeasured because the authorised usage-browser route is unavailable; keep deployment and charged live tests held. Passing offline tests and a healthy cached page do not prove that budget gate or a new-version flip.
+
 **Purpose**: Persistent instructions for Claude Code sessions on the E-Ink Dashboard. Read this file end-to-end at the start of every session before doing any work.
 
 **Default behavior**: Prefer small, reviewable changes. Test visually before deploying. Strong documentation over large refactors.
@@ -147,11 +149,15 @@ This project has independent image pipelines. They share the LLM event selection
 
 | | Pipeline A (`/fact.png`) | Pipeline B (`/fact1.png`) | Pipeline D (`/color/moment`) | Pipeline E (`/skyline`) |
 |---|---|---|---|---|
-| Model | FLUX.2 klein-9b | SDXL | FLUX.2 (fallback SDXL) | FLUX.2 + ref photo (fallback SDXL) |
+| Model | FLUX.2 klein-9b | FLUX.2 klein-9b | FLUX.2 klein-9b | FLUX.2 klein-9b, with a reference when present; text-only only when absent |
 | Style | Daily rotation (Woodcut/Pencil/Charcoal) | 6-style rotation (style-aware) | shared library `src/art-styles.ts`: 70 styles, random order, no repeat until all used (#86) | same library: 66 styles, never the moment's style that day (#86) |
 | Output | Full colour as-is (panel converts, #81) | 1-bit (Bayer or threshold) | Full colour as-is (panel converts, #81) | Full colour as-is, both modes (#81) |
-| Cache key | `fact4:v5:YYYY-MM-DD` | `fact1:v7:YYYY-MM-DD` | `color-moment:v4:YYYY-MM-DD:STYLE_ID` | default `skyline:v5:DATE:daily[:bw]`; rotate `skyline:v5:DATE:rN:bBUCKET[:bw]` |
+| Cache key | `fact4:v6:YYYY-MM-DD` | `fact1:v8:YYYY-MM-DD` | `color-moment:v5:YYYY-MM-DD:STYLE_ID` | default `skyline:v6:DATE:daily[:bw]`; rotate `skyline:v6:DATE:rN:bBUCKET[:bw]` |
 | Display | none — on request only, not warmed (#84) | none — on request only, not warmed (#83) | E1002 + home E1001 (#84) | E1002 + home E1001 (`/skyline-bw` not warmed, #84) |
+
+Pipeline C uses the same FLUX model and its own portrait references, 1280×768 generation, likeness prompt and captions. Its cache keys are `birthday:v3:DATE` and `color-birthday:v4:DATE`. Raw/test routes use the applicable pipeline, not an independent SDXL helper. Cache versions above were already bumped for #102; documentation-only corrections do not invalidate them again.
+
+The normal warm imports delivered art first and generates only the missing colour moment/birthday and skyline. It does not warm A, B or the BW skyline. Successful cache fills prevent the second daily trigger from regenerating them. Two text-only FLUX outputs are an estimated 2,727.28 neurons at the published first-MP rate, before input-reference charges, LLM work, failures, on-demand/test requests or other account users. This is not measured account usage. The 10,000-neuron pool resets at 00:00 UTC; the existing error marker is reactive and soft locks are best-effort, not an account-wide spending cap. Obtain current usage and headroom before any charged live test or release; do not enable paid billing or change access policy to make a test pass.
 
 ---
 
@@ -234,7 +240,7 @@ Do not commit documentation updates until you have verified every file.
 - Use `Env` type from `src/types.ts` for all bindings
 - Always coerce LLM responses: `typeof raw === "string" ? raw : JSON.stringify(raw)`
 - Chunk large arrays for `String.fromCharCode` (8192-byte slices) to avoid stack overflow
-- SDXL does NOT support `negative_prompt` — embed negatives in positive prompt
+- SDXL is retired from executable source (#102); do not restore its JSON contract or fallback. Keep anti-text instructions in each pipeline's own positive prompt.
 - FLUX.2 requires multipart FormData, not JSON
 - `env.IMAGES.input()` requires a **ReadableStream** — pass `bytesToImageStream()` from `src/images-input.ts`, never a `Uint8Array`/`ArrayBuffer`/`Blob` (DECISIONS.md #59)
 - KV cache dates use America/Chicago timezone
@@ -328,8 +334,8 @@ eink-dashboard/
     device.ts             — SenseCraft device data fetch + KV cache
     fact.ts               — Wikipedia "On This Day" fetch + KV cache
     moment.ts             — LLM event selection + scene prompt generation
-    image.ts              — Pipeline A (FLUX.2, full colour as-is, #81) + Pipeline B (SDXL 1-bit); burnCaption() lays a caption over a colour picture in solid black/white
-    image-color.ts        — jpegToRGB(): AI image → 800x480 full-colour RGB via Cloudflare Images; the SDXL/FLUX generate-and-decode helpers (#81)
+    image.ts              — FLUX multipart transport, Pipeline A (full colour as-is, #81) + Pipeline B (1-bit); burnCaption() lays a caption over a colour picture in solid black/white
+    image-color.ts        — jpegToRGB(): AI image → 800x480 full-colour RGB via Cloudflare Images; FLUX generate-and-decode helper (#81, #102)
     convert-1bit.ts       — 1-bit conversion engine (Bayer + threshold)
     styles-1bit.ts        — Pipeline B style table, picker, hash
     art.ts                — Jarvis's daily pictures: the brief (`/art/brief`), and the warm taking his R2 deliveries before Workers AI (DECISIONS #89)
@@ -372,7 +378,7 @@ eink-dashboard/
     headlines.ts          — Steel/trade RSS/HTML fetch + deterministic ranking (no LLM)
     moon.ts               — Pure moon phase calculator + parametric SVG icons
     skyline.ts            — World Skyline Series: city/style selection, prompt building
-    skyline-image.ts      — Skyline image generation (SDXL) + BW/color post-processing
+    skyline-image.ts      — One FLUX image attempt, optional R2 reference, separate BW/colour prompts and caption finishing (#102)
     spectra6.ts           — Spectra 6 palette constants + CSS variables
     dither-spectra6.ts    — Floyd-Steinberg dithering engine (no panel picture uses it since #81; kept for the World Cup flag generator)
     png.ts                — Pure JS PNG encoder (8-bit, 1-bit, indexed) + pngToBase64()
