@@ -22,6 +22,8 @@ binding = "IMAGES"
 # third-party service, API key or account (DECISIONS #60). No destination_address
 # here on purpose: the address lives in the ALERT_TO secret because this repo is
 # public. Sending is still restricted to addresses verified on the account.
+# JARVIS_SLACK_WEBHOOK is a secret too (DECISIONS #106): an Incoming Webhook URL
+# the owner creates and sets with `wrangler secret put`. It is not written here.
 [[send_email]]
 name = "SEND_EMAIL"
 
@@ -47,10 +49,16 @@ bucket_name = "eink-series"
 #                       renderer timed out, and the E1002 skyline went white (DECISIONS #57,
 #                       #64). Kept as ONE expression with two fire times: Workers Free allows
 #                       only 5 cron triggers per account and the slots are already full.
-#   "5 0,6,12,18 * * *" — headlines + weather + the failure-alert check (#60)
+#   "5 0,2,3,6,12,18 * * *" — weather, device telemetry and the failure-alert check on the
+#                       original hours 0, 6, 12 and 18 (#60; no headlines since #82). Hours 2
+#                       and 3 exist so one of them is 21:05 America/Chicago (02:05 UTC in CDT,
+#                       03:05 UTC in CST). The code runs the family preflight only on that
+#                       fire; the other is a no-op.
+#                       Still ONE expression: Workers Free allows 5 cron triggers per account
+#                       and the slots are already full (DECISIONS #57, #60, #106).
 #
 # The World Cup "*/15 * * * *" trigger was removed when the tournament dashboard was
 # retired (DECISIONS #61) — it was 96 no-op invocations a day, and cron triggers are a
 # scarce per-account resource on the free plan (5 across all Workers; see #57).
 [triggers]
-crons = ["35 4,5 * * *", "5 0,6,12,18 * * *"]
+crons = ["35 4,5 * * *", "5 0,2,3,6,12,18 * * *"]

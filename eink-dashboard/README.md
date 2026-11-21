@@ -55,7 +55,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /color/headlines?test-headlines` | Headlines page with fake test data | none |
 | **World Cup 2026** | *Retired 2026-08-21 — routes now 404. Source and tests are preserved for 2030; see DECISIONS.md #61.* | — |
 | `GET /art/brief?date=YYYY-MM-DD` | What Jarvis draws for today or tomorrow (Chicago): the moment or birthday portrait and the skyline, with styles, prompts and look rules, as JSON (DECISIONS #89) | none |
-| `GET /color/family` | 800x480 **Family Memory**: a family photo from this date in an earlier year (the album "Coelhos de Oliveira", then Favourites, then the album's closest day), repainted by Jarvis, or the photo itself if he missed; caption "15 Oct 2019 \| Family Memory \| 7 years ago", no names. The response also sends `x-family-date` (the photo's YYYY-MM-DD), `x-family-ago`, `x-family-place` (or `Family` when the photo has no GPS) and `x-family-style`. PNG inlined, one request; never generates; falls back to the latest earlier day, then a text page. For the office E1002 and home E1001 (DECISIONS #92) | none |
+| `GET /color/family` | 800x480 **Family Memory**: a family photo from this date in an earlier year, repainted by Jarvis, or the photo itself if he missed. If that upload never landed, the nightly warm fills the same frame from a staged spare (`drawn_by.family` is `staged` or `staged-photo`). Caption "15 Oct 2019 \| Family Memory \| 7 years ago", no names. The response also sends `x-family-date` (the photo's YYYY-MM-DD), `x-family-ago`, `x-family-place` (or `Family` when the photo has no GPS) and `x-family-style`. PNG inlined, one request; never generates; falls back to the latest earlier day, then a text page. For the office E1002 and home E1001 (DECISIONS #92, #106) | none |
 | **World Skyline Series** | | |
 | `GET /skyline` | 800x480 HTML skyline page for the E1002 and (since 2026-10-16, #84) the home E1001, with the PNG **inlined as a data URI** — one request, nothing for the renderer to cancel (DECISIONS #65). Always no-store. Degrades to a plain text page when the image cannot be produced (DECISIONS #58) | none |
 | `GET /skyline-bw` | 800x480 HTML skyline page, mono art styles only; on no panel and not warmed since 2026-10-16 (#84), generates on request; PNG inlined the same way. Same text fallback as `/skyline` (DECISIONS #58, #65) | none |
@@ -90,7 +90,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /alert-test?key=KEY` | Run the failure check on demand and report what it found (requires `TEST_AUTH_KEY`) | none |
 | `GET /alert-test?force=1&key=KEY` | Send a test alert email immediately, bypassing the hour guard and de-duplication | none |
 | `GET /health` | Status check | none |
-| `GET /health-detailed` | Cache health, daily image cache status (today and `next_day_images` for tomorrow), telemetry age, and AI budget pause status | none |
+| `GET /health-detailed` | Cache health, daily image cache status (today and `next_day_images` for tomorrow), `drawn_by` (`jarvis`, `workers-ai`, `photo`, `staged`, `staged-photo`, or null), `staged_pool.unused`, telemetry age, and AI budget pause status | none |
 
 ## Live URL
 
@@ -368,6 +368,8 @@ DECISIONS #92, design `docs/superpowers/specs/2026-10-17-family-memory-design.md
 2. **Download.** `~/Applications/EinkFamilyFetch.app` (built by `scripts/build-family-fetch.sh` from `scripts/family-fetch.swift`, for macOS 14+) downloads just that photo at 1600 px through PhotoKit; the job starts it with `open -W` and reads the result from `<photo>.txt`. It is an app so macOS's Photos permission can be granted once on screen (the owner allowed it on 2026-10-17); a launchd job cannot show that question. The album's originals stay in iCloud.
 3. **Upload.** The photo goes to R2 `family/<date>/photo.jpg` with `photo.json` (`{"taken","place"}`). The place is resolved on the Mac from the photo's GPS (cache `~/Library/Application Support/coelho-dashboard/places.json`, then Nominatim). No GPS sends "Family", never the album name. Coordinates are not uploaded. The brief adds a `family` picture with the photo as its reference, and `subject.date`, `yearsAgo`, `place` and `style`.
 4. **Warm.** The nightly warm stores Jarvis's repainting (`art/<date>/family`), or the photo itself, cropped with the caption burned in, under KV `family:v1:<date>`, then deletes the temporary R2 photo and its metadata. No Workers AI. If the painting arrives after that photo fallback, a later existing warm can recover the caption only from the exact dated cache and replace the photo. It validates the picture, scheduled style, real nonfuture date and calendar-year count; missing or invalid cached details cannot admit a new raw photo. Bad metadata, conversion or storage failure leaves the current picture in place; the used marker follows a successful cache write. `/color/family` remains read-only and never triggers this work. The alert watches it from 19 Oct 2026. See DECISIONS #104 for the late-arrival correction.
+5. **Staged spare.** When `family/<date>/photo.json` is missing, or it is valid and both the repaint and the photo are unreadable, the same warm claims one entry from `family/staged/{date}/` (that date first, else the newest unused manifest). It uses the repaint when `repaintSha256` matches, otherwise the photo, and stores it under the same KV key. It does not delete staged objects. `drawn_by.family` reads `staged` or `staged-photo`, and `/health-detailed` reports `staged_pool.unused`. A staged fill is degraded but filled, not "Daily images missing". `stained_glass` is paused for Family only (`FAMILY_PAUSED_STYLES`); a safety refusal is not retried in another style by the Worker. See DECISIONS #106.
+6. **21:05 Chicago preflight.** The periodic cron is `5 0,2,3,6,12,18 * * *` (still one trigger). Only the fire at 21:05 America/Chicago checks tomorrow. If neither tomorrow's ordinary pair nor tomorrow's own unused staged manifest is in R2, the Worker posts one Slack message through the `JARVIS_SLACK_WEBHOOK` secret. A spare pool for other days does not count as ready. No webhook: log and skip. Email only if the Slack post fails. The owner creates the webhook and runs `npx wrangler secret put JARVIS_SLACK_WEBHOOK` before this can notify anyone.
 
 ## The Series
 
@@ -411,11 +413,12 @@ DECISIONS #92, design `docs/superpowers/specs/2026-10-17-family-memory-design.md
 | `env.AI` | Workers AI | LLM + image generation (FLUX.2 only, #102) |
 | `env.IMAGES` | Cloudflare Images | Format conversion + center-crop/resize to 800×480 via `.transform()` |
 | `env.CACHE` | KV Namespace | Response caching (24h/6h) |
-| `env.PHOTOS` | R2 Bucket | Birthday portraits (`portraits/`) + skyline reference photos (`skylines/`) |
+| `env.PHOTOS` | R2 Bucket | Birthday portraits (`portraits/`), skyline references (`skylines/`), family uploads (`family/<date>/`) and the staged pool (`family/staged/`) |
 | ~~`env.BROWSER`~~ | Browser Rendering | *Removed with the World Cup retirement (DECISIONS #61). Restore the `[browser]` binding to revive the B&W `/worldcup` image.* |
 | `env.SEND_EMAIL` | Email Routing | Sends failure-alert email via Cloudflare Email Routing (DECISIONS #60) |
 | `env.TEST_AUTH_KEY` | Secret | Auth key for expensive test endpoints (optional, open in dev) |
 | `env.ALERT_TO` / `env.ALERT_FROM` | Secrets | Alert destination + sending identity (secrets, not vars — this repo is public) |
+| `env.JARVIS_SLACK_WEBHOOK` | Secret | Slack Incoming Webhook for the 21:05 Chicago family preflight. Unset: the check logs and skips (DECISIONS #106) |
 | `env.TARS_KEY` | Secret | Lets the owner's Macs post reports to `/desk/tars` and unlocks that page (DECISIONS #69) |
 | `env.FOOTBALL_DATA_KEY` | Secret | football-data.org API key for the World Cup dashboard (optional; falls back to openfootball JSON when absent) |
 

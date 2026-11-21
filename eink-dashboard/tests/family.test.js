@@ -6,7 +6,8 @@ const buildDir = process.env.EINK_TEST_BUILD_DIR || "/tmp/eink-dashboard-tests";
 const fromBuild = (p) => require(path.join(buildDir, p));
 
 const { familyStyleFor, yearsAgo, familyCaption, storeFamily } = fromBuild("src/family.js");
-const { momentStyleFor } = fromBuild("src/art-styles.js");
+const { momentStyleFor, stylesFor, familyPortraitStyles, FAMILY_PAUSED_STYLES } = fromBuild("src/art-styles.js");
+const { BIRTHDAY_STYLES } = fromBuild("src/birthday.js");
 const { parseDateParts, pickSkylineStyle, DEFAULT_ROTATE_MIN } = fromBuild("src/skyline.js");
 const { buildArtBrief } = fromBuild("src/art.js");
 const { encodePNGRGB } = fromBuild("src/png.js");
@@ -46,7 +47,18 @@ test("the family style is never the day's moment or skyline style", () => {
     const id = familyStyleFor(d).id;
     assert.notEqual(id, momentStyleFor(d).id, d);
     assert.notEqual(id, pickSkylineStyle(parseDateParts(d), { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 }).key, d);
+    assert.notEqual(id, "stained_glass", d);
   }
+});
+
+test("stained glass is paused for family only; pop art stays available", () => {
+  assert.deepEqual([...FAMILY_PAUSED_STYLES], ["stained_glass"]);
+  assert.ok(stylesFor("portrait").some((s) => s.id === "stained_glass"));
+  assert.ok(stylesFor("portrait").some((s) => s.id === "pop_art"));
+  assert.ok(familyPortraitStyles().some((s) => s.id === "pop_art"));
+  assert.equal(familyPortraitStyles().some((s) => s.id === "stained_glass"), false);
+  assert.ok(BIRTHDAY_STYLES.some((s) => s.id === "stained_glass"));
+  assert.ok(BIRTHDAY_STYLES.some((s) => s.id === "pop_art"));
 });
 
 test("years ago and the caption", () => {

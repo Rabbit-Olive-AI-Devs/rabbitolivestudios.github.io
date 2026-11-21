@@ -10,16 +10,32 @@
  *   2. The brief asks Jarvis to repaint it in the day's family style.
  *   3. The nightly warm stores Jarvis's picture, or the photo itself when he did not deliver, cropped
  *      to the panel with the caption burned in, under `family:v1:<date>`. No Workers AI.
+ *   4. When that upload is missing, or both of its files are unreadable, the same warm fills the
+ *      same key from the staged pool (`family/staged/`, DECISIONS #106). It never deletes those
+ *      objects and never calls Workers AI.
  */
 
 import type { Env } from "./types";
-import { stylesFor, dailyPick, momentStyleFor } from "./art-styles";
+import { familyPortraitStyles, dailyPick, momentStyleFor } from "./art-styles";
 import type { ArtStyle } from "./art-styles";
 import { parseDateParts, pickSkylineStyle, DEFAULT_ROTATE_MIN } from "./skyline";
 import { familyCacheKey } from "./cache-keys";
 import { jpegToRGB } from "./image-color";
 import { finishSkylinePNG } from "./skyline-image";
 import { pngToBase64 } from "./png";
+import {
+  claimStaged,
+  claimsFor,
+  familyCacheSource,
+  listStagedManifests,
+  loadVerifiedStagedAsset,
+  markStagedUsed,
+  readStagedMarker,
+  releaseStagedClaim,
+  releaseStagedClaimsFor,
+  stagedPickOrder,
+} from "./family-staged";
+import type { StagedAsset, StagedManifest, StagedRecord } from "./family-staged";
 
 export const FAMILY_TITLE = "Family Memory";
 
@@ -30,7 +46,7 @@ const PHOTO_KEY = (date: string) => `family/${date}/photo.jpg`;
 const META_KEY = (date: string) => `family/${date}/photo.json`;
 const ART_KEY = (date: string) => `art/${date}/family`;
 
-const FAMILY_STYLES = stylesFor("portrait");
+const FAMILY_STYLES = familyPortraitStyles();
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** The family picture's style for a date: a portrait style that is neither the moment's nor the skyline's. */
@@ -40,7 +56,11 @@ export function familyStyleFor(date: string): ArtStyle {
     pickSkylineStyle(parseDateParts(date), { mode: "daily", rotateMin: DEFAULT_ROTATE_MIN, bucket: 0 }).key,
   ]);
   let i = FAMILY_STYLES.indexOf(dailyPick(FAMILY_STYLES, date, 0x46414d));
-  while (avoid.has(FAMILY_STYLES[i].id)) i = (i + 1) % FAMILY_STYLES.length;
+  if (i < 0) i = 0;
+  for (let n = 0; n < FAMILY_STYLES.length; n++) {
+    if (!avoid.has(FAMILY_STYLES[i].id)) return FAMILY_STYLES[i];
+    i = (i + 1) % FAMILY_STYLES.length;
+  }
   return FAMILY_STYLES[i];
 }
 
@@ -156,11 +176,27 @@ export async function familyPicture(env: Env, date: string): Promise<{
   };
 }
 
+export type FamilySource = "jarvis" | "photo" | "staged" | "staged-photo";
+
 /**
  * Store the day's family picture under `family:v1:<date>`: Jarvis's when he delivered, else the
- * photo itself. Returns who made it, or null when no photo was put up for the date (nothing stored).
+ * photo itself, else one staged spare. Returns who made it, or null when nothing was stored.
  */
-export async function storeFamily(env: Env, date: string): Promise<"jarvis" | "photo" | null> {
+export async function storeFamily(env: Env, date: string): Promise<FamilySource | null> {
+  const dated = await storeDatedFamily(env, date);
+  if (dated) {
+    try { await releaseStagedClaimsFor(env, date); }
+    catch (err) { console.error(`Family ${date}: could not release a staged claim:`, err); }
+    return dated;
+  }
+  return storeStagedFallback(env, date);
+}
+
+/**
+ * The ordinary `family/<date>/` path. Jarvis's repaint when he delivered, else the photo itself.
+ * Returns null without writing when the date cannot be stored from those objects.
+ */
+async function storeDatedFamily(env: Env, date: string): Promise<"jarvis" | "photo" | null> {
   const meta = await env.PHOTOS.get(META_KEY(date));
   let parsed: { taken: string; place: string } | null = null;
   if (meta) {
@@ -171,6 +207,8 @@ export async function storeFamily(env: Env, date: string): Promise<"jarvis" | "p
     // metadata before a late painting arrived. Reuse only this day's validated,
     // already-stored caption; do not retain the private source photo any longer.
     const raw = await env.CACHE.get(familyCacheKey(date));
+    // A staged fill is not proof that a dated photo was stored. It must not caption a later painting.
+    if (raw && familyCacheSource(raw)) return null;
     const stored = raw ? parseStoredFamily(raw) : null;
     const caption = stored?.caption;
     if (!caption || !stored?.image || caption.style !== familyStyleFor(date).id ||
@@ -211,4 +249,100 @@ export async function storeFamily(env: Env, date: string): Promise<"jarvis" | "p
   if (source === "jarvis") await env.PHOTOS.put(`art/used/${date}/family`, new Date().toISOString());
   await Promise.all([PHOTO_KEY(date), META_KEY(date), ART_KEY(date)].map((k) => env.PHOTOS.delete(k)));
   return source;
+}
+
+type DatedMeta = "missing" | "bad" | "ok";
+
+async function datedMetaState(env: Env, date: string): Promise<DatedMeta> {
+  const meta = await env.PHOTOS.get(META_KEY(date));
+  if (!meta) return "missing";
+  try {
+    return parsePhotoMeta(await meta.json()) ? "ok" : "bad";
+  } catch {
+    return "bad";
+  }
+}
+
+async function writeStagedCache(env: Env, date: string, manifest: StagedManifest, asset: StagedAsset): Promise<boolean> {
+  try {
+    const rgb = await jpegToRGB(env, asset.bytes);
+    const png = await finishSkylinePNG(rgb, familyCaption(manifest.taken, date));
+    const payload = JSON.stringify({
+      image: pngToBase64(png),
+      date: manifest.taken,
+      yearsAgo: yearsAgo(manifest.taken, date),
+      place: cleanPlace(manifest.place),
+      style: familyStyleFor(date).id,
+      staged: { entry: manifest.date, asset: asset.kind },
+    });
+    await env.CACHE.put(familyCacheKey(date), payload, { expirationTtl: 604800 });
+    return (await env.CACHE.get(familyCacheKey(date))) === payload;
+  } catch (err) {
+    console.error(`Family ${date}: staged ${manifest.date} unreadable:`, err);
+    return false;
+  }
+}
+
+/** Render a claimed entry, then mark it used. Null means nothing was cached for it. */
+async function fulfillClaim(env: Env, date: string, record: StagedRecord): Promise<FamilySource | null> {
+  const asset = await loadVerifiedStagedAsset(env, record.manifest);
+  if (!asset) return null;
+  if (!(await writeStagedCache(env, date, record.manifest, asset))) return null;
+  try { await markStagedUsed(env, record.key, date, new Date().toISOString()); }
+  catch (err) { console.error(`Family ${date}: staged used-mark failed:`, err); }
+  return asset.kind === "repaint" ? "staged" : "staged-photo";
+}
+
+async function releaseIfUnstored(env: Env, date: string, record: StagedRecord): Promise<FamilySource | null> {
+  const raw = await env.CACHE.get(familyCacheKey(date));
+  if (readStagedMarker(raw)?.entry === record.manifest.date) return familyCacheSource(raw);
+  await releaseStagedClaim(env, record.key, date);
+  return null;
+}
+
+/**
+ * Fill an empty `family:v1:<date>` from the staged pool. A picture already cached from the
+ * ordinary path is left alone. A bad `photo.json` fails closed. Staged objects are not deleted.
+ */
+async function storeStagedFallback(env: Env, date: string): Promise<FamilySource | null> {
+  const existing = await env.CACHE.get(familyCacheKey(date));
+  if (existing && !familyCacheSource(existing)) return null;
+  if (!existing && (await datedMetaState(env, date)) === "bad") return null;
+
+  const records = await listStagedManifests(env);
+  if (existing) {
+    const marker = readStagedMarker(existing);
+    for (const claim of claimsFor(records, date)) {
+      if (marker && claim.manifest.date === marker.entry) {
+        try { await markStagedUsed(env, claim.key, date, new Date().toISOString()); }
+        catch (err) { console.error(`Family ${date}: staged used-mark failed:`, err); }
+      } else {
+        await releaseStagedClaim(env, claim.key, date);
+      }
+    }
+    return familyCacheSource(existing);
+  }
+
+  for (const claim of claimsFor(records, date)) {
+    const done = await fulfillClaim(env, date, claim);
+    if (done) {
+      for (const other of claimsFor(records, date)) {
+        if (other.key !== claim.key) await releaseStagedClaim(env, other.key, date);
+      }
+      return done;
+    }
+    const kept = await releaseIfUnstored(env, date, claim);
+    if (kept) return kept;
+  }
+
+  for (const candidate of stagedPickOrder(records, date)) {
+    if (!(await loadVerifiedStagedAsset(env, candidate.manifest))) continue;
+    const claimed = await claimStaged(env, candidate.key, date);
+    if (!claimed) continue;
+    const done = await fulfillClaim(env, date, claimed);
+    if (done) return done;
+    const kept = await releaseIfUnstored(env, date, claimed);
+    if (kept) return kept;
+  }
+  return null;
 }
