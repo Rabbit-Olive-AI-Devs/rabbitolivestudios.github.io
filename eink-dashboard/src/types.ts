@@ -11,11 +11,6 @@ export interface Env {
   SEND_EMAIL?: SendEmail;
   ALERT_TO?: string;
   ALERT_FROM?: string;
-  /**
-   * Slack Incoming Webhook for the 21:05 Chicago family preflight (DECISIONS #106).
-   * The owner creates it and sets the secret. Unset means the check logs and skips.
-   */
-  JARVIS_SLACK_WEBHOOK?: string;
   // Desk panel TARS page (DECISIONS #69): one secret both lets the owner's Macs post
   // their reports and unlocks the page, which shows plans and spend.
   TARS_KEY?: string;

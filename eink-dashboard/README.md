@@ -89,6 +89,7 @@ Example: For the sinking of the Titanic, the image would show the ocean liner ti
 | `GET /clean?s=N` | Seconds each color is held before rotating (default 1) | none |
 | `GET /alert-test?key=KEY` | Run the failure check on demand and report what it found (requires `TEST_AUTH_KEY`) | none |
 | `GET /alert-test?force=1&key=KEY` | Send a test alert email immediately, bypassing the hour guard and de-duplication | none |
+| `GET /alert-test?family=1&key=KEY` | Send one 9:05 PM family-preflight proof email. Does not mark that date as already mailed | none |
 | `GET /health` | Status check | none |
 | `GET /health-detailed` | Cache health, daily image cache status (today and `next_day_images` for tomorrow), `drawn_by` (`jarvis`, `workers-ai`, `photo`, `staged`, `staged-photo`, or null), `staged_pool.unused`, telemetry age, and AI budget pause status | none |
 
@@ -369,7 +370,7 @@ DECISIONS #92, design `docs/superpowers/specs/2026-10-17-family-memory-design.md
 3. **Upload.** The photo goes to R2 `family/<date>/photo.jpg` with `photo.json` (`{"taken","place"}`). The place is resolved on the Mac from the photo's GPS (cache `~/Library/Application Support/coelho-dashboard/places.json`, then Nominatim). No GPS sends "Family", never the album name. Coordinates are not uploaded. The brief adds a `family` picture with the photo as its reference, and `subject.date`, `yearsAgo`, `place` and `style`.
 4. **Warm.** The nightly warm stores Jarvis's repainting (`art/<date>/family`), or the photo itself, cropped with the caption burned in, under KV `family:v1:<date>`, then deletes the temporary R2 photo and its metadata. No Workers AI. If the painting arrives after that photo fallback, a later existing warm can recover the caption only from the exact dated cache and replace the photo. It validates the picture, scheduled style, real nonfuture date and calendar-year count; missing or invalid cached details cannot admit a new raw photo. Bad metadata, conversion or storage failure leaves the current picture in place; the used marker follows a successful cache write. `/color/family` remains read-only and never triggers this work. The alert watches it from 19 Oct 2026. See DECISIONS #104 for the late-arrival correction.
 5. **Staged spare.** When `family/<date>/photo.json` is missing, or it is valid and both the repaint and the photo are unreadable, the same warm claims one entry from `family/staged/{date}/` (that date first, else the newest unused manifest). It uses the repaint when `repaintSha256` matches, otherwise the photo, and stores it under the same KV key. It does not delete staged objects. `drawn_by.family` reads `staged` or `staged-photo`, and `/health-detailed` reports `staged_pool.unused`. A staged fill is degraded but filled, not "Daily images missing". `stained_glass` is paused for Family only (`FAMILY_PAUSED_STYLES`); a safety refusal is not retried in another style by the Worker. See DECISIONS #106.
-6. **21:05 Chicago preflight.** The periodic cron is `5 0,2,3,6,12,18 * * *` (still one trigger). Only the fire at 21:05 America/Chicago checks tomorrow. If neither tomorrow's ordinary pair nor tomorrow's own unused staged manifest is in R2, the Worker posts one Slack message through the `JARVIS_SLACK_WEBHOOK` secret. A spare pool for other days does not count as ready. No webhook: log and skip. Email only if the Slack post fails. The owner creates the webhook and runs `npx wrangler secret put JARVIS_SLACK_WEBHOOK` before this can notify anyone.
+6. **9:05 PM Chicago preflight.** The periodic cron is `5 0,2,3,6,12,18 * * *` (still one trigger). Only the fire at 21:05 America/Chicago checks tomorrow. If neither tomorrow's ordinary pair nor tomorrow's own unused staged manifest is in R2, the Worker emails once through the existing `SEND_EMAIL` binding, from `ALERT_FROM` to `ALERT_TO`. Subject: `Frame: Nov 22 family photo missing at 9:05 PM` (the month and day of the missing picture). A spare pool for other days does not count as ready. If those secrets are unset, it logs and skips. Prove delivery with `GET /alert-test?family=1&key=KEY`; that send does not mark the date as already mailed. See DECISIONS #107.
 
 ## The Series
 
@@ -417,8 +418,7 @@ DECISIONS #92, design `docs/superpowers/specs/2026-10-17-family-memory-design.md
 | ~~`env.BROWSER`~~ | Browser Rendering | *Removed with the World Cup retirement (DECISIONS #61). Restore the `[browser]` binding to revive the B&W `/worldcup` image.* |
 | `env.SEND_EMAIL` | Email Routing | Sends failure-alert email via Cloudflare Email Routing (DECISIONS #60) |
 | `env.TEST_AUTH_KEY` | Secret | Auth key for expensive test endpoints (optional, open in dev) |
-| `env.ALERT_TO` / `env.ALERT_FROM` | Secrets | Alert destination + sending identity (secrets, not vars — this repo is public) |
-| `env.JARVIS_SLACK_WEBHOOK` | Secret | Slack Incoming Webhook for the 21:05 Chicago family preflight. Unset: the check logs and skips (DECISIONS #106) |
+| `env.ALERT_TO` / `env.ALERT_FROM` | Secrets | Alert destination and sending identity, including the 9:05 PM family preflight (secrets, not vars — this repo is public) |
 | `env.TARS_KEY` | Secret | Lets the owner's Macs post reports to `/desk/tars` and unlocks that page (DECISIONS #69) |
 | `env.FOOTBALL_DATA_KEY` | Secret | football-data.org API key for the World Cup dashboard (optional; falls back to openfootball JSON when absent) |
 
@@ -515,6 +515,8 @@ account or API key involved.
    ```
 4. Confirm: `/health-detailed` → `config.alerting` should read `configured`, then
    `curl "https://URL/alert-test?force=1&key=YOUR_KEY"` to prove delivery.
+   `curl "https://URL/alert-test?family=1&key=YOUR_KEY"` sends one 9:05 PM family-preflight
+   proof. It uses the same sender and recipient and does not mark that date as already mailed.
 
 The `[[send_email]]` binding in `wrangler.toml` intentionally has **no** `destination_address` — the
 address lives in `ALERT_TO` because this repo is public. Sending is still restricted to addresses

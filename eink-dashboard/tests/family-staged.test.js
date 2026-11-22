@@ -14,6 +14,7 @@ const {
 } = fromBuild("src/family-staged.js");
 const {
   isFamilyPreflightInstant, periodicFireAction, chicagoHourMinute, runFamilyPreflight, familyPreflightMessage,
+  familyPreflightSubject, sendFamilyPreflightTest,
 } = fromBuild("src/family-preflight.js");
 const { describeProblems, alertFingerprint } = fromBuild("src/alert.js");
 
@@ -303,72 +304,59 @@ function preflightEnv(photos, opts = {}) {
         kv.set(k, v);
       },
     },
-    JARVIS_SLACK_WEBHOOK: opts.webhook,
     SEND_EMAIL: opts.email ? { send: async (msg) => { sent.push(msg); } } : undefined,
     ALERT_TO: opts.email ? "alert-to" : undefined,
     ALERT_FROM: opts.email ? "alert-from" : undefined,
   };
 }
 
-test("the preflight posts once, skips a missing webhook, and a spare pool does not count as ready", async () => {
+test("the subject names the Chicago date the way the frame mail should", () => {
+  assert.equal(familyPreflightSubject("2026-11-22"), "Frame: Nov 22 family photo missing at 9:05 PM");
+  assert.equal(familyPreflightSubject("2026-01-05"), "Frame: Jan 5 family photo missing at 9:05 PM");
+});
+
+test("the preflight emails once, skips when mail is unset, and a spare pool does not count as ready", async () => {
   const photos = bucket();
   const spare = await picture("2026-11-28", { stagedAt: "2026-11-20T00:00:00.000Z" });
   plant(photos, "2026-11-28", spare);
   const when = Date.parse("2026-01-16T03:05:00Z");
   const quiet = preflightEnv(photos);
-  assert.deepEqual(await runFamilyPreflight(quiet, when, HEALTH), { posted: false, skipped: "no-webhook" });
+  assert.deepEqual(await runFamilyPreflight(quiet, when, HEALTH), { posted: false, skipped: "not-configured" });
   assert.equal(quiet.kv.size, 0);
 
-  const posts = [];
-  const original = globalThis.fetch;
-  globalThis.fetch = async (url, init) => {
-    posts.push({ url, body: JSON.parse(init.body) });
-    return new Response("ok", { status: 200 });
-  };
-  try {
-    const env = preflightEnv(photos, { webhook: "https://hooks.example/secret" });
-    const first = await runFamilyPreflight(env, when, HEALTH);
-    const second = await runFamilyPreflight(env, when, HEALTH);
-    assert.deepEqual(first, { posted: true, skipped: "slack" });
-    assert.deepEqual(second, { posted: false, skipped: "deduped" });
-    assert.equal(posts.length, 1);
-    assert.equal(posts[0].url, "https://hooks.example/secret");
-    const expected = familyPreflightMessage(
-      "2026-01-16",
-      "family/2026-01-16/photo.json, family/2026-01-16/photo.jpg, family/staged/2026-01-16/photo.json",
-      1,
-      `${HEALTH}/health-detailed`,
-    );
-    assert.equal(posts[0].body.text, expected);
-    assert.match(expected, /^<@U0C7QQZUTJQ> REQUEST \[eink-family-preflight\] Family picture for 2026-01-16 is not ready at 21:05 CT: /);
-    assert.match(expected, /staged unused: 1\. Health: /);
-    assert.equal(env.sent.length, 0);
-  } finally {
-    globalThis.fetch = original;
-  }
+  const env = preflightEnv(photos, { email: true });
+  const first = await runFamilyPreflight(env, when, HEALTH);
+  const second = await runFamilyPreflight(env, when, HEALTH);
+  assert.deepEqual(first, { posted: true, skipped: "email" });
+  assert.deepEqual(second, { posted: false, skipped: "deduped" });
+  assert.equal(env.sent.length, 1);
+  assert.equal(env.sent[0].from, "alert-from");
+  assert.equal(env.sent[0].to, "alert-to");
+  assert.equal(env.sent[0].subject, "Frame: Jan 16 family photo missing at 9:05 PM");
+  const expected = familyPreflightMessage(
+    "2026-01-16",
+    "family/2026-01-16/photo.json, family/2026-01-16/photo.jpg, family/staged/2026-01-16/photo.json",
+    1,
+    `${HEALTH}/health-detailed`,
+  );
+  assert.equal(env.sent[0].text, expected);
+  assert.match(expected, /staged unused: 1\. Health: /);
 });
 
-test("a failed Slack post falls back to email once, and a ready upload does not post", async () => {
+test("a ready upload does not mail, and the proof send does not mark the date", async () => {
   const photos = bucket();
   const when = Date.parse("2026-07-16T02:05:00Z");
-  const original = globalThis.fetch;
-  globalThis.fetch = async () => new Response("no", { status: 500 });
-  try {
-    const env = preflightEnv(photos, { webhook: "https://hooks.example/secret", email: true });
-    assert.deepEqual(await runFamilyPreflight(env, when, HEALTH), { posted: true, skipped: "email" });
-    assert.equal(env.sent.length, 1);
-    assert.match(env.sent[0].text, /Family picture for 2026-07-16 is not ready at 21:05 CT:/);
-    assert.equal((await runFamilyPreflight(env, when, HEALTH)).skipped, "deduped");
-    assert.equal(env.sent.length, 1);
+  photos.seed("family/2026-07-16/photo.json", "{}");
+  photos.seed("family/2026-07-16/photo.jpg", new TextEncoder().encode("jpg"));
+  const env = preflightEnv(photos, { email: true });
+  assert.deepEqual(await runFamilyPreflight(env, when, HEALTH), { posted: false, skipped: "ready" });
+  assert.equal(env.sent.length, 0);
 
-    photos.seed("family/2026-07-16/photo.json", "{}");
-    photos.seed("family/2026-07-16/photo.jpg", new TextEncoder().encode("jpg"));
-    env.kv.clear();
-    assert.deepEqual(await runFamilyPreflight(env, when, HEALTH), { posted: false, skipped: "ready" });
-    assert.equal(env.sent.length, 1);
-  } finally {
-    globalThis.fetch = original;
-  }
+  const proof = await sendFamilyPreflightTest(env, when, HEALTH);
+  assert.equal(proof.subject, "Frame: Jul 16 family photo missing at 9:05 PM");
+  assert.equal(env.sent.length, 1);
+  assert.match(env.sent[0].text, /Test of the 9:05 PM family preflight/);
+  assert.equal(env.kv.size, 0, "a proof send must not suppress the real night");
 });
 
 test("the extra UTC fire does no work, and 21:05 does not run the six-hour warm", async () => {
@@ -393,7 +381,7 @@ test("the extra UTC fire does no work, and 21:05 does not run the six-hour warm"
   };
   await worker.scheduled({ cron: "5 0,2,3,6,12,18 * * *", scheduledTime: Date.parse("2026-01-16T03:05:00Z") }, preflight, ctx);
   await pending;
-  assert.deepEqual(puts, [], "no webhook means no marker and no weather writes");
+  assert.deepEqual(puts, [], "unset mail means no marker and no weather writes");
 });
 
 test("a staged fill is degraded-but-filled and is not a missing daily image", () => {

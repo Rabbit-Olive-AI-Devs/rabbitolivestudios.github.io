@@ -4717,3 +4717,15 @@ The URL is the Worker secret `JARVIS_SLACK_WEBHOOK`. The owner creates the webho
 **Cleanup, not built.** The Mac should delete `family/staged/{date}/` when `used` is true and `usedAt` is older than 30 days. That job is separate from this Worker change. Until it exists, used manifests accumulate and `unused` simply does not count them.
 
 **Limits.** Not deployed. The secret is not set here. No SenseCraft change, no Mac job change, no Workers AI call. The cache key stays `family:v1:` because the stored picture is the same shape the page already serves.
+
+## 107. The 9:05 PM family miss is email, not Slack (2026-11-22)
+
+The owner asked for the 21:05 Chicago family preflight to be mailed instead of posted to Slack. This supersedes only the delivery in #106. The clock gate, the readiness rule, the dedupe key, and the staged fallback stay.
+
+**Delivery.** `runFamilyPreflight` calls `sendAlertEmail`. That is the existing `SEND_EMAIL` binding. The sender is the `ALERT_FROM` secret and the recipient is the `ALERT_TO` secret, the same pair the other failure mail uses. `wrangler.toml` still declares `[[send_email]]` with no `destination_address` and no `allowed_destination_addresses` (#60): this repo is public, so the addresses stay secrets. `JARVIS_SLACK_WEBHOOK` is gone. If `ALERT_FROM` or `ALERT_TO` is unset, the check logs and skips. A failed send does not write the dedupe marker and does not fail the cron.
+
+**Subject.** `Frame: Nov 22 family photo missing at 9:05 PM`. The month is the short English name and the day has no leading zero. The date is the Chicago display date that is not ready (tomorrow at 9:05 PM).
+
+**Proof.** `GET /alert-test?family=1&key=TEST_AUTH_KEY` sends one email with that subject. It does not write `family:preflight:v1:<date>`, so a proof cannot suppress the real night. Auth is the same as the other `/alert-test` routes: a wrong or missing key is 404 when `TEST_AUTH_KEY` is set.
+
+**Limits.** Not deployed. No new address, no new secret, no cron change.
