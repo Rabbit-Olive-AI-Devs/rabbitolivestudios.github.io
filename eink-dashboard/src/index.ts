@@ -63,6 +63,8 @@ import type { SkylineColorMode, SkylineMode, SkylinePickerOpts, SkylineCity } fr
 import { generateSkylineImage } from "./skyline-image";
 import { buildArtBrief, storeJarvisColor, storeJarvisSkyline, jarvisDrew } from "./art";
 import { storeFamily, FAMILY_WATCH_FROM } from "./family";
+import { countUnusedStaged, familyCacheSource } from "./family-staged";
+import { periodicFireAction, runFamilyPreflight } from "./family-preflight";
 import { handleFamilyPage } from "./pages/family";
 
 const VERSION = "3.25.1";
@@ -688,15 +690,17 @@ function watchedImages(dateStr: string): readonly (typeof ALERT_WATCHED_IMAGES)[
   return dateStr >= FAMILY_WATCH_FROM ? ALERT_WATCHED_IMAGES : ALERT_WATCHED_IMAGES.filter((l) => l !== "family");
 }
 
-/** "jarvis", "workers-ai" or null (not made yet) for the day's colour picture and skyline. */
+/** "jarvis", "workers-ai" or null (not made yet) for the day's colour picture and skyline.
+ * Family is "jarvis", "photo", "staged", "staged-photo", or null (DECISIONS #90, #106). */
 async function drawnBy(env: Env, dateStr: string, month: number, day: number, colorKey: string, skylineKey: string, familyKey: string) {
   const colorKind = getBirthdayToday(month, day) ? "birthday" : "moment";
   const [jColor, jSky, jFam, color, sky, fam] = await Promise.all([
     jarvisDrew(env, dateStr, colorKind), jarvisDrew(env, dateStr, "skyline"), jarvisDrew(env, dateStr, "family"),
-    env.CACHE.get(colorKey, "stream"), env.CACHE.get(skylineKey, "stream"), env.CACHE.get(familyKey, "stream"),
+    env.CACHE.get(colorKey, "stream"), env.CACHE.get(skylineKey, "stream"), env.CACHE.get(familyKey),
   ]);
   const who = (jarvis: boolean, cached: unknown, backup = "workers-ai") => (jarvis ? "jarvis" : cached ? backup : null);
-  return { [colorKind]: who(jColor, color), skyline: who(jSky, sky), family: who(jFam, fam, "photo") };
+  const staged = familyCacheSource(fam);
+  return { [colorKind]: who(jColor, color), skyline: who(jSky, sky), family: jFam ? "jarvis" : staged ? staged : fam ? "photo" : null };
 }
 
 async function handleHealthDetailed(env: Env): Promise<Response> {
@@ -728,6 +732,7 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 
   // Determine daily image keys (birthday-aware)
   const { keys: dailyKeys, colorStyle } = dailyImageKeys(dateStr, monthNum, dayNum);
+  const stagedUnused = countUnusedStaged(env);
   const { color_moment: colorMomentKey, skyline: skylineKey, moment_event: momentKey } = dailyKeys;
   const aiBudgetBlock = await getAiBudgetBlock(env);
 
@@ -772,8 +777,10 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
         family:       { cached: (await env.CACHE.get(dailyKeys.family, "stream")) !== null, key: dailyKeys.family },
       },
       next_day_images: { date_chicago: nextDate, ...nextCached },
-      // Who drew each picture: Jarvis, or Workers AI as the backup (DECISIONS #89, #90).
+      // Who drew each picture: Jarvis, Workers AI, the photo, or a staged spare (DECISIONS #89, #90, #106).
       drawn_by: await drawnBy(env, dateStr, monthNum, dayNum, dailyKeys.color_moment, dailyKeys.skyline, dailyKeys.family),
+      // Unused staged family entries (no hash re-check; the warm verifies bytes before use).
+      staged_pool: { unused: await stagedUnused },
       ephemeral: {
         weather_home:   weatherStatus(weatherHomeRaw),
         weather_office: weatherStatus(weatherOfficeRaw),
@@ -814,7 +821,30 @@ async function handleHealthDetailed(env: Env): Promise<Response> {
 /** Cron expressions that trigger the daily image warm (see the isDaily note below). */
 const DAILY_CRONS = new Set(["35 4,5 * * *", "35 4 * * *", "35 5 * * *"]);
 
-async function handleScheduled(env: Env, cronExpression: string): Promise<void> {
+/** The periodic cron, including the two UTC hours added for the 21:05 Chicago preflight. */
+const PERIODIC_CRONS = new Set(["5 0,2,3,6,12,18 * * *", "5 0,6,12,18 * * *"]);
+
+async function handleScheduled(env: Env, cronExpression: string, scheduledTime?: number): Promise<void> {
+  // 02:05 and 03:05 UTC exist so one of them is 21:05 Chicago in either offset. The other
+  // fire is a no-op: it must not refresh weather or write KV (DECISIONS #106).
+  if (PERIODIC_CRONS.has(cronExpression) && scheduledTime != null) {
+    const action = periodicFireAction(scheduledTime);
+    if (action === "preflight") {
+      console.log(`Cron: family preflight (${cronExpression})`);
+      try {
+        const result = await runFamilyPreflight(env, scheduledTime, WORKER_BASE_URL);
+        console.log(`Family preflight: ${result.posted ? "posted" : result.skipped}`);
+      } catch (err) {
+        console.error("Cron: family preflight failed:", err);
+      }
+      return;
+    }
+    if (action === "noop") {
+      console.log("Cron: family preflight hour is not 21:05 America/Chicago; no-op");
+      return;
+    }
+  }
+
   // The daily warm fires twice, before midnight Chicago in either UTC offset: 04:35 UTC
   // is 23:35 CDT / 22:35 CST, 05:35 UTC is 00:35 CDT / 23:35 CST. Each fire warms the
   // date the panels are about to ask for (tomorrow in the evening, today after
@@ -1332,6 +1362,6 @@ export default {
   },
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(handleScheduled(env, event.cron));
+    ctx.waitUntil(handleScheduled(env, event.cron, event.scheduledTime));
   },
 };

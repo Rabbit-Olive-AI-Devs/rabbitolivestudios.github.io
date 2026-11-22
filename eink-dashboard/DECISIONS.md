@@ -4676,3 +4676,44 @@ The existing coordinator continues every 15 minutes. Writing checks run daily 09
 **Budget, not an invented measurement.** The existing warm first imports delivered art, then uses cache, then generates only a missing colour moment/birthday and skyline. A, B and BW skyline are not warmed. Offline tests confirm zero image calls for two delivered pictures and two for two missing slots. At [Cloudflare's published price](https://developers.cloudflare.com/workers-ai/platform/pricing/), two first-MP text-only outputs are 2,727.28 neurons; references cost 181.82 neurons per input MP, and LLM selection, failures, on-demand legacy/test traffic and other account use remain additional. Seven text-only outputs are 9,545.48 neurons; eight are 10,909.12 before those extras. The normal warm count is not a hard 24-hour bound: failures, UTC target dates, concurrent requests and other users must be accounted for. The existing error marker only reacts after a quota error, and KV locks are best-effort. Neither guarantees an account-wide spending cap. No new current daily account total has been measured. The authorised native browser route became unavailable when opening account usage; no sign-in, credential read or access-policy change was attempted. The existing API transport does not admit analytics GraphQL; do not widen it to pass this gate. No paid-tier upgrade or live image test is authorised by a successful dry-run.
 
 **Approved candidate and open release gates.** On November 14 the owner directly replied yes to the quoted request for 3.25.1 and the remaining protected `CLAUDE.md` edit. That exact edit subsequently succeeded through the protected patch route; the earlier timeout is historical, not current missing consent. The local candidate's package version and `VERSION` constant are now 3.25.1; last verified production remains 3.25.0. The lockfile's two stale root-package version fields are aligned to 3.25.1 without changing dependency selections. Commit all four documentation files, both application version fields and this lock metadata together, after re-running the named gates against the final candidate. Measure current account-wide usage and confirm headroom before deployment or charged acceptance tests; if it does not fit, report it before deployment. The current browser health checks are a pre-release baseline, not a new-version flip; recheck both actual endpoints after release without repeating the denied Python reader. Approval does not restore the unavailable usage-browser route or admit analytics through another boundary. No new deployment, runtime/service, schedule, panel, credential, billing or art-production change is part of this candidate. Jarvis owns the remaining completion; no new scheduler or delegated worker is created.
+
+## 106. Staged family photos fill a missed night, and 21:05 Chicago asks Jarvis (2026-11-21)
+
+**What missed.** On 20 November the Family repaint was refused by the provider safety filter, so the panel showed the raw photo. On 21 November the evening R2 upload failed on all three runs, so nothing was cached and `/color/family` had no picture for the day. The owner approved a staged pool and a nightly preflight the same day. No application-version bump.
+
+**Staged fallback.** The ordinary `family/<date>/photo.json` plus `photo.jpg` / `art/<date>/family` path is unchanged and still wins. `storeFamily` uses the staged pool only when that path stores nothing: there is no `photo.json`, or `photo.json` is valid and both the repaint and the photo are unreadable. A malformed `photo.json` still fails closed. A picture already cached from the ordinary path is not replaced. The spare is rendered like today (same crop, `familyCaption(taken, displayDate)`, KV `family:v1:<date>`, 7-day TTL). No Workers AI, so no neurons.
+
+The Mac's contract, implemented behind `src/family-staged.ts`:
+
+- Bucket binding `PHOTOS` (`eink-birthday-photos`). One set per intended Chicago date: `family/staged/{date}/photo.jpg`, optional `repaint.png`, and `photo.json` written last.
+- The Worker claims with `onlyIf: { etagMatches }` using the `httpEtag` it just read, sets `claimFor` to the display date, writes KV, reads that key back, then sets `used`, `usedFor` and `usedAt`. An interrupted claim is reconciled against `family:v1:<date>` before it is finished or released. A claim held for a different date is not available.
+- Pick order: the unused, unclaimed entry whose `date` is the display date, else the newest `stagedAt`, then the later `date` when those timestamps tie. A declared `repaintSha256` is required to match `repaint.png` or the whole entry is skipped. `repaintSha256: null` uses the photo. A manifest rewrite that lands before the claim is re-read and, when it names a repaint, that repaint is what gets stored.
+- Nothing under `family/staged/` is deleted. `drawn_by.family` is `staged` (repaint) or `staged-photo`. `/health-detailed` adds `staged_pool: { unused: N }` for manifests with `used: false` and `claimFor: null`. That count does not re-hash bytes; the warm and the preflight hash before they trust an asset.
+- A staged cache entry is not a late-arrival caption. Otherwise a later `art/<date>/family` would be burned with the spare photo's date and place.
+
+**Alert.** A staged fill is cached, so it is not "Daily images missing". The failure email instead says the picture is filled from the staged pool and degraded but filled.
+
+**Preflight.** The account is still at five cron triggers, so the periodic expression grows from `5 0,6,12,18 * * *` to `5 0,2,3,6,12,18 * * *`. Hours 2 and 3 are 21:05 Chicago in CDT and CST respectively. The code runs the check only when the Chicago clock reads 21:05; the other new fire returns without reading or writing. Tomorrow is ready when `family/<tomorrow>/photo.json` and `photo.jpg` both exist, or when `family/staged/<tomorrow>/photo.json` is unused, unclaimed, and its photo hash matches. A non-empty pool for other dates does not count, but the unused count is in the message.
+
+If it is not ready, one Slack Incoming Webhook post, deduped with KV `family:preflight:v1:<date>`:
+
+`<@U0C7QQZUTJQ> REQUEST [eink-family-preflight] Family picture for <date> is not ready at 21:05 CT: <which object is missing>; staged unused: N. Health: <url>`
+
+The URL is the Worker secret `JARVIS_SLACK_WEBHOOK`. The owner creates the webhook and sets the secret. If it is unset, the Worker logs and skips, and does not email. Email (`SEND_EMAIL` / `ALERT_TO`) is sent only when the Slack post itself fails.
+
+**Styles.** `stained_glass` is paused for Family only, via `FAMILY_PAUSED_STYLES` in `src/art-styles.ts`. `familyStyleFor` and the portrait list it uses both skip that list. Birthday portraits, moments and skylines still include it. `pop_art` is not paused: one Moment refusal is not enough. The daily pick stays deterministic. The owner decided the same day that a safety refusal is not retried in another style inside the Worker. Jarvis hands the photo to a separate image assistant; the result comes back to Jarvis and is staged as `family/staged/{date}/repaint.png`. The Worker adds no style retry.
+
+**Where the proposal does not match the Worker.**
+
+- `staged_pool.unused` is a flag count, not a hash-verified spare count. A manifest whose bytes do not match still increments it until the Mac replaces the manifest.
+- Tie-break on equal `stagedAt` keeps the later `date` string.
+- The folder date and `manifest.date` must be the same. A manifest filed under a different date is ignored.
+- A non-null `repaintSha256` whose file is missing or mismatched skips the entry, photo included. "No repaint" means `repaintSha256: null`.
+- An outstanding claim is unavailable to every display date except the one that holds it, which resumes or releases it. The proposal's "not available" rule is that, plus this reconciliation.
+- `etagMatches` is the Workers `httpEtag` (quoted If-Match form) of the object just read. Jarvis does not put an etag in the manifest.
+- A repaint added after a successful claim is not swapped in. The manifest has to be rewritten before the claim.
+- The Worker does not delete used staged objects.
+
+**Cleanup, not built.** The Mac should delete `family/staged/{date}/` when `used` is true and `usedAt` is older than 30 days. That job is separate from this Worker change. Until it exists, used manifests accumulate and `unused` simply does not count them.
+
+**Limits.** Not deployed. The secret is not set here. No SenseCraft change, no Mac job change, no Workers AI call. The cache key stays `family:v1:` because the stored picture is the same shape the page already serves.

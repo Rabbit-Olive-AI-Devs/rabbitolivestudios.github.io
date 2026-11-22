@@ -16,6 +16,7 @@ import { seriesProblems } from "./series/watch";
 import { serialProblems } from "./serial";
 import { readState } from "./tars";
 import { jarvisDrew } from "./art";
+import { familyCacheSource } from "./family-staged";
 
 const ALERT_STATE_KEY = "alert:v1:last";
 
@@ -47,6 +48,11 @@ export interface AlertState {
   quietMachines?: string[];
   /** The day's pictures Workers AI drew because Jarvis delivered none (DECISIONS #89, #90). */
   jarvisMissed?: string[];
+  /**
+   * The family picture is cached from the staged pool: degraded, but the panel is not blank
+   * (DECISIONS #106). This is not "Daily images missing".
+   */
+  familyStaged?: "staged" | "staged-photo";
 }
 
 /** Machines that run the e-ink jobs and must keep reporting (the MacBook after the #99 migration). */
@@ -97,6 +103,10 @@ export function describeProblems(state: AlertState): string[] {
   if (state.jarvisMissed?.includes("family")) {
     problems.push(`Jarvis did not deliver ${state.dateStr}'s family picture; the photo itself is shown (#92)`);
   }
+  if (state.familyStaged === "staged" || state.familyStaged === "staged-photo") {
+    const how = state.familyStaged === "staged" ? "a staged repaint" : "a staged photo";
+    problems.push(`Family picture for ${state.dateStr} is filled from the staged pool (${how}); degraded but filled (#106)`);
+  }
   return problems;
 }
 
@@ -116,6 +126,7 @@ export function alertFingerprint(state: AlertState): string {
   if (state.series && state.series.length > 0) parts.push(`series:${[...state.series].sort().join(";")}`);
   if (state.quietMachines && state.quietMachines.length > 0) parts.push(`quiet:${[...state.quietMachines].sort().join(",")}`);
   if (state.jarvisMissed && state.jarvisMissed.length > 0) parts.push(`jarvis:${[...state.jarvisMissed].sort().join(",")}`);
+  if (state.familyStaged) parts.push(`family:${state.familyStaged}`);
   return parts.length === 0 ? OK_FINGERPRINT : parts.join("|");
 }
 
@@ -247,14 +258,17 @@ export async function runAlertCheck(
 
     const labels = Object.keys(opts.imageKeys);
     const kinds = opts.jarvisKinds ?? [];
-    const [present, block, series, tars, drew] = await Promise.all([
+    const familyKey = opts.imageKeys.family;
+    const [present, block, series, tars, drew, familyRaw] = await Promise.all([
       Promise.all(labels.map((l) => env.CACHE.get(opts.imageKeys[l], "stream"))),
       getAiBudgetBlock(env),
       Promise.all([seriesProblems(env, new Date(now)), serialProblems(env, new Date(now))]).then((p) => p.flat()),
       readState(env),
       Promise.all(kinds.map((k) => jarvisDrew(env, opts.dateStr, k))),
+      familyKey ? env.CACHE.get(familyKey) : Promise.resolve(null),
     ]);
     const lastReport = Object.fromEntries(Object.entries(tars.machines).map(([id, m]) => [id, m.receivedAt]));
+    const familyStaged = familyCacheSource(familyRaw) ?? undefined;
 
     const state: AlertState = {
       dateStr: opts.dateStr,
@@ -264,7 +278,9 @@ export async function runAlertCheck(
       series,
       quietMachines: quietMachines(lastReport, now),
       // Only a picture that exists counts as "drawn by Workers AI"; a missing one is reported above.
-      jarvisMissed: kinds.filter((k, i) => !drew[i] && present[labels.indexOf(k === "moment" || k === "birthday" ? "color_moment" : k)] !== null),
+      // A staged fill is its own degraded-but-filled line, not the raw-photo miss.
+      jarvisMissed: kinds.filter((k, i) => !drew[i] && present[labels.indexOf(k === "moment" || k === "birthday" ? "color_moment" : k)] !== null && !(k === "family" && familyStaged)),
+      familyStaged,
     };
 
     const problems = describeProblems(state);

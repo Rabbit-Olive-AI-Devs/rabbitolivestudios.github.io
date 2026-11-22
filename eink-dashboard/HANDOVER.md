@@ -1,5 +1,7 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
+> **Family staged fallback and 21:05 preflight — 2026-11-21 (#106, source only, not deployed).** A missed `family/<date>/` upload can be filled from `family/staged/` on the existing nightly warm. `drawn_by.family` is `staged` or `staged-photo`, and `/health-detailed` includes `staged_pool.unused`. The periodic cron is now `5 0,2,3,6,12,18 * * *`; only 21:05 America/Chicago posts to Slack via the secret `JARVIS_SLACK_WEBHOOK`, and the other new UTC hour is a no-op. `stained_glass` is paused for Family only. No Workers AI, no version bump, no deploy in this change. Earlier handover dates below stay historical.
+
 > **Owner-requested retirement completion — 2026-11-14 (#105, pending release).** Do not repeat #102: main/remote main are `74ed68c`, with the SDXL migration already present. Fresh typecheck, all 588 utility tests and the Wrangler dry-run passed. Deployment metadata selects the November 10 version at 100%; fresh authorised browser reads of both health endpoints report `ok` and 3.25.0, with today's image caches present. The downloaded active module now matches the accepted November 10 release exactly, with no retired-model reference; no new local rebuild is claimed. On November 14 the owner approved 3.25.1 and the remaining protected CLAUDE.md edit. The local candidate is now 3.25.1; last verified production remains 3.25.0, not a new release. This candidate corrects the stale SDXL/cache guidance in `CLAUDE.md` at the owner's explicit request. Normal warm is zero image calls when delivered art fills both slots, otherwise up to two successful missing-slot generations; A/B/BW/test traffic is additional. The published two-output cost is an estimate, not measured account-wide neurons. The approved 3.25.1 candidate passed typecheck, all 588 utility tests and the Wrangler dry-run. Account-wide usage measurement and live release acceptance remain open; version and protected-file consent are no longer missing. A source commit is not a deployed release. No new deployment, charged live generation, billing, credential or schedule change.
 
 > **Family late-arrival correction — verified 2026-11-10 (#104).** Jarvis deployed `97c1e512-b1ea-4ec8-be36-2a8dde0363a2` with the owner's specific separate-review waiver. If the first warm used the photo and deleted its temporary metadata, a later existing warm can accept the painting using only the same date's validated stored caption. Malformed metadata, missing/invalid caption, conversion failure and cache failure cannot replace the current picture incorrectly. All 588 Node tests, typecheck and dry-run passed; the downloaded previous/live programs reproduced/repaired the three late-arrival regression failures. The actual live painting, caption, 800×480 browser render and health were checked after release; the active module exactly matches the release build. A new scheduled production warm, physical panel refresh and ordinary clearing notification remain unobserved. No schedule, binding, model, runtime/service, security-hold, version or macOS change. Earlier handover dates below are historical; this checkpoint supplements v3.25.0 and #103.
@@ -111,6 +113,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/skyline`, `/skyline-bw` | `/skyline`: E1002 and home E1001; `/skyline-bw`: none (not warmed since #84) | HTML with the daily skyline PNG inlined as a `data:` URI |
 | `/skyline.png` | — | The skyline PNG itself (`?bw=1`, `?mode=daily\|rotate\|random`) |
 | `/color/headlines` | none (dropped from the E1002 by the owner; retired 2026-10-16, #82) | Steel/trade headlines, ranked without an LLM; builds on request, not warmed |
+| `/color/family` | Home E1001, office E1002 | Family Memory: one earlier-year photo, repainted, or a staged spare when the evening upload missed. Inlined PNG, else the latest earlier day, else text. No Workers AI (#92, #106) |
 | `/desk/aurebesh` | Desk E1001 | Aurebesh word of the day as a Worker-drawn 1-bit PNG inlined in one document (`?date=`, `?word=`, `?sheet`) (#66) |
 | `/desk/planet` | Desk E1001 | Planet of the day from NASA's Exoplanet Archive, drawn from its data; `?date=` (#68) |
 | `/desk/tars` | Desk E1001 | TARS: the owner's Macs and AI allowances. `GET ?key=` shows the page, `POST` with a bearer key takes a report from a Mac (#69) |
@@ -123,7 +126,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/series/proof` | Showrunner | A chapter's scenes and teaser for approval, each page framed from `/series/proof/page`; needs `SERIES_KEY` (#71) |
 | `/desk/test` | Desk E1001 | Calibration card for judging type, rules and fills on the panel (#66) |
 | `/clean` | either | Solid full-screen colour fills, rotating, to clear e-ink ghosting (#56) |
-| `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, AI budget block, alerting config |
+| `/health`, `/health-detailed` | — | Version; cache state, `next_day_images`, `drawn_by` (including `staged` / `staged-photo`), `staged_pool.unused`, AI budget block, alerting config |
 | `/weather.json`, `/fact.json`, `/fact-raw.jpg` | — | Data and debug outputs |
 | `/color/apod` | — | 301 to `/skyline` (legacy) |
 
@@ -138,10 +141,11 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `env.AI` | Workers AI | Llama 3.3 70B (event selection), FLUX.2 klein-9b (all image routes, #102) |
 | `env.IMAGES` | Cloudflare Images | JPEG to PNG, centre-crop and resize to 800x480 |
 | `env.CACHE` | KV namespace `de97776d35af4df08b13fd2158acebdc` | Every cache in the project |
-| `env.PHOTOS` | R2 bucket `eink-birthday-photos` | `portraits/` (birthday references), `skylines/` (city references) |
+| `env.PHOTOS` | R2 bucket `eink-birthday-photos` | `portraits/` (birthday references), `skylines/` (city references), `family/<date>/` and `family/staged/` (#92, #106) |
 | `env.SERIES` | R2 bucket `eink-series` (private) | The series: every finished page (`series/sNN/cNN/…html`, one-request documents) and `series/schedule.json` (#71) |
 | `env.SEND_EMAIL` | Email Routing | Failure-alert email |
 | `TEST_AUTH_KEY`, `ALERT_TO`, `ALERT_FROM` | Secrets | Test-route auth; alert addresses (secrets because the repo is public) |
+| `JARVIS_SLACK_WEBHOOK` | Secret | Slack Incoming Webhook for the 21:05 Chicago family preflight. The owner sets it; unset skips the post (#106) |
 | `TARS_KEY` | Secret | Lets the owner's Macs post to `/desk/tars` and unlocks that page |
 | `SERIES_KEY` | Secret | Unlocks series previews (`?at=`) and the proof page; they reveal unreleased chapters. The owner sets it with `scripts/series-set-key.sh`; a copy lives in `~/.config/eink/series-key` on the Mac mini (not the Keychain, which locks in remote sessions) |
 | `FOOTBALL_DATA_KEY` | Secret | Only for the retired World Cup code |
@@ -149,7 +153,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 **Cron triggers** (`wrangler.toml`), all in UTC:
 
 - `35 4,5 * * *` — the daily image warm. It fires *before* Chicago midnight and fills the keys for the date the panels are **about to** ask for (`dailyWarmTargetDate()`), so a panel poll is never the thing that triggers generation (#64). It is one expression with two fire times because the account is at the free plan's cap of 5 cron triggers.
-- `5 0,6,12,18 * * *` — refreshes both weather locations and all three devices' telemetry (no headlines since #82), warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check.
+- `5 0,2,3,6,12,18 * * *` — on hours 0, 6, 12 and 18 UTC, refreshes both weather locations and all three devices' telemetry (no headlines since #82), warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check. Hours 2 and 3 exist so one of them is 21:05 America/Chicago. That fire only runs the family preflight (#106). The other new fire is a no-op and does not write KV. Still one cron expression (the account stays at five triggers).
 
 The daily warm runs its pipelines **sequentially in priority order** (colour moment or colour birthday, then skyline; `/fact`, its mono birthday portrait, `/fact1.png` and `/skyline-bw` are no longer warmed, #83, #84), skips any key that already exists, and stops at the first neuron-budget error.
 
@@ -457,7 +461,7 @@ This is separate from the Muse firmware experiment above, which concerns the fir
 | Holiday weeks (#91) | `src/holidays.ts` |
 | Desk story page (#93, spoilers: never describe it to the owner) | `src/castaway.ts`, `src/castaway-story.ts`, `src/hud/castaway-draw.ts`, `src/hud/castaway-page.ts`, `src/hud/shapes.ts` |
 | Desk serial (#96, spoilers; story only in `~/desk-serial-work/`) | `src/serial.ts`, `scripts/serial-build.mjs`, `scripts/serial-mailbox.mjs`, `scripts/series-agent/serial-{writer,review}.md`, `scripts/launchd/com.eink.serial-{run,weekly}.plist` |
-| Family Memory (#92) | `src/family.ts`, `src/pages/family.ts`, `scripts/family-pick.py`, `scripts/family-fetch.swift` |
+| Family Memory (#92, #106) | `src/family.ts`, `src/family-staged.ts`, `src/family-preflight.ts`, `src/pages/family.ts`, `scripts/family-pick.py`, `scripts/family-fetch.swift` |
 | Birthday | `src/birthday.ts`, `src/birthday-image.ts`; references: `scripts/pick-portraits-from-photos.py` → `scripts/prepare-portraits.py` (+ `portrait-faces.swift`) → `npm run upload-photos` |
 | Weather | `src/weather.ts`, `src/weather-nws.ts`, `src/alerts.ts`, `src/device.ts`, `src/weather-ui.ts`, `src/pages/weather2.ts`, `src/pages/color-weather.ts` |
 | Caching and guards | `src/cache-keys.ts`, `src/cache-guard.ts`, `src/stale-cache.ts`, `src/with-budget.ts` |

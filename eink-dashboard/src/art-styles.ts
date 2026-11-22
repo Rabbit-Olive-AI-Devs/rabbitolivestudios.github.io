@@ -110,6 +110,18 @@ export function stylesFor(subject: ArtSubject): ArtStyle[] {
   return ART_STYLES.filter((s) => s.for.includes(subject));
 }
 
+/**
+ * Family repaints skip these after a provider safety refusal (DECISIONS #106).
+ * Moments, skylines and birthday portraits still use them. Add an id here to pause another.
+ */
+export const FAMILY_PAUSED_STYLES: readonly string[] = ["stained_glass"];
+
+/** Portrait styles Family may ask for. `stylesFor("portrait")` itself is unchanged. */
+export function familyPortraitStyles(): ArtStyle[] {
+  const paused = new Set<string>(FAMILY_PAUSED_STYLES);
+  return stylesFor("portrait").filter((s) => !paused.has(s.id));
+}
+
 export function findArtStyle(id: string): ArtStyle | undefined {
   return ART_STYLES.find((s) => s.id === id);
 }
