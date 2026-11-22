@@ -6,17 +6,16 @@
  * only the fire whose Chicago clock reads 21:05 runs. The other one returns without doing
  * any work. Tomorrow is ready when its ordinary upload is in R2, or when its own staged
  * manifest is unused, unclaimed, and its photo hash matches. A spare in the pool for some
- * other day does not count.
+ * other day does not count. A miss is mailed through the existing SEND_EMAIL binding
+ * (ALERT_FROM to ALERT_TO). There is no Slack webhook (DECISIONS #107).
  */
 
 import type { Env } from "./types";
 import { shiftDateStr } from "./date-utils";
-import { fetchWithTimeout } from "./fetch-timeout";
-import { sendAlertEmail } from "./alert";
+import { alertingConfigured, sendAlertEmail } from "./alert";
 import { listStagedManifests, sha256Hex, stagedPhotoKey } from "./family-staged";
 
-/** Approved Slack mention for the preflight request. Not an email address. */
-export const FAMILY_PREFLIGHT_MENTION = "<@U0C7QQZUTJQ>";
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const PREFLIGHT_KEY = (date: string) => `family:preflight:v1:${date}`;
 const PERIODIC_HOURS = new Set([0, 6, 12, 18]);
@@ -64,8 +63,14 @@ export function periodicFireAction(epochMs: number): "preflight" | "refresh" | "
   return "refresh";
 }
 
+/** Subject for the 9:05 PM Chicago miss. `2026-11-22` becomes "Frame: Nov 22 family photo missing at 9:05 PM". */
+export function familyPreflightSubject(date: string): string {
+  const [, month, day] = date.split("-").map(Number);
+  return `Frame: ${MONTHS[month - 1]} ${day} family photo missing at 9:05 PM`;
+}
+
 export function familyPreflightMessage(date: string, missing: string, unused: number, healthUrl: string): string {
-  return `${FAMILY_PREFLIGHT_MENTION} REQUEST [eink-family-preflight] Family picture for ${date} is not ready at 21:05 CT: ${missing}; staged unused: ${unused}. Health: ${healthUrl}`;
+  return `Family picture for ${date} is not ready at 9:05 PM CT: ${missing}; staged unused: ${unused}. Health: ${healthUrl}`;
 }
 
 export interface FamilyReadiness {
@@ -110,8 +115,9 @@ export interface PreflightResult {
 }
 
 /**
- * Post at most one Slack message for a date. No webhook: log and skip, and do not email.
- * Email is only the fallback when the Slack post itself fails.
+ * Mail at most one note for a date, through the same SEND_EMAIL path as the other alerts
+ * (`ALERT_FROM` → `ALERT_TO`). If those secrets are unset, log and skip. A failed send
+ * does not write the dedupe marker.
  */
 export async function runFamilyPreflight(env: Env, epochMs: number, baseUrl: string): Promise<PreflightResult> {
   if (!isFamilyPreflightInstant(epochMs)) return { posted: false, skipped: "not-2105" };
@@ -121,36 +127,37 @@ export async function runFamilyPreflight(env: Env, epochMs: number, baseUrl: str
 
   const marker = PREFLIGHT_KEY(date);
   if (await env.CACHE.get(marker)) return { posted: false, skipped: "deduped" };
+  if (!alertingConfigured(env)) {
+    console.log(`Family preflight: email alerting unset; skipping post for ${date}`);
+    return { posted: false, skipped: "not-configured" };
+  }
 
   const text = familyPreflightMessage(date, status.missing, status.unused, `${baseUrl}/health-detailed`);
-  const webhook = env.JARVIS_SLACK_WEBHOOK;
-  if (!webhook) {
-    console.log(`Family preflight: JARVIS_SLACK_WEBHOOK unset; skipping post for ${date}`);
-    return { posted: false, skipped: "no-webhook" };
-  }
-
-  let slackOk = false;
   try {
-    const res = await fetchWithTimeout(webhook, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text }),
-    }, 10_000);
-    slackOk = res.ok;
-    if (!slackOk) console.error(`Family preflight: Slack post failed (HTTP ${res.status})`);
-  } catch {
-    console.error("Family preflight: Slack post failed");
-  }
-
-  if (!slackOk) {
-    try {
-      await sendAlertEmail(env, `[e-ink] Family picture for ${date} is not ready`, text);
-    } catch (err) {
-      console.error("Family preflight: email fallback failed:", err instanceof Error ? err.message : "send failed");
-      return { posted: false, skipped: "delivery-failed" };
-    }
+    await sendAlertEmail(env, familyPreflightSubject(date), text);
+  } catch (err) {
+    console.error("Family preflight: email failed:", err instanceof Error ? err.message : "send failed");
+    return { posted: false, skipped: "delivery-failed" };
   }
 
   await env.CACHE.put(marker, "sent", { expirationTtl: 604800 });
-  return { posted: true, skipped: slackOk ? "slack" : "email" };
+  return { posted: true, skipped: "email" };
+}
+
+/**
+ * One proof email for `/alert-test?family=1`. It does not write the nightly dedupe marker,
+ * so a test cannot suppress the real 9:05 PM mail.
+ */
+export async function sendFamilyPreflightTest(env: Env, epochMs: number, baseUrl: string): Promise<{ sent: true; subject: string }> {
+  const date = shiftDateStr(chicagoDateStr(epochMs), 1);
+  const status = await familySourceReady(env, date);
+  const missing = status.ready ? "none — tomorrow already looks ready; this is only a test" : status.missing;
+  const text = [
+    "Test of the 9:05 PM family preflight. This send does not mark the date as already mailed.",
+    "",
+    familyPreflightMessage(date, missing, status.unused, `${baseUrl}/health-detailed`),
+  ].join("\n");
+  const subject = familyPreflightSubject(date);
+  await sendAlertEmail(env, subject, text);
+  return { sent: true, subject };
 }

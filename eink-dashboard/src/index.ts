@@ -64,7 +64,7 @@ import { generateSkylineImage } from "./skyline-image";
 import { buildArtBrief, storeJarvisColor, storeJarvisSkyline, jarvisDrew } from "./art";
 import { storeFamily, FAMILY_WATCH_FROM } from "./family";
 import { countUnusedStaged, familyCacheSource } from "./family-staged";
-import { periodicFireAction, runFamilyPreflight } from "./family-preflight";
+import { periodicFireAction, runFamilyPreflight, sendFamilyPreflightTest } from "./family-preflight";
 import { handleFamilyPage } from "./pages/family";
 
 const VERSION = "3.25.1";
@@ -1189,6 +1189,15 @@ export default {
         // Runs the real check against real cache state. ?force=1 ignores both the
         // hour guard and the de-duplication, so delivery can be proven on demand.
         const force = url.searchParams.get("force") === "1";
+        // One family-preflight proof email. It does not write the nightly dedupe marker.
+        if (url.searchParams.get("family") === "1") {
+          try {
+            const proof = await sendFamilyPreflightTest(env, Date.now(), WORKER_BASE_URL);
+            return jsonResponse(proof, 200, 0);
+          } catch (err) {
+            return jsonResponse({ sent: false, error: String((err as Error)?.message ?? err) }, 500, 0);
+          }
+        }
         const { month: aMonth, day: aDay, dateStr: aDate } = getChicagoDateParts();
         const aKeys = dailyImageKeys(aDate, parseInt(aMonth), parseInt(aDay)).keys;
         if (force) {

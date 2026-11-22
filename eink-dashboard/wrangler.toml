@@ -22,8 +22,8 @@ binding = "IMAGES"
 # third-party service, API key or account (DECISIONS #60). No destination_address
 # here on purpose: the address lives in the ALERT_TO secret because this repo is
 # public. Sending is still restricted to addresses verified on the account.
-# JARVIS_SLACK_WEBHOOK is a secret too (DECISIONS #106): an Incoming Webhook URL
-# the owner creates and sets with `wrangler secret put`. It is not written here.
+# The 9:05 PM family preflight uses this same binding and the same ALERT_FROM /
+# ALERT_TO secrets (DECISIONS #107). There is no Slack webhook.
 [[send_email]]
 name = "SEND_EMAIL"
 

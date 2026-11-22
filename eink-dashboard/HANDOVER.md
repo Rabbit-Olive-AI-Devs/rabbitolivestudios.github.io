@@ -1,6 +1,8 @@
 # E-Ink "Moment Before" Dashboard — Agent Handover
 
-> **Family staged fallback and 21:05 preflight — 2026-11-21 (#106, source only, not deployed).** A missed `family/<date>/` upload can be filled from `family/staged/` on the existing nightly warm. `drawn_by.family` is `staged` or `staged-photo`, and `/health-detailed` includes `staged_pool.unused`. The periodic cron is now `5 0,2,3,6,12,18 * * *`; only 21:05 America/Chicago posts to Slack via the secret `JARVIS_SLACK_WEBHOOK`, and the other new UTC hour is a no-op. `stained_glass` is paused for Family only. No Workers AI, no version bump, no deploy in this change. Earlier handover dates below stay historical.
+> **Family preflight mail — 2026-11-22 (#107, not deployed).** The 9:05 PM Chicago miss now goes out through the existing `SEND_EMAIL` binding (`ALERT_FROM` to `ALERT_TO`). There is no Slack webhook. Subject shape: `Frame: Nov 22 family photo missing at 9:05 PM`. Prove it with `GET /alert-test?family=1&key=KEY`; that proof does not mark the date as already mailed. The #106 banner below is historical for the Slack delivery.
+
+> **Family staged fallback and 21:05 preflight — 2026-11-21 (#106).** A missed `family/<date>/` upload can be filled from `family/staged/` on the existing nightly warm. `drawn_by.family` is `staged` or `staged-photo`, and `/health-detailed` includes `staged_pool.unused`. The periodic cron is `5 0,2,3,6,12,18 * * *`; only 21:05 America/Chicago runs the check, and the other new UTC hour is a no-op. `stained_glass` is paused for Family only. No Workers AI. The Slack webhook in the original #106 note was replaced by email in #107.
 
 > **Owner-requested retirement completion — 2026-11-14 (#105, pending release).** Do not repeat #102: main/remote main are `74ed68c`, with the SDXL migration already present. Fresh typecheck, all 588 utility tests and the Wrangler dry-run passed. Deployment metadata selects the November 10 version at 100%; fresh authorised browser reads of both health endpoints report `ok` and 3.25.0, with today's image caches present. The downloaded active module now matches the accepted November 10 release exactly, with no retired-model reference; no new local rebuild is claimed. On November 14 the owner approved 3.25.1 and the remaining protected CLAUDE.md edit. The local candidate is now 3.25.1; last verified production remains 3.25.0, not a new release. This candidate corrects the stale SDXL/cache guidance in `CLAUDE.md` at the owner's explicit request. Normal warm is zero image calls when delivered art fills both slots, otherwise up to two successful missing-slot generations; A/B/BW/test traffic is additional. The published two-output cost is an estimate, not measured account-wide neurons. The approved 3.25.1 candidate passed typecheck, all 588 utility tests and the Wrangler dry-run. Account-wide usage measurement and live release acceptance remain open; version and protected-file consent are no longer missing. A source commit is not a deployed release. No new deployment, charged live generation, billing, credential or schedule change.
 
@@ -130,7 +132,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `/weather.json`, `/fact.json`, `/fact-raw.jpg` | — | Data and debug outputs |
 | `/color/apod` | — | 301 to `/skyline` (legacy) |
 
-**Test routes** that cost AI calls are protected by the `TEST_AUTH_KEY` secret (`?key=…`; a wrong key returns 404 to hide the route; with no secret set, as in local dev, they are open): `/test.png`, `/test1.png`, `/test-birthday.png`, `/color/test-moment`, `/color/test-birthday`, `/skyline-test`, `/skyline-test.png`, `/alert-test`.
+**Test routes** that cost AI calls are protected by the `TEST_AUTH_KEY` secret (`?key=…`; a wrong key returns 404 to hide the route; with no secret set, as in local dev, they are open): `/test.png`, `/test1.png`, `/test-birthday.png`, `/color/test-moment`, `/color/test-birthday`, `/skyline-test`, `/skyline-test.png`, `/alert-test`. `/alert-test?family=1` sends one family-preflight proof email and does not mark the date (#107).
 
 **Free test parameters** (no AI, no auth): `?test-device`, `?test-alert=tornado|winter|flood`, `?test-rain`, `?test-temp=N`, `?test-moon=0..7`, `?test-provider=nws|fail`, `?test-headlines`.
 
@@ -144,8 +146,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 | `env.PHOTOS` | R2 bucket `eink-birthday-photos` | `portraits/` (birthday references), `skylines/` (city references), `family/<date>/` and `family/staged/` (#92, #106) |
 | `env.SERIES` | R2 bucket `eink-series` (private) | The series: every finished page (`series/sNN/cNN/…html`, one-request documents) and `series/schedule.json` (#71) |
 | `env.SEND_EMAIL` | Email Routing | Failure-alert email |
-| `TEST_AUTH_KEY`, `ALERT_TO`, `ALERT_FROM` | Secrets | Test-route auth; alert addresses (secrets because the repo is public) |
-| `JARVIS_SLACK_WEBHOOK` | Secret | Slack Incoming Webhook for the 21:05 Chicago family preflight. The owner sets it; unset skips the post (#106) |
+| `TEST_AUTH_KEY`, `ALERT_TO`, `ALERT_FROM` | Secrets | Test-route auth; alert sender and recipient, including the 9:05 PM family mail (secrets because the repo is public) |
 | `TARS_KEY` | Secret | Lets the owner's Macs post to `/desk/tars` and unlocks that page |
 | `SERIES_KEY` | Secret | Unlocks series previews (`?at=`) and the proof page; they reveal unreleased chapters. The owner sets it with `scripts/series-set-key.sh`; a copy lives in `~/.config/eink/series-key` on the Mac mini (not the Keychain, which locks in remote sessions) |
 | `FOOTBALL_DATA_KEY` | Secret | Only for the retired World Cup code |
@@ -153,7 +154,7 @@ A **third panel**, a second E1001 (mono), sits on the owner's home-office desk a
 **Cron triggers** (`wrangler.toml`), all in UTC:
 
 - `35 4,5 * * *` — the daily image warm. It fires *before* Chicago midnight and fills the keys for the date the panels are **about to** ask for (`dailyWarmTargetDate()`), so a panel poll is never the thing that triggers generation (#64). It is one expression with two fire times because the account is at the free plan's cap of 5 cron triggers.
-- `5 0,2,3,6,12,18 * * *` — on hours 0, 6, 12 and 18 UTC, refreshes both weather locations and all three devices' telemetry (no headlines since #82), warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check. Hours 2 and 3 exist so one of them is 21:05 America/Chicago. That fire only runs the family preflight (#106). The other new fire is a no-op and does not write KV. Still one cron expression (the account stays at five triggers).
+- `5 0,2,3,6,12,18 * * *` — on hours 0, 6, 12 and 18 UTC, refreshes both weather locations and all three devices' telemetry (no headlines since #82), warms the desk panel's planet for today and tomorrow, refreshes the Flamengo board if its entry has aged, then runs the failure-alert check. Hours 2 and 3 exist so one of them is 21:05 America/Chicago. That fire only runs the family preflight, which emails through `SEND_EMAIL` (#107). The other new fire is a no-op and does not write KV. Still one cron expression (the account stays at five triggers).
 
 The daily warm runs its pipelines **sequentially in priority order** (colour moment or colour birthday, then skyline; `/fact`, its mono birthday portrait, `/fact1.png` and `/skyline-bw` are no longer warmed, #83, #84), skips any key that already exists, and stops at the first neuron-budget error.
 
