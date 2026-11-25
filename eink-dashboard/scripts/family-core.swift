@@ -285,23 +285,31 @@ enum FamilyCore {
     var round = shown.map { $0.round }.max() ?? 1
     var seen = Set(shown.filter { $0.round == round }.map { $0.uuid })
     if !albumIDs.isEmpty && albumIDs.isSubset(of: seen) { round += 1; seen = [] }
+    // Shown log dates are the nights, so the capture date is the candidate's. Current round only.
+    // Fallback only: a full capture date already shown sorts after dates not yet shown,
+    // then closest day, then larger image. Exact matches keep a zero here so their order stays.
+    let usedDates = Set(candidates.filter { seen.contains($0.uuid) }.map { $0.taken })
     // Original input position explicitly breaks ties, matching Python's stable sorted().
-    var ranked: [(Int,Int,Int64,Int,FamilyCandidate)] = []
+    var ranked: [(Int,Int,Int,Int64,Int,FamilyCandidate)] = []
     for (index,c) in candidates.enumerated() {
       guard let taken = date(c.taken) else { throw FamilyFailure.invalid }
       guard Int((day.timeIntervalSince1970-taken.timeIntervalSince1970)/86400) >= 335, !seen.contains(c.uuid) else { continue }
       let exact = String(c.taken.suffix(5)) == String(target.suffix(5))
+      let reused = (!exact && usedDates.contains(c.taken)) ? 1 : 0
       if c.source == "album" {
-        ranked.append((exact ? 0 : 2, exact ? 0 : distance(taken,day), c.pixels, index, c))
+        ranked.append((exact ? 0 : 2, reused, exact ? 0 : distance(taken,day), c.pixels, index, c))
       } else if c.source == "favourite" && exact && !albumIDs.contains(c.uuid) {
-        ranked.append((1,0,c.pixels,index,c))
+        ranked.append((1, 0, 0, c.pixels, index, c))
       }
     }
     ranked.sort { a,b in
-      if a.0 != b.0 { return a.0 < b.0 }; if a.1 != b.1 { return a.1 < b.1 }
-      if a.2 != b.2 { return a.2 > b.2 }; return a.3 < b.3
+      if a.0 != b.0 { return a.0 < b.0 }
+      if a.1 != b.1 { return a.1 < b.1 }
+      if a.2 != b.2 { return a.2 < b.2 }
+      if a.3 != b.3 { return a.3 > b.3 }
+      return a.4 < b.4
     }
-    return (round, Array(ranked.prefix(12)).map { $0.4 })
+    return (round, Array(ranked.prefix(12)).map { $0.5 })
   }
   static func readCandidates(_ file: String, people: [String:String], albumTitle: String = "Family Album") throws -> ([FamilyCandidate], Bool) {
     guard !albumTitle.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { throw FamilyFailure.invalid }

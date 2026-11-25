@@ -55,6 +55,32 @@ class ChooseTest(unittest.TestCase):
         got = pick([photo("x", "2020-10-19"), photo("x", "2020-10-19", "favourite")], "2026-10-19")
         self.assertEqual(got, ["x"])
 
+    def test_fallback_prefers_an_unused_capture_date(self):
+        # Same capture day, closer to the target. The second and third are leftovers.
+        big = photo("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1", "2024-03-06", pixels=5_000_000)
+        mid = photo("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2", "2024-03-06", pixels=4_000_000)
+        small = photo("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3", "2024-03-06", pixels=3_000_000)
+        # Farther calendar day, and a smaller image, so only the unused-date key pulls it forward.
+        nearby = photo("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4", "2024-03-04", pixels=1_000_000)
+        cands = [small, nearby, mid, big]
+        target = "2026-03-08"
+        self.assertEqual(pick(cands, target), [big["uuid"], mid["uuid"], small["uuid"], nearby["uuid"]])
+        shown = [{"uuid": big["uuid"], "date": "2026-01-04", "round": 1}]
+        self.assertEqual(pick(cands, target, shown), [nearby["uuid"], mid["uuid"], small["uuid"]])
+        shown_nearby = shown + [{"uuid": nearby["uuid"], "date": "2026-02-04", "round": 1}]
+        self.assertEqual(pick(cands, target, shown_nearby), [mid["uuid"], small["uuid"]])
+
+    def test_exact_day_ignores_a_capture_date_already_shown(self):
+        shown_photo = photo("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1", "2021-03-08", pixels=1_000_000)
+        same_date = photo("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2", "2021-03-08", pixels=4_000_000)
+        other_year = photo("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3", "2019-03-08", pixels=2_000_000)
+        nearby = photo("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4", "2024-03-07", pixels=9_000_000)
+        cands = [shown_photo, nearby, same_date, other_year]
+        target = "2026-03-08"
+        self.assertEqual(pick(cands, target), [same_date["uuid"], other_year["uuid"], shown_photo["uuid"], nearby["uuid"]])
+        shown = [{"uuid": shown_photo["uuid"], "date": "2026-02-01", "round": 1}]
+        self.assertEqual(pick(cands, target, shown), [same_date["uuid"], other_year["uuid"], nearby["uuid"]])
+
 
 class PlaceTest(unittest.TestCase):
     def test_no_gps_place_is_family(self):
