@@ -9,7 +9,10 @@ them in turn (the first that downloads wins) and records the winner in the shown
 Order (owner, 2026-10-17):
   1. a photo from the album taken on the exact date (month and day) in an earlier year;
   2. else a Favourites family photo (a face of someone in people.json) on the exact date;
-  3. else the album photo from the closest calendar day, either way, wrapping around New Year.
+  3. else an album photo. On that fallback only: a full capture date not yet shown
+     this round, then the closest calendar day (either way, wrapping around New Year),
+     then the larger image. A date already shown is used again once the others are gone.
+     Exact month-day matches above are not reordered.
 Every candidate is wide, a still photo, not hidden, trashed or a screenshot, and at least
 11 months old. A photo shown in the current round is skipped; once every album photo has
 been shown, a new round starts and all of them are available again.
@@ -73,6 +76,8 @@ def choose(candidates, shown, target):
     """
     album_ids = {c["uuid"] for c in candidates if c["source"] == "album"}
     rnd, seen = current_round(shown, album_ids)
+    # Shown log dates are the nights, so the capture date is the candidate's. Current round only.
+    used_dates = {c["taken"] for c in candidates if c["uuid"] in seen}
     ok = [c for c in candidates
           if (target - c["taken"]).days >= MIN_AGE_DAYS and c["uuid"] not in seen]
     exact = lambda c: (c["taken"].month, c["taken"].day) == (target.month, target.day)
@@ -81,7 +86,8 @@ def choose(candidates, shown, target):
     favs = [c for c in ok if c["source"] == "favourite" and c["uuid"] not in album_ids]
     order = (sorted(filter(exact, album), key=bigger)
              + sorted(filter(exact, favs), key=bigger)
-             + sorted((c for c in album if not exact(c)), key=lambda c: (day_distance(c["taken"], target), bigger(c))))
+             + sorted((c for c in album if not exact(c)),
+                      key=lambda c: (c["taken"] in used_dates, day_distance(c["taken"], target), bigger(c))))
     return rnd, order[:MAX_CANDIDATES]
 
 

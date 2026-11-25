@@ -54,7 +54,7 @@ class NativeParity(unittest.TestCase):
         try:
             result = unittest.TestResult()
             unittest.defaultTestLoader.loadTestsFromModule(mod).run(result)
-            self.assertEqual(result.testsRun, 11)
+            self.assertEqual(result.testsRun, 13)
             self.assertEqual(result.errors + result.failures, [])
         finally:
             mod.fp.choose = original
